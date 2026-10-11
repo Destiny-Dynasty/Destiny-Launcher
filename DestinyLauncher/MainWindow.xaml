@@ -1,0 +1,161 @@
+<Window x:Class="DestinyLauncher.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:DestinyLauncher"
+        Title="Destiny Launcher" Width="1320" Height="830" MinWidth="1080" MinHeight="780"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="CanResize"
+        UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display">
+    <Window.Resources>
+        <ImageBrush x:Key="ObsidianAmbient" ImageSource="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/obsidian-texture.png" Stretch="UniformToFill" TileMode="Tile" ViewportUnits="Absolute" Viewport="0,0,420,420" Opacity=".10"/>
+        <ImageBrush x:Key="ObsidianCard" ImageSource="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/card-surface-v2.png" Stretch="UniformToFill" Opacity=".28"/>
+        <Style x:Key="NavItem" TargetType="Button">
+            <Setter Property="Height" Value="52"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="#9C9588"/>
+            <Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="15,0"/><Setter Property="Margin" Value="0,3"/>
+            <Setter Property="FontSize" Value="13"/><Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="9"><Grid><Border x:Name="Indicator" Width="3" Background="Transparent" CornerRadius="2" HorizontalAlignment="Left"/><ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="12,0,0,0"/></Grid></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Shell" Property="Background" Value="#1C1A15"/><Setter Property="Foreground" Value="#F1E6CE"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Shell" Property="Background" Value="#272216"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="EditionChip" TargetType="Button">
+            <Setter Property="Height" Value="38"/><Setter Property="MinWidth" Value="98"/><Setter Property="Padding" Value="14,0"/><Setter Property="Margin" Value="0,0,9,0"/>
+            <Setter Property="Background" Value="#18150F18"/><Setter Property="Foreground" Value="#BFB394"/>
+            <Setter Property="FontSize" Value="10"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Grid x:Name="Chip" RenderTransformOrigin="0.5,0.5"><Grid.RenderTransform><ScaleTransform x:Name="ChipScale"/></Grid.RenderTransform><Image Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/edition-selector-plate.png" Stretch="Fill" Opacity=".92" IsHitTestVisible="False"/><Border x:Name="ChipTint" Background="{TemplateBinding Background}" CornerRadius="6" IsHitTestVisible="False"/><Border x:Name="ChipEdge" BorderBrush="#66D7B65F" BorderThickness=".7" CornerRadius="6" Opacity=".38" IsHitTestVisible="False"/><ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"><ContentPresenter.RenderTransform><TranslateTransform Y="1"/></ContentPresenter.RenderTransform></ContentPresenter></Grid><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ChipEdge" Property="Opacity" Value=".9"/><Setter Property="Foreground" Value="#FFF0C2"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Chip" Property="Opacity" Value=".86"/></Trigger><EventTrigger RoutedEvent="Mouse.MouseEnter"><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="ChipScale" Storyboard.TargetProperty="ScaleX" To="1.035" Duration="0:0:0.13"/><DoubleAnimation Storyboard.TargetName="ChipScale" Storyboard.TargetProperty="ScaleY" To="1.035" Duration="0:0:0.13"/></Storyboard></BeginStoryboard></EventTrigger><EventTrigger RoutedEvent="Mouse.MouseLeave"><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="ChipScale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.16"/><DoubleAnimation Storyboard.TargetName="ChipScale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.16"/></Storyboard></BeginStoryboard></EventTrigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="QuietButton" TargetType="Button">
+            <Setter Property="Height" Value="40"/><Setter Property="Padding" Value="14,0"/><Setter Property="Background" Value="#191813"/><Setter Property="Foreground" Value="#D3C9B3"/>
+            <Setter Property="BorderBrush" Value="#393326"/><Setter Property="BorderThickness" Value="1"/><Setter Property="FontSize" Value="10"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Quiet" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Quiet" Property="Background" Value="#252116"/><Setter TargetName="Quiet" Property="BorderBrush" Value="#8E713B"/><Setter Property="Foreground" Value="#F5D898"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="PrimaryAction" TargetType="Button">
+            <Setter Property="Foreground" Value="#F4E2B7"/><Setter Property="FontSize" Value="16"/><Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="Transparent"/><Setter Property="Padding" Value="18,0"/><Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Grid x:Name="Action" RenderTransformOrigin="0.5,0.5"><Grid.RenderTransform><ScaleTransform x:Name="ActionScale"/></Grid.RenderTransform><Grid.Effect><DropShadowEffect Color="#BA8737" BlurRadius="16" ShadowDepth="0" Opacity=".32"/></Grid.Effect><Image Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/primary-button-plate.png" Stretch="Fill" IsHitTestVisible="False"/><ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"><ContentPresenter.RenderTransform><TranslateTransform Y="1.5"/></ContentPresenter.RenderTransform></ContentPresenter></Grid><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Action" Property="Effect"><Setter.Value><DropShadowEffect Color="#F0B849" BlurRadius="27" ShadowDepth="0" Opacity=".64"/></Setter.Value></Setter></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Action" Property="Opacity" Value=".86"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Action" Property="Opacity" Value=".48"/></Trigger><EventTrigger RoutedEvent="Mouse.MouseEnter"><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="ActionScale" Storyboard.TargetProperty="ScaleX" To="1.025" Duration="0:0:0.14"/><DoubleAnimation Storyboard.TargetName="ActionScale" Storyboard.TargetProperty="ScaleY" To="1.025" Duration="0:0:0.14"/></Storyboard></BeginStoryboard></EventTrigger><EventTrigger RoutedEvent="Mouse.MouseLeave"><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="ActionScale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.17"/><DoubleAnimation Storyboard.TargetName="ActionScale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.17"/></Storyboard></BeginStoryboard></EventTrigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="WindowControl" TargetType="Button">
+            <Setter Property="Width" Value="42"/><Setter Property="Height" Value="36"/><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="#B6AD9D"/><Setter Property="BorderThickness" Value="0"/><Setter Property="FontSize" Value="17"/><Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Control" Background="{TemplateBinding Background}" CornerRadius="6"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Control" Property="Background" Value="#242119"/><Setter Property="Foreground" Value="#F2D58E"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="Card" TargetType="Border"><Setter Property="Background" Value="{StaticResource ObsidianCard}"/><Setter Property="BorderBrush" Value="#927443"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="11"/><Setter Property="Effect"><Setter.Value><DropShadowEffect Color="#9E7836" BlurRadius="12" ShadowDepth="0" Opacity=".12"/></Setter.Value></Setter></Style>
+        <Geometry x:Key="CardCorner">M 0,18 L 0,5 L 5,0 L 18,0 M 0,11 L 7,4 M 7,0 L 14,7 L 18,7</Geometry>
+        <ControlTemplate x:Key="CardOrnamentTemplate" TargetType="Control">
+            <Grid IsHitTestVisible="False">
+                <Path Data="{StaticResource CardCorner}" Width="16" Height="16" Stretch="Fill" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4" Stroke="#C6A35D" StrokeThickness=".8" Opacity=".82"/>
+                <Path Data="{StaticResource CardCorner}" Width="16" Height="16" Stretch="Fill" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4" Stroke="#C6A35D" StrokeThickness=".8" Opacity=".82" RenderTransformOrigin=".5,.5"><Path.RenderTransform><ScaleTransform ScaleX="-1"/></Path.RenderTransform></Path>
+                <Path Data="{StaticResource CardCorner}" Width="16" Height="16" Stretch="Fill" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="4" Stroke="#C6A35D" StrokeThickness=".8" Opacity=".82" RenderTransformOrigin=".5,.5"><Path.RenderTransform><ScaleTransform ScaleY="-1"/></Path.RenderTransform></Path>
+                <Path Data="{StaticResource CardCorner}" Width="16" Height="16" Stretch="Fill" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="4" Stroke="#C6A35D" StrokeThickness=".8" Opacity=".82" RenderTransformOrigin=".5,.5"><Path.RenderTransform><ScaleTransform ScaleX="-1" ScaleY="-1"/></Path.RenderTransform></Path>
+                <Path Data="M 0,5 L 5,0 L 10,5 L 5,10 Z" Width="10" Height="10" Stretch="Fill" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,-1,0,0" Fill="#17130D" Stroke="#B9914A" StrokeThickness=".8"/>
+            </Grid>
+        </ControlTemplate>
+        <Geometry x:Key="FrameCorner">M 0,28 L 0,8 L 8,0 L 28,0 M 0,16 L 7,9 M 9,0 L 16,7 M 0,28 L 9,19 L 9,13 L 15,13 L 22,6 M 9,19 L 19,19 L 28,10</Geometry>
+        <Style TargetType="Slider"><Setter Property="Foreground" Value="#C49A4B"/><Setter Property="Background" Value="#28241B"/><Setter Property="Height" Value="26"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Slider"><Grid VerticalAlignment="Center"><Track x:Name="PART_Track" IsDirectionReversed="False" Focusable="False" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value}"><Track.DecreaseRepeatButton><RepeatButton Command="Slider.DecreaseLarge" Focusable="False" Background="#C49A4B" BorderThickness="0" Height="3"/></Track.DecreaseRepeatButton><Track.IncreaseRepeatButton><RepeatButton Command="Slider.IncreaseLarge" Focusable="False" Background="#342E22" BorderThickness="0" Height="3"/></Track.IncreaseRepeatButton><Track.Thumb><Thumb Width="14" Height="14" Focusable="False"><Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="#E3C477" BorderBrush="#F5E2AE" BorderThickness="1" CornerRadius="7"><Border.Effect><DropShadowEffect Color="#C49A4B" BlurRadius="8" ShadowDepth="0" Opacity=".42"/></Border.Effect></Border></ControlTemplate></Thumb.Template></Thumb></Track.Thumb></Track></Grid></ControlTemplate></Setter.Value></Setter></Style>
+    </Window.Resources>
+
+    <Border x:Name="WindowFrame" Margin="8" CornerRadius="20" Background="#090908" BorderBrush="#403725" BorderThickness="1">
+        <Border.Effect><DropShadowEffect Color="#000000" BlurRadius="34" ShadowDepth="8" Opacity=".58"/></Border.Effect>
+        <Grid ClipToBounds="True">
+            <Grid.RowDefinitions><RowDefinition Height="52"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Border Grid.Row="0" CornerRadius="19,19,0,0" Background="{StaticResource ObsidianAmbient}" BorderBrush="#45391F" BorderThickness="0,0,0,1">
+                <Grid x:Name="TitleBar" Background="Transparent" PreviewMouseLeftButtonDown="TitleBar_PreviewMouseLeftButtonDown">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0">
+                        <Image Width="28" Height="28" Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/destiny-emblem.png" Stretch="Uniform"/>
+                        <TextBlock Text="Destiny Launcher" FontSize="14" FontWeight="SemiBold" Foreground="#E9E2D3" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,11,0">
+                        <Button Style="{StaticResource WindowControl}" Click="Minimize_Click" ToolTip="Minimizar"><Path Data="{x:Static local:IconGlyphs.Minimize}" Width="13" Height="13" Stretch="Uniform" Stroke="#B6AD9D" StrokeThickness="1.3" StrokeStartLineCap="Round"/></Button>
+                        <Button Style="{StaticResource WindowControl}" Click="Maximize_Click" ToolTip="Maximizar o restaurar"><Path x:Name="WindowStateIcon" Data="{x:Static local:IconGlyphs.Maximize}" Width="12" Height="12" Stretch="Uniform" Stroke="#B6AD9D" StrokeThickness="1.2"/></Button>
+                        <Button Style="{StaticResource WindowControl}" Click="Close_Click" ToolTip="Cerrar"><Path Data="{x:Static local:IconGlyphs.Close}" Width="13" Height="13" Stretch="Uniform" Stroke="#C1B8A7" StrokeThickness="1.3" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/></Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="188"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Background="{StaticResource ObsidianAmbient}" BorderBrush="#39301E" BorderThickness="0,0,1,0">
+                    <Grid>
+                        <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="90"/></Grid.RowDefinitions>
+                        <StackPanel Margin="12,25,12,0">
+                            <TextBlock Text="NAVEGACIÓN" FontSize="9" FontWeight="Bold" Foreground="#756D5E" Margin="14,0,0,11"/>
+                            <Button x:Name="HomeNav" Style="{StaticResource NavItem}" Background="#211C11" Foreground="#F1D18A"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="25"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{x:Static local:IconGlyphs.Home}" Width="18" Height="18" Stretch="Uniform" Stroke="#E3BF6A" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><TextBlock Grid.Column="1" Text="Inicio" VerticalAlignment="Center"/></Grid></Button>
+                            <Border Background="#C9A250" Width="3" Height="37" CornerRadius="2" HorizontalAlignment="Left" Margin="0,-47,0,10"/>
+                            <Button Style="{StaticResource NavItem}" ToolTip="Sección en preparación" IsEnabled="False"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="25"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Path Data="{x:Static local:IconGlyphs.News}" Width="18" Height="18" Stretch="Uniform" Stroke="#877E6C" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><TextBlock Grid.Column="1" Text="Noticias" VerticalAlignment="Center"/><TextBlock Grid.Column="2" Text="PRONTO" FontSize="8" Foreground="#6F6655" VerticalAlignment="Center"/></Grid></Button>
+                            <Button Style="{StaticResource NavItem}" ToolTip="Sección en preparación" IsEnabled="False"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="25"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Path Data="{x:Static local:IconGlyphs.Cube}" Width="18" Height="18" Stretch="Uniform" Stroke="#877E6C" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><TextBlock Grid.Column="1" Text="Modpacks" VerticalAlignment="Center"/><TextBlock Grid.Column="2" Text="PRONTO" FontSize="8" Foreground="#6F6655" VerticalAlignment="Center"/></Grid></Button>
+                            <Rectangle Height="1" Fill="#29251B" Margin="12,18,12,16"/>
+                            <Button Style="{StaticResource NavItem}" Click="Settings_Click"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="25"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{x:Static local:IconGlyphs.Settings}" Width="18" Height="18" Stretch="Uniform" Stroke="#A89B7E" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><TextBlock Grid.Column="1" Text="Ajustes" VerticalAlignment="Center"/></Grid></Button>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="21,0"><Rectangle Height="1" Fill="#29251B" Margin="0,0,0,12"/><TextBlock Text="DESTINY" FontFamily="Georgia" FontSize="10" Foreground="#C5A45B"/><TextBlock Text="MINECRAFT  ·  FABRIC" FontSize="8" Foreground="#6E675A" Margin="0,4,0,0"/></StackPanel>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Column="1" Background="{StaticResource ObsidianAmbient}">
+                    <Grid.RowDefinitions><RowDefinition Height="340"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Border Grid.Row="0" Background="#15120D" ClipToBounds="True">
+                        <Grid>
+                            <Image Source="/DestinyLauncher;component/Assets/destiny-hero-gold-v3.png" Stretch="UniformToFill" Opacity=".96"/>
+                            <Rectangle><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="1,0"><GradientStop Color="#CF090908" Offset="0"/><GradientStop Color="#8C090908" Offset=".15"/><GradientStop Color="#3018130B" Offset=".46"/><GradientStop Color="#56110E09" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
+                            <Rectangle><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#480A0908" Offset="0"/><GradientStop Color="#10000000" Offset=".48"/><GradientStop Color="#C9100E0A" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
+                            <Image Width="332" Height="193" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="90,0,0,0" Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/destiny-combination-mark.png" Stretch="Uniform" Opacity=".96" RenderOptions.BitmapScalingMode="HighQuality"/>
+                            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="28,0,0,22"><TextBlock x:Name="HeroEditionText" Text="DESTINY  /  1.20.1" Foreground="#D4B46C" FontSize="9" FontWeight="Bold"/><TextBlock Text="Entra en tu mundo." Foreground="#F1E8D4" FontSize="22" FontWeight="SemiBold" Margin="0,4,0,0"/></StackPanel>
+                            <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" CornerRadius="5,0,0,0" Background="#11100C" BorderBrush="#56472A" BorderThickness="1,1,0,0" Padding="10,6" Margin="0,0,0,0"><TextBlock Text="MINECRAFT JAVA" Foreground="#C4A65F" FontSize="8" FontWeight="SemiBold"/></Border>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="1" Margin="18,16,18,16">
+                        <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="76"/><RowDefinition Height="48"/></Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="286"/></Grid.ColumnDefinitions>
+
+                        <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}" Padding="0" Margin="0,0,14,0">
+                            <Grid>
+                            <Grid Margin="20,17"><Grid.ColumnDefinitions><ColumnDefinition Width="88"/><ColumnDefinition Width="*"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions>
+                                <Image Width="78" Height="78" VerticalAlignment="Center" Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/destiny-emblem.png" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                <StackPanel Grid.Column="1" Margin="8,1,8,0" VerticalAlignment="Center"><TextBlock x:Name="EditionText" Text="Destiny" FontFamily="Georgia" FontSize="24" FontWeight="SemiBold"/><TextBlock x:Name="VersionText" Text="Minecraft 1.20.1  ·  Fabric" Foreground="#928A79" FontSize="11" Margin="0,4,0,14"/><StackPanel Orientation="Horizontal"><Button x:Name="DestinyButton" Content="DESTINY" Tag="Destiny" Click="Edition_Click" Style="{StaticResource EditionChip}"/><Button x:Name="LiteButton" Content="DESTINY LITE" Tag="DestinyLite" Click="Edition_Click" Style="{StaticResource EditionChip}"/></StackPanel><StackPanel Orientation="Horizontal" Margin="0,15,0,0"><Ellipse Width="6" Height="6" Fill="#BFA45C" VerticalAlignment="Center"/><TextBlock x:Name="InstalledText" Text="No instalado" Foreground="#B9AF9A" FontSize="10" Margin="7,0,0,0" VerticalAlignment="Center"/><TextBlock Text="  ·  " Foreground="#625B4C" FontSize="10" VerticalAlignment="Center"/><TextBlock x:Name="LatestText" Text="Versión 0.1.0" Foreground="#8D8575" FontSize="10" VerticalAlignment="Center"/></StackPanel></StackPanel>
+                                <Button x:Name="PrimaryButton" Grid.Column="2" Style="{StaticResource PrimaryAction}" Width="220" Height="74" HorizontalAlignment="Right" VerticalAlignment="Center" Click="Primary_Click"><Button.Content><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock x:Name="PrimaryLabel" Text="INSTALAR" Foreground="#F4E2B7" VerticalAlignment="Center" TextAlignment="Center"/><Path x:Name="ActionArrow" Data="{x:Static local:IconGlyphs.Arrow}" Width="17" Height="17" Stretch="Uniform" Stroke="#F0CF79" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" VerticalAlignment="Center" Margin="10,0,0,0"/></StackPanel></Button.Content></Button>
+                            </Grid>
+                            <Control Template="{StaticResource CardOrnamentTemplate}" Focusable="False" IsHitTestVisible="False"/>
+                            </Grid>
+                        </Border>
+
+                        <Grid Grid.Row="0" Grid.Column="1">
+                            <Grid.RowDefinitions><RowDefinition Height="94"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                            <Border Style="{StaticResource Card}" Padding="0">
+                                <Grid>
+                                    <Grid Margin="14,12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="68"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <Border Width="62" Height="62" CornerRadius="9" BorderBrush="#B18A43" BorderThickness="1.2" VerticalAlignment="Center" ClipToBounds="True">
+                                            <Border.Background><RadialGradientBrush GradientOrigin="0.5,0.35"><GradientStop Color="#48391D" Offset="0"/><GradientStop Color="#1D180F" Offset="1"/></RadialGradientBrush></Border.Background>
+                                            <Border.Effect><DropShadowEffect Color="#B58A3B" BlurRadius="12" ShadowDepth="0" Opacity=".28"/></Border.Effect>
+                                            <Grid><TextBlock x:Name="PlayerInitial" Text="D" FontFamily="Georgia" FontSize="27" Foreground="#D8B966" HorizontalAlignment="Center" VerticalAlignment="Center"/><Image x:Name="PlayerHead" Visibility="Collapsed" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="NearestNeighbor"/></Grid>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center"><TextBlock Text="JUGADOR" FontSize="8" FontWeight="Bold" Foreground="#A18A58"/><TextBlock x:Name="PlayerNameText" Text="Sin configurar" FontFamily="Georgia" FontSize="17" Margin="0,4,0,1"/><TextBlock Text="Cabeza de skin · MCHeads" FontSize="9" Foreground="#7A7468"/></StackPanel>
+                                        <Button x:Name="ProfileButton" Grid.Column="2" Content="···" Click="Profile_Click" Background="Transparent" Foreground="#BEB08D" BorderThickness="0" FontSize="18" VerticalAlignment="Top" ToolTip="Editar perfil"/>
+                                    </Grid>
+                                    <Control Template="{StaticResource CardOrnamentTemplate}" Focusable="False" IsHitTestVisible="False"/>
+                                </Grid>
+                            </Border>
+                            <Border Grid.Row="1" Style="{StaticResource Card}" Padding="0" Margin="0,10,0,0">
+                                <Grid>
+                                    <Grid Margin="15,13">
+                                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="1"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="ESTADO DEL PACK" FontFamily="Georgia" FontSize="12" Foreground="#D4B361" VerticalAlignment="Center"/><Border Grid.Column="1" Background="#211D14" BorderBrush="#3B3323" BorderThickness="1" CornerRadius="8" Padding="7,4"><StackPanel Orientation="Horizontal"><Ellipse x:Name="PackStateDot" Width="6" Height="6" Fill="#BFA45C" VerticalAlignment="Center"/><TextBlock x:Name="PackStateText" Text="VERIFICANDO" FontSize="7" FontWeight="Bold" Foreground="#CAB989" Margin="5,0,0,0" VerticalAlignment="Center"/></StackPanel></Border></Grid>
+                                        <Rectangle Grid.Row="1" Height="1" Fill="#302B20" Margin="0,12,0,12"/>
+                                        <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="1"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="INSTALADA" FontSize="8" FontWeight="Bold" Foreground="#817968"/><TextBlock x:Name="PackInstalledVersionText" Text="—" FontFamily="Georgia" FontSize="16" Foreground="#E5DDCC" Margin="0,4,0,0"/></StackPanel><Rectangle Grid.Column="1" Width="1" Fill="#302B20" Margin="0,1"/><StackPanel Grid.Column="2" Margin="13,0,0,0"><TextBlock Text="DISPONIBLE" FontSize="8" FontWeight="Bold" Foreground="#817968"/><TextBlock x:Name="PackLatestVersionText" Text="0.1.0" FontFamily="Georgia" FontSize="16" Foreground="#E5DDCC" Margin="0,4,0,0"/></StackPanel></Grid>
+                                        <TextBlock Grid.Row="3" x:Name="PackDetailText" Text="La verificación se realizará al iniciar." FontSize="9" Foreground="#8B8374" TextWrapping="Wrap" VerticalAlignment="Bottom" Margin="0,14,0,0"/>
+                                    </Grid>
+                                    <Control Template="{StaticResource CardOrnamentTemplate}" Focusable="False" IsHitTestVisible="False"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Style="{StaticResource Card}" Padding="16,9" Margin="0,12,0,0"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="43"/><ColumnDefinition Width="*"/><ColumnDefinition Width="246"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions><Path Data="{x:Static local:IconGlyphs.Memory}" Width="23" Height="23" Stretch="Uniform" Stroke="#C5A65D" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" VerticalAlignment="Center"/><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="MEMORIA ASIGNADA" FontSize="8" FontWeight="Bold" Foreground="#817968"/><TextBlock x:Name="RamText" Text="8 GB" FontSize="13" FontWeight="SemiBold" Margin="0,3,0,0"/></StackPanel><Slider x:Name="RamSlider" Grid.Column="2" Minimum="4" Maximum="12" TickFrequency="2" IsSnapToTickEnabled="True" Value="8" ValueChanged="RamSlider_Changed" VerticalAlignment="Center" Margin="8,0"/><Button Grid.Column="3" Style="{StaticResource QuietButton}" Width="35" Height="35" Padding="0" Click="Settings_Click" ToolTip="Abrir ajustes"><Path Data="{x:Static local:IconGlyphs.Settings}" Width="17" Height="17" Stretch="Uniform" Stroke="#C5B37E" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/></Button></Grid></Border>
+
+                        <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Background="#100F0C" BorderBrush="#2B271D" BorderThickness="1" CornerRadius="8" Margin="0,10,0,0" Padding="13,7"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Grid Width="18" Height="18"><Ellipse Stroke="#A88A4B" StrokeThickness="1.3"/><Path Data="{x:Static local:IconGlyphs.Check}" Width="10" Height="10" Stretch="Uniform" Stroke="#D4B45F" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid><TextBlock x:Name="StatusText" Text="Listo" Foreground="#CBC2B0" FontSize="10" VerticalAlignment="Center" Margin="10,0,0,0"/></StackPanel><ProgressBar x:Name="Progress" Grid.Column="1" Height="4" Maximum="1" Value="0" VerticalAlignment="Center" Visibility="Collapsed" Background="#242017" Foreground="#D1AB5A"/></Grid></Border>
+                    </Grid>
+                </Grid>
+            </Grid>
+            <Grid x:Name="FrameOrnaments" Grid.RowSpan="2" IsHitTestVisible="False">
+                <Border Margin="3" CornerRadius="17" BorderBrush="#4D3D20" BorderThickness=".6"/>
+                <Path Data="{StaticResource FrameCorner}" Width="16" Height="16" Stretch="Fill" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="4" Stroke="#C09A4D" StrokeThickness=".9" Opacity=".82" RenderTransformOrigin=".5,.5"><Path.RenderTransform><ScaleTransform ScaleY="-1"/></Path.RenderTransform></Path>
+                <Path Data="{StaticResource FrameCorner}" Width="16" Height="16" Stretch="Fill" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="4" Stroke="#C09A4D" StrokeThickness=".9" Opacity=".82" RenderTransformOrigin=".5,.5"><Path.RenderTransform><ScaleTransform ScaleX="-1" ScaleY="-1"/></Path.RenderTransform></Path>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

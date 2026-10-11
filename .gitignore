@@ -1,0 +1,19 @@
+# Build and publish output (publish is intentionally replaced by each build).
+**/bin/
+**/obj/
+/publish/
+/publish-experiment/
+
+# Generated visual previews and local editor state.
+/artifacts/
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.log
+*.tmp
+
+# The modpack feed has its own Git repository and remote.
+/modpack-distribution/

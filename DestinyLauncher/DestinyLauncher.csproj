@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CmlLib.Core" Version="4.0.6" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\destiny-hero-gold-v3.png" />
+    <Resource Include="Assets\experiment\obsidian-gold-v1\obsidian-texture.png" />
+    <Resource Include="Assets\experiment\obsidian-gold-v1\card-surface-v2.png" />
+    <Resource Include="Assets\experiment\obsidian-gold-v1\primary-button-plate.png" />
+    <Resource Include="Assets\experiment\obsidian-gold-v1\edition-selector-plate.png" />
+    <Resource Include="Assets\experiment\obsidian-gold-v1\destiny-emblem.png" />
+    <Resource Include="Assets\experiment\obsidian-gold-v1\destiny-combination-mark.png" />
+  </ItemGroup>
+
+</Project>
