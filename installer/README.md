@@ -2,12 +2,13 @@
 
 El instalador es pequeño y se instala sólo para el usuario actual: ofrece acceso desde Inicio, un acceso opcional en el escritorio y desinstalación desde Windows. Descarga el paquete de la última release desde una URL pública y deja intactos los datos guardados por el launcher bajo `%LOCALAPPDATA%\DestinyLauncher`.
 
-La URL predeterminada usa este repositorio como destino de releases. Como el repositorio de código no es público, no hay que distribuir ese setup tal cual: al publicar, hay que indicar una URL pública con `tools/Build-Installer.ps1 -PayloadUrl <URL-del-ZIP>` o acordar que este repositorio sea público. No se cambia la privacidad del repo automáticamente.
+La URL predeterminada usa la última release pública de `Destiny-Dynasty/Destiny-Launcher`. El repositorio ya es público; el setup podrá descargar el ZIP cuando `DestinyLauncher-win-x64.zip` esté publicado como asset. No se necesita un repositorio privado separado para los binarios: el instalador debe poder descargarlos sin iniciar sesión.
 
 ## Flujo de publicación
 
-1. Ejecutar `tools/Publish-Launcher.ps1`.
-2. Ejecutar `tools/Build-Installer.ps1 -PayloadUrl <URL-del-ZIP>`; se crea el ZIP del launcher y el setup en `publish/`.
-3. Subir `publish/DestinyLauncher-win-x64.zip` como asset de una release de GitHub con ese nombre.
+1. Ejecutar `tools/Publish-Launcher.ps1` para actualizar el ejecutable de `publish/`.
+2. Ejecutar `tools/Package-Launcher.ps1` y crear una release pública que incluya `publish/DestinyLauncher-win-x64.zip`.
+3. Ejecutar `tools/Build-Installer.ps1`; se genera `publish/DestinyLauncherSetup.exe` con la URL pública predeterminada.
+4. Subir `publish/DestinyLauncherSetup.exe` como asset de esa misma release.
 
-El setup sólo podrá instalar cuando exista ese asset en una release pública. No se suben compilaciones de prueba al repositorio como commits. Antes de una distribución pública, conviene añadir firma digital del instalador y del paquete para que Windows pueda verificar al editor.
+El setup sólo podrá instalar cuando exista el ZIP en una release pública. No se suben compilaciones de prueba al repositorio como commits. Antes de una distribución amplia, conviene añadir firma digital al instalador y al paquete para que Windows pueda verificar al editor.

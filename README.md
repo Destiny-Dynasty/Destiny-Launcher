@@ -16,4 +16,4 @@ La configuración, el perfil, las instancias, la caché y los logs se guardan ba
 
 ## Distribución
 
-El instalador online y su proceso de publicación se mantienen en `installer/` y `tools/`. El paquete debe estar en una release pública. Como este repositorio de código no es público, antes de distribuir el setup hay que proporcionar una URL pública con `tools/Build-Installer.ps1 -PayloadUrl <URL-del-ZIP>` o decidir hacer público este repositorio.
+El instalador online y su proceso de publicación se mantienen en `installer/` y `tools/`. Este repositorio es público y sirve también para alojar los paquetes en GitHub Releases. El setup descarga `DestinyLauncher-win-x64.zip` desde la última release pública; el archivo debe existir allí antes de distribuir el instalador.
