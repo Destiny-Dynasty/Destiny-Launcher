@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$CompilerPath
+    [string]$CompilerPath,
+    [string]$PayloadUrl
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,7 +34,12 @@ if ([string]::IsNullOrWhiteSpace($CompilerPath) -or -not (Test-Path -LiteralPath
 
 & (Join-Path $PSScriptRoot 'Package-Launcher.ps1') | Out-Null
 $payloadSize = (Get-Item -LiteralPath $launcherPath).Length
-& $CompilerPath "/dPayloadSize=$payloadSize" $installerScript
+$compilerArgs = @("/dPayloadSize=$payloadSize")
+if (-not [string]::IsNullOrWhiteSpace($PayloadUrl)) {
+    $compilerArgs += "/dPayloadUrl=$PayloadUrl"
+}
+$compilerArgs += $installerScript
+& $CompilerPath @compilerArgs
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

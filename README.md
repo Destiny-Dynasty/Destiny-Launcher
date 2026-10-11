@@ -16,4 +16,4 @@ La configuración, el perfil, las instancias, la caché y los logs se guardan ba
 
 ## Distribución
 
-El instalador online y su proceso de publicación se mantienen en `installer/` y `tools/`. El instalador descarga el paquete del launcher desde los assets de una release de este repositorio; antes de distribuirlo debe existir una release con el nombre de asset configurado en el script.
+El instalador online y su proceso de publicación se mantienen en `installer/` y `tools/`. El paquete debe estar en una release pública. Como este repositorio de código no es público, antes de distribuir el setup hay que proporcionar una URL pública con `tools/Build-Installer.ps1 -PayloadUrl <URL-del-ZIP>` o decidir hacer público este repositorio.

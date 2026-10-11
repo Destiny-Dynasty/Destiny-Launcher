@@ -1,6 +1,9 @@
 #ifndef PayloadSize
   #define PayloadSize 0
 #endif
+#ifndef PayloadUrl
+  #define PayloadUrl "https://github.com/Destiny-Dynasty/Destiny-Launcher/releases/latest/download/DestinyLauncher-win-x64.zip"
+#endif
 
 [Setup]
 AppId={{D7E98A51-6E09-4F63-929B-34DDF0B24B3C}
@@ -32,7 +35,7 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 Name: "desktopicon"; Description: "Crear un acceso directo en el escritorio"; GroupDescription: "Accesos directos:"; Flags: unchecked
 
 [Files]
-Source: "https://github.com/Destiny-Dynasty/Destiny-Launcher/releases/latest/download/DestinyLauncher-win-x64.zip"; DestDir: "{app}"; DestName: "DestinyLauncher-win-x64.zip"; ExternalSize: {#PayloadSize}; Flags: external download extractarchive ignoreversion recursesubdirs createallsubdirs
+Source: "{#PayloadUrl}"; DestDir: "{app}"; DestName: "DestinyLauncher-win-x64.zip"; ExternalSize: {#PayloadSize}; Flags: external download extractarchive ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\Destiny Launcher"; Filename: "{app}\DestinyLauncher.exe"; WorkingDir: "{app}"; IconFilename: "{app}\DestinyLauncher.exe"
