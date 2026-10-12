@@ -60,7 +60,7 @@ public partial class MainWindow : Window
         SelectedEdition = PackEdition.Destiny,
         RamGb = 8,
         Destiny = new PackDefinition { Name = "Destiny", Slug = "destiny", Version = "1.4.7" },
-        DestinyLite = new PackDefinition { Name = "Destiny Lite", Slug = "destiny-lite", Version = "1.4.7" }
+        DestinyLite = new PackDefinition { Name = "Destiny Lite", Slug = "destiny-lite", DownloadUrl = "", ManifestUrl = "", Version = "0.1.0" }
     };
 
     private void Refresh()

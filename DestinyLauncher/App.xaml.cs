@@ -86,8 +86,8 @@ public partial class App : Application
         var config = new LauncherConfig
         {
             PlayerName = "Shady935",
-            Destiny = new PackDefinition { Name = "Destiny", Slug = "destiny", Version = "1.4.7", DownloadUrl = "https://github.com/destiny/pack/releases/latest/download/destiny.zip", ManifestUrl = "https://raw.githubusercontent.com/destiny/pack/main/manifests/destiny.json" },
-            DestinyLite = new PackDefinition { Name = "Destiny Lite", Slug = "destiny-lite", Version = "1.4.7", DownloadUrl = "https://github.com/destiny/pack/releases/latest/download/destiny-lite.zip", ManifestUrl = "https://raw.githubusercontent.com/destiny/pack/main/manifests/destiny-lite.json" },
+            Destiny = new PackDefinition { Name = "Destiny", Slug = "destiny", Version = "1.4.7", DownloadUrl = "", ManifestUrl = PackDefinition.DefaultDestinyManifestUrl },
+            DestinyLite = new PackDefinition { Name = "Destiny Lite", Slug = "destiny-lite", Version = "0.1.0", DownloadUrl = "", ManifestUrl = "" },
             ServerAddress = "play.destiny.example"
         };
         RenderDialog(new SettingsDialog(config), outputPath, 620, 740);

@@ -33,6 +33,16 @@ $manifestRoot = Join-Path $outRoot 'manifests'
 $manifestPath = Join-Path $manifestRoot "$PackId.json"
 $fileBaseUrl = if ($repositoryMode) { $RepositoryFilesBaseUrl.TrimEnd('/') } else { $ReleaseBaseUrl.TrimEnd('/') }
 
+function ConvertTo-GitHubReleaseAssetName([string]$Name) {
+    # GitHub normalizes some release-asset filenames (diacritics, spaces,
+    # parentheses, and apostrophes). Predict that normalization so manifest
+    # URLs match the names GitHub actually serves.
+    $normalized = $Name.Normalize([Text.NormalizationForm]::FormD)
+    $normalized = [regex]::Replace($normalized, '\p{Mn}', '')
+    $normalized = [regex]::Replace($normalized, "[\s()']+", '.')
+    return [regex]::Replace($normalized, '\.{2,}', '.')
+}
+
 if (Test-Path -LiteralPath $outRoot) {
     $existingOutput = Get-ChildItem -LiteralPath $outRoot -Force | Select-Object -First 1
     if ($null -ne $existingOutput) {
@@ -76,7 +86,7 @@ foreach ($rootName in $managedRoots) {
         else {
             $pathHash = [System.Security.Cryptography.SHA256]::HashData([System.Text.Encoding]::UTF8.GetBytes($relative))
             $prefix = [Convert]::ToHexString($pathHash).Substring(0, 12).ToLowerInvariant()
-            $assetName = "$prefix-$($sourceFile.Name)"
+            $assetName = ConvertTo-GitHubReleaseAssetName "$prefix-$($sourceFile.Name)"
         }
 
         $assetPath = Join-Path $assetRoot $assetName
