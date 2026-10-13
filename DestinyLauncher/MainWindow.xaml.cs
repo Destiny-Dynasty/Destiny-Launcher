@@ -29,7 +29,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _playerHeadCancellation;
     private Task? _playerHeadLoadTask;
 
-    public MainWindow(bool previewMode = false, bool loadRemoteSkinInPreview = false)
+    public MainWindow(bool previewMode = false, bool loadRemoteSkinInPreview = false, bool startOnSettingsPage = false)
     {
         InitializeComponent();
         _previewMode = previewMode;
@@ -47,6 +47,7 @@ public partial class MainWindow : Window
         Loaded += async (_, _) => await RefreshManifestAsync();
         UpdateWindowFrame();
         Refresh();
+        if (startOnSettingsPage) ShowSettingsPage();
     }
 
     private PackDefinition Pack => _config.SelectedEdition == PackEdition.Destiny ? _config.Destiny : _config.DestinyLite;
@@ -310,20 +311,61 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void Settings_Click(object sender, RoutedEventArgs e)
+    private void Home_Click(object sender, RoutedEventArgs e) => ShowHomePage();
+
+    private void Settings_Click(object sender, RoutedEventArgs e) => ShowSettingsPage();
+
+    private void ShowHomePage()
+    {
+        HomeView.Visibility = Visibility.Visible;
+        SettingsPageHost.Visibility = Visibility.Collapsed;
+        SettingsPageHost.Content = null;
+        SetNavigationState(settingsSelected: false);
+    }
+
+    private void ShowSettingsPage()
     {
         if (_busy) return;
-        var dialog = new SettingsDialog(_config) { Owner = this };
-        if (dialog.ShowDialog() == true)
+
+        var page = new SettingsPage(_config)
         {
-            _config = dialog.Config;
-            _paths.SetInstallDirectory(_config.InstallDirectory);
-            if (!_previewMode) _configService.Save(_config);
-            _manifestCheck = null;
-            _manifestError = null;
-            Refresh();
-            await RefreshManifestAsync();
-        }
+            SaveRequested = SaveSettingsAsync
+        };
+        page.BackRequested += ShowHomePage;
+        HomeView.Visibility = Visibility.Collapsed;
+        SettingsPageHost.Content = page;
+        SettingsPageHost.Visibility = Visibility.Visible;
+        SetNavigationState(settingsSelected: true);
+    }
+
+    private void SetNavigationState(bool settingsSelected)
+    {
+        var activeBackground = new SolidColorBrush(Color.FromRgb(33, 28, 17));
+        var activeText = new SolidColorBrush(Color.FromRgb(241, 209, 138));
+        var inactiveText = new SolidColorBrush(Color.FromRgb(156, 149, 136));
+        var activeIcon = new SolidColorBrush(Color.FromRgb(227, 191, 106));
+        var inactiveIcon = new SolidColorBrush(Color.FromRgb(168, 155, 126));
+
+        HomeNav.Tag = settingsSelected ? "Unselected" : "Selected";
+        HomeNav.Background = settingsSelected ? Brushes.Transparent : activeBackground;
+        HomeNav.Foreground = settingsSelected ? inactiveText : activeText;
+        HomeNavIcon.Stroke = settingsSelected ? inactiveIcon : activeIcon;
+        SettingsNav.Tag = settingsSelected ? "Selected" : "Unselected";
+        SettingsNav.Background = settingsSelected ? activeBackground : Brushes.Transparent;
+        SettingsNav.Foreground = settingsSelected ? activeText : inactiveText;
+        SettingsNavIcon.Stroke = settingsSelected ? activeIcon : inactiveIcon;
+    }
+
+    private async Task SaveSettingsAsync(LauncherConfig config)
+    {
+        _config = config;
+        _paths.SetInstallDirectory(_config.InstallDirectory);
+        if (!_previewMode) _configService.Save(_config);
+        _manifestCheck = null;
+        _manifestError = null;
+        ShowHomePage();
+        Refresh();
+        await RefreshManifestAsync();
     }
 
     private void TitleBar_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -462,7 +504,7 @@ public sealed class ProfileDialog : Window
     }
 }
 
-public sealed class SettingsDialog : Window
+public sealed class SettingsPage : UserControl
 {
     private readonly LauncherConfig _source;
     private readonly TextBox _installDirectory;
@@ -470,15 +512,41 @@ public sealed class SettingsDialog : Window
     private readonly Slider _ramSlider;
     private bool _syncingRam;
 
-    public LauncherConfig Config { get; private set; }
+    public Action? BackRequested { get; set; }
+    public Func<LauncherConfig, Task>? SaveRequested { get; set; }
 
-    public SettingsDialog(LauncherConfig source)
+    public SettingsPage(LauncherConfig source)
     {
         _source = source;
-        Config = source;
-        var stack = new StackPanel { Margin = new Thickness(24, 18, 24, 20) };
-        stack.Children.Add(SectionTitle("INSTALACIÓN"));
-        var pathRow = new Grid { Margin = new Thickness(0, 0, 0, 20) };
+        var layout = new Grid { Margin = new Thickness(30, 26, 30, 28) };
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        var header = new Grid { Margin = new Thickness(0, 0, 0, 24) };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.Children.Add(new TextBlock
+        {
+            Text = "AJUSTES",
+            FontFamily = new FontFamily("Georgia"),
+            FontSize = 27,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        var back = ProfileDialog.DialogButton("VOLVER", false);
+        back.MinWidth = 112;
+        back.Height = 36;
+        back.Click += (_, _) => BackRequested?.Invoke();
+        Grid.SetColumn(back, 1);
+        header.Children.Add(back);
+        layout.Children.Add(header);
+
+        var cards = new Grid { VerticalAlignment = VerticalAlignment.Top };
+        cards.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
+        cards.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var installCard = CreateSettingsCard();
+        var installContent = new StackPanel();
+        installContent.Children.Add(SectionTitle("INSTALACIÓN"));
+        var pathRow = new Grid { Margin = new Thickness(0, 4, 0, 0) };
         pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _installDirectory = new TextBox
@@ -512,12 +580,18 @@ public sealed class SettingsDialog : Window
         browse.Click += (_, _) =>
         {
             var picker = new Microsoft.Win32.OpenFolderDialog { Title = "Elige la carpeta de instalación de Destiny", InitialDirectory = Directory.Exists(_installDirectory.Text) ? _installDirectory.Text : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Multiselect = false };
-            if (picker.ShowDialog(this) == true) _installDirectory.Text = picker.FolderName;
+            if (picker.ShowDialog(Window.GetWindow(this)) == true) _installDirectory.Text = picker.FolderName;
         };
         pathRow.Children.Add(browse);
-        stack.Children.Add(pathRow);
-        stack.Children.Add(SectionTitle("MEMORIA"));
-        var ramRow = new Grid { Margin = new Thickness(0, 1, 0, 4) };
+        installContent.Children.Add(pathRow);
+        installCard.Child = installContent;
+        cards.Children.Add(installCard);
+
+        var memoryCard = CreateSettingsCard();
+        memoryCard.Margin = new Thickness(14, 0, 0, 0);
+        var memoryContent = new StackPanel();
+        memoryContent.Children.Add(SectionTitle("MEMORIA"));
+        var ramRow = new Grid { Margin = new Thickness(0, 8, 0, 0) };
         ramRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         ramRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         ramRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -554,33 +628,40 @@ public sealed class SettingsDialog : Window
         var ramUnit = new TextBlock { Text = "GB", FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(178, 167, 142)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
         Grid.SetColumn(ramUnit, 2);
         ramRow.Children.Add(ramUnit);
-        stack.Children.Add(ramRow);
+        memoryContent.Children.Add(ramRow);
+        memoryCard.Child = memoryContent;
+        Grid.SetColumn(memoryCard, 1);
+        cards.Children.Add(memoryCard);
+        var content = new StackPanel { VerticalAlignment = VerticalAlignment.Top };
+        content.Children.Add(cards);
 
         var save = ProfileDialog.DialogButton("GUARDAR", true);
         save.HorizontalAlignment = HorizontalAlignment.Right;
-        save.Margin = new Thickness(0, 18, 0, 0);
-        save.Click += (_, _) =>
+        save.MinWidth = 156;
+        save.Height = 42;
+        save.Margin = new Thickness(0, 20, 0, 0);
+        save.Click += async (_, _) =>
         {
             if (string.IsNullOrWhiteSpace(_installDirectory.Text) || !Path.IsPathFullyQualified(Environment.ExpandEnvironmentVariables(_installDirectory.Text.Trim())))
             {
-                MessageBox.Show(this, "Elige una carpeta válida.", "Instalación", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(Window.GetWindow(this), "Elige una carpeta válida.", "Instalación", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             if (!int.TryParse(_ramValue.Text, out var ramGb) || ramGb is < 1 or > 1024)
             {
-                MessageBox.Show(this, "Introduce un valor entre 1 y 1024 GB.", "Memoria", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(Window.GetWindow(this), "Introduce un valor entre 1 y 1024 GB.", "Memoria", MessageBoxButton.OK, MessageBoxImage.Information);
                 _ramValue.Focus();
                 _ramValue.SelectAll();
                 return;
             }
             _source.InstallDirectory = Path.GetFullPath(Environment.ExpandEnvironmentVariables(_installDirectory.Text.Trim()));
             _source.RamGb = ramGb;
-            Config = _source;
-            DialogResult = true;
+            if (SaveRequested is not null) await SaveRequested(_source);
         };
-        stack.Children.Add(save);
-
-        DialogChrome.Create(this, "Ajustes", stack, 560, 360);
+        content.Children.Add(save);
+        Grid.SetRow(content, 1);
+        layout.Children.Add(content);
+        Content = layout;
     }
 
     private void RamSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -598,6 +679,15 @@ public sealed class SettingsDialog : Window
         _ramSlider.Value = Math.Clamp(value, _ramSlider.Minimum, _ramSlider.Maximum);
         _syncingRam = false;
     }
+
+    private static Border CreateSettingsCard() => new()
+    {
+        Background = new SolidColorBrush(Color.FromRgb(17, 16, 13)),
+        BorderBrush = new SolidColorBrush(Color.FromRgb(77, 62, 35)),
+        BorderThickness = new Thickness(1),
+        CornerRadius = new CornerRadius(11),
+        Padding = new Thickness(20, 18, 20, 20)
+    };
 
     private static TextBlock SectionTitle(string title) => new()
     {

@@ -83,13 +83,8 @@ public partial class App : Application
 
     private static void RenderSettingsPreview(string outputPath)
     {
-        var config = new LauncherConfig
-        {
-            PlayerName = "Shady935",
-            Destiny = new PackDefinition { Name = "Destiny", Slug = "destiny", Version = "1.4.7" },
-            DestinyLite = new PackDefinition { Name = "Destiny Lite", Slug = "destiny-lite", Version = "0.1.0" }
-        };
-        RenderDialog(new SettingsDialog(config), outputPath, 560, 360);
+        var window = new MainWindow(previewMode: true, startOnSettingsPage: true);
+        RenderDialog(window, outputPath, 1320, 830);
     }
 
     private static void RenderProfilePreview(string outputPath) => RenderDialog(new ProfileDialog("Shady935"), outputPath, 420, 252);

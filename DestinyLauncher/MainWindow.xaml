@@ -13,7 +13,7 @@
             <Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="#9C9588"/>
             <Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="15,0"/><Setter Property="Margin" Value="0,3"/>
             <Setter Property="FontSize" Value="13"/><Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="9"><Grid><Border x:Name="Indicator" Width="3" Background="Transparent" CornerRadius="2" HorizontalAlignment="Left"/><ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="12,0,0,0"/></Grid></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Shell" Property="Background" Value="#1C1A15"/><Setter Property="Foreground" Value="#F1E6CE"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Shell" Property="Background" Value="#272216"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="9"><Grid><Border x:Name="Indicator" Width="3" Background="Transparent" CornerRadius="2" HorizontalAlignment="Left"/><ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="12,0,0,0"/></Grid></Border><ControlTemplate.Triggers><DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="Selected"><Setter TargetName="Shell" Property="Background" Value="#211C11"/><Setter TargetName="Indicator" Property="Background" Value="#C9A250"/><Setter Property="Foreground" Value="#F1D18A"/></DataTrigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Shell" Property="Background" Value="#1C1A15"/><Setter Property="Foreground" Value="#F1E6CE"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Shell" Property="Background" Value="#272216"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
         </Style>
         <Style x:Key="EditionChip" TargetType="Button">
             <Setter Property="Height" Value="40"/><Setter Property="MinWidth" Value="104"/><Setter Property="Padding" Value="14,0"/><Setter Property="Margin" Value="0,0,9,0"/>
@@ -73,15 +73,15 @@
                     <Grid>
                         <Image Width="150" Height="150" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,38" Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/destiny-emblem.png" Stretch="Uniform" Opacity=".16" IsHitTestVisible="False" RenderOptions.BitmapScalingMode="HighQuality"/>
                         <StackPanel Margin="12,30,12,0">
-                            <Button x:Name="HomeNav" Style="{StaticResource NavItem}" Background="#211C11" Foreground="#F1D18A"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="25"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{x:Static local:IconGlyphs.Home}" Width="18" Height="18" Stretch="Uniform" Stroke="#E3BF6A" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><TextBlock Grid.Column="1" Text="Inicio" VerticalAlignment="Center"/></Grid></Button>
-                            <Border Background="#C9A250" Width="3" Height="37" CornerRadius="2" HorizontalAlignment="Left" Margin="0,-47,0,10"/>
+                            <Button x:Name="HomeNav" Tag="Selected" Style="{StaticResource NavItem}" Click="Home_Click"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="25"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path x:Name="HomeNavIcon" Data="{x:Static local:IconGlyphs.Home}" Width="18" Height="18" Stretch="Uniform" Stroke="#E3BF6A" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><TextBlock Grid.Column="1" Text="Inicio" VerticalAlignment="Center"/></Grid></Button>
                             <Rectangle Height="1" Fill="#29251B" Margin="12,14,12,14"/>
-                            <Button Style="{StaticResource NavItem}" Click="Settings_Click"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="25"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path Data="{x:Static local:IconGlyphs.Settings}" Width="18" Height="18" Stretch="Uniform" Stroke="#A89B7E" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><TextBlock Grid.Column="1" Text="Ajustes" VerticalAlignment="Center"/></Grid></Button>
+                            <Button x:Name="SettingsNav" Tag="Unselected" Style="{StaticResource NavItem}" Click="Settings_Click"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="25"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path x:Name="SettingsNavIcon" Data="{x:Static local:IconGlyphs.Settings}" Width="18" Height="18" Stretch="Uniform" Stroke="#A89B7E" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><TextBlock Grid.Column="1" Text="Ajustes" VerticalAlignment="Center"/></Grid></Button>
                         </StackPanel>
                     </Grid>
                 </Border>
 
-                <Grid Grid.Column="1" Background="{StaticResource ObsidianAmbient}">
+                <Grid x:Name="PageHost" Grid.Column="1" Background="{StaticResource ObsidianAmbient}">
+                  <Grid x:Name="HomeView">
                     <Grid.RowDefinitions><RowDefinition Height="320"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                     <Border Grid.Row="0" Background="#15120D" ClipToBounds="True">
                         <Grid>
@@ -139,6 +139,8 @@
 
                         <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Background="#100F0C" BorderBrush="#2B271D" BorderThickness="1" CornerRadius="8" Margin="0,12,0,0" Padding="14,8"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock x:Name="StatusText" Text="Listo" Foreground="#CBC2B0" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/><ProgressBar x:Name="Progress" Grid.Column="1" Height="4" Maximum="1" Value="0" VerticalAlignment="Center" Visibility="Collapsed" Background="#242017" Foreground="#D1AB5A"/></Grid></Border>
                     </Grid>
+                  </Grid>
+                  <ContentControl x:Name="SettingsPageHost" Visibility="Collapsed"/>
                 </Grid>
             </Grid>
             <Grid x:Name="FrameOrnaments" Grid.RowSpan="2" IsHitTestVisible="False">
