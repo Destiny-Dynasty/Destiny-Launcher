@@ -15,6 +15,7 @@ public sealed class ConfigService
                 : new();
             config.Destiny ??= new LauncherConfig().Destiny;
             config.DestinyLite ??= new LauncherConfig().DestinyLite;
+            if (string.IsNullOrWhiteSpace(config.InstallDirectory)) config.InstallDirectory = LauncherPaths.DefaultInstallDirectory;
             var oldZipPlaceholder = string.Equals(config.Destiny.DownloadUrl, "https://example.com/destiny.zip", StringComparison.OrdinalIgnoreCase)
                                     || string.Equals(config.Destiny.DownloadUrl, "https://github.com/destiny/pack/releases/latest/download/destiny.zip", StringComparison.OrdinalIgnoreCase);
             if (oldZipPlaceholder)

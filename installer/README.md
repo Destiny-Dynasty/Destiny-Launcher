@@ -1,6 +1,6 @@
 # Instalador online
 
-El instalador es pequeño y se instala sólo para el usuario actual: ofrece acceso desde Inicio, un acceso opcional en el escritorio y desinstalación desde Windows. Descarga el paquete de la última release desde una URL pública y deja intactos los datos guardados por el launcher bajo `%LOCALAPPDATA%\DestinyLauncher`.
+El instalador es pequeño y se instala sólo para el usuario actual: ofrece acceso desde Inicio, un acceso opcional en el escritorio y desinstalación desde Windows. Descarga el paquete de la última release desde una URL pública y deja intactos los datos guardados por el launcher bajo `%LOCALAPPDATA%\DestinyLauncher`, además del juego y modpack instalados en la carpeta elegida por el usuario (por defecto `%APPDATA%\.minecraft\versions\DestinyDynasty`).
 
 La URL predeterminada usa la última release pública de `Destiny-Dynasty/Destiny-Launcher`. El repositorio ya es público; el setup podrá descargar el ZIP cuando `DestinyLauncher-win-x64.zip` esté publicado como asset. No se necesita un repositorio privado separado para los binarios: el instalador debe poder descargarlos sin iniciar sesión.
 

@@ -12,7 +12,9 @@ Launcher de escritorio para el modpack Destiny, construido con WPF y .NET 10.
 
 ## Datos del usuario
 
-La configuración, el perfil, las instancias, la caché y los logs se guardan bajo `%LOCALAPPDATA%\DestinyLauncher`, separados de los archivos de la aplicación para conservarlos al actualizar o desinstalar el launcher.
+La configuración, el perfil, la caché y los logs se guardan bajo `%LOCALAPPDATA%\DestinyLauncher`, separados de los archivos de la aplicación para conservarlos al actualizar o desinstalar el launcher. Por defecto, el juego y los archivos del modpack Destiny se instalan en `%APPDATA%\.minecraft\versions\DestinyDynasty`; Destiny Lite usa la carpeta hermana `DestinyDynasty-Lite`. La carpeta principal se puede cambiar desde Ajustes.
+
+El launcher descarga Minecraft Java 1.20.1, instala Fabric y después sincroniza los archivos del modpack desde su manifiesto. En cada instalación consulta Fabric Meta para elegir el loader estable más reciente compatible con Minecraft 1.20.1; si el servicio no está disponible, utiliza la versión fijada en el manifiesto o la configuración.
 
 ## Distribución
 

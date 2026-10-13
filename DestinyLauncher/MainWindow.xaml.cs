@@ -43,6 +43,7 @@ public partial class MainWindow : Window
         _minecraft = new MinecraftService(_paths, _log);
         _playerHeadService = new PlayerHeadService(_paths);
         _config = previewMode ? CreatePreviewConfig() : _configService.Load();
+        _paths.SetInstallDirectory(_config.InstallDirectory);
 
         WindowFrame.SizeChanged += (_, _) => UpdateFrameClip();
         StateChanged += (_, _) => UpdateWindowFrame();
@@ -69,6 +70,8 @@ public partial class MainWindow : Window
         PlayerInitial.Text = string.IsNullOrWhiteSpace(_config.PlayerName) ? "D" : _config.PlayerName[..1].ToUpperInvariant();
         RefreshPlayerHead();
         EditionText.Text = Pack.Name;
+        InstallPathText.Text = _paths.Instance(Pack.Slug);
+        InstallPathText.ToolTip = $"Carpeta del juego y del modpack: {_paths.Instance(Pack.Slug)}";
         VersionText.Text = $"Minecraft {_config.MinecraftVersion}  ·  Fabric {_config.FabricLoaderVersion}";
         HeroEditionText.Text = $"{Pack.Name.ToUpperInvariant()}  /  {_config.MinecraftVersion}";
         LatestText.Text = $"Versión {TargetVersion}";
@@ -246,6 +249,7 @@ public partial class MainWindow : Window
             }
 
             await _minecraft.PrepareAndLaunchAsync(_config, pack, progress, CancellationToken.None);
+            _configService.Save(_config);
         }
         catch (Exception ex)
         {
@@ -366,6 +370,7 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() == true)
         {
             _config = dialog.Config;
+            _paths.SetInstallDirectory(_config.InstallDirectory);
             if (!_previewMode) _configService.Save(_config);
             _manifestCheck = null;
             _manifestError = null;
@@ -519,6 +524,7 @@ public sealed class SettingsDialog : Window
     private readonly TextBox _liteZip;
     private readonly TextBox _liteManifest;
     private readonly TextBox _server;
+    private readonly TextBox _installDirectory;
 
     public LauncherConfig Config { get; private set; }
 
@@ -527,6 +533,26 @@ public sealed class SettingsDialog : Window
         _source = source;
         Config = source;
         var stack = new StackPanel { Margin = new Thickness(23, 18, 23, 18) };
+        stack.Children.Add(SectionTitle("INSTALACIÓN"));
+        stack.Children.Add(new TextBlock { Text = "Carpeta principal de Destiny", FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(178, 167, 142)), Margin = new Thickness(0, 5, 0, 4) });
+        var pathRow = new Grid { Margin = new Thickness(0, 0, 0, 2) };
+        pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _installDirectory = new TextBox { Text = string.IsNullOrWhiteSpace(source.InstallDirectory) ? LauncherPaths.DefaultInstallDirectory : source.InstallDirectory, MinHeight = 36, VerticalContentAlignment = VerticalAlignment.Center };
+        pathRow.Children.Add(_installDirectory);
+        var browse = ProfileDialog.DialogButton("ELEGIR…", false);
+        browse.MinWidth = 86;
+        browse.Height = 36;
+        browse.Margin = new Thickness(8, 0, 0, 0);
+        Grid.SetColumn(browse, 1);
+        browse.Click += (_, _) =>
+        {
+            var picker = new Microsoft.Win32.OpenFolderDialog { Title = "Elige la carpeta de instalación de Destiny", InitialDirectory = Directory.Exists(_installDirectory.Text) ? _installDirectory.Text : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Multiselect = false };
+            if (picker.ShowDialog(this) == true) _installDirectory.Text = picker.FolderName;
+        };
+        pathRow.Children.Add(browse);
+        stack.Children.Add(pathRow);
+        stack.Children.Add(new TextBlock { Text = "Recomendada: %APPDATA%\\.minecraft\\versions\\DestinyDynasty. Destiny Lite se mantiene aislado en una carpeta hermana terminada en -Lite.", FontSize = 9, Foreground = new SolidColorBrush(Color.FromRgb(130, 120, 101)), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 12) });
         stack.Children.Add(SectionTitle("DESTINY"));
         _destinyZip = AddField(stack, "ZIP del paquete", source.Destiny.DownloadUrl);
         _destinyManifest = AddField(stack, "Manifiesto HTTPS de GitHub (opcional)", source.Destiny.ManifestUrl, "Raw GitHub: manifests/destiny.json");
@@ -542,6 +568,12 @@ public sealed class SettingsDialog : Window
         save.Margin = new Thickness(0, 18, 0, 0);
         save.Click += (_, _) =>
         {
+            if (string.IsNullOrWhiteSpace(_installDirectory.Text) || !Path.IsPathFullyQualified(Environment.ExpandEnvironmentVariables(_installDirectory.Text.Trim())))
+            {
+                MessageBox.Show(this, "Selecciona una ruta completa para instalar Minecraft y el modpack.", "Carpeta de instalación", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            _source.InstallDirectory = Path.GetFullPath(Environment.ExpandEnvironmentVariables(_installDirectory.Text.Trim()));
             _source.Destiny.DownloadUrl = _destinyZip.Text.Trim();
             _source.Destiny.ManifestUrl = _destinyManifest.Text.Trim();
             _source.DestinyLite.DownloadUrl = _liteZip.Text.Trim();
@@ -552,7 +584,7 @@ public sealed class SettingsDialog : Window
         };
         stack.Children.Add(save);
 
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = stack };
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = stack };
         DialogChrome.Create(this, "Ajustes del launcher", scroll, 620, 740);
     }
 
