@@ -17,7 +17,9 @@ public sealed class PlayerHeadService : IDisposable
     {
         var cacheDirectory = Path.Combine(_paths.Cache, "player-heads");
         Directory.CreateDirectory(cacheDirectory);
-        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(username.ToLowerInvariant())));
+        // Include the render type so a previously cached 3D image cannot mask the /head/ endpoint.
+        var cacheIdentity = $"mc-heads/head/{username.ToLowerInvariant()}";
+        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(cacheIdentity)));
         var cachePath = Path.Combine(cacheDirectory, $"{key}.png");
         byte[]? cached = null;
 
