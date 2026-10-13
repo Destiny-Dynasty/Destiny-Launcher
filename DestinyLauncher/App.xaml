@@ -48,6 +48,34 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style TargetType="Slider">
+            <Setter Property="Foreground" Value="{StaticResource Gold}"/>
+            <Setter Property="Background" Value="{StaticResource PanelSoft}"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center">
+                            <Track x:Name="PART_Track" IsDirectionReversed="False" Focusable="False" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value}">
+                                <Track.DecreaseRepeatButton><RepeatButton Command="Slider.DecreaseLarge" Focusable="False" Background="{StaticResource Gold}" BorderThickness="0" Height="3"/></Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton><RepeatButton Command="Slider.IncreaseLarge" Focusable="False" Background="#342E22" BorderThickness="0" Height="3"/></Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="14" Height="14" Focusable="False">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Background="{StaticResource GoldBright}" BorderBrush="#F5E2AE" BorderThickness="1" CornerRadius="7">
+                                                    <Border.Effect><DropShadowEffect Color="#C49A4B" BlurRadius="8" ShadowDepth="0" Opacity=".42"/></Border.Effect>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="DialogAction" TargetType="Button">
             <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>

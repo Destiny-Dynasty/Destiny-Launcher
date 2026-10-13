@@ -5,12 +5,24 @@ $ErrorActionPreference = 'Stop'
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $workspaceRoot 'DestinyLauncher\DestinyLauncher.csproj'
 $outputPath = Join-Path $workspaceRoot 'publish-experiment'
+$localSdkPath = Join-Path $env:LOCALAPPDATA 'Programs\dotnet-sdk-10.0.401\dotnet.exe'
 
 if (-not (Test-Path -LiteralPath $projectPath)) {
     throw "No se encontró el proyecto: $projectPath"
 }
 
 New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
+$dotnetCommand = if (Test-Path -LiteralPath $localSdkPath) {
+    $localSdkPath
+} else {
+    (Get-Command dotnet -ErrorAction Stop).Source
+}
+
+$sdkVersion = & $dotnetCommand --version
+if ($LASTEXITCODE -ne 0 -or $sdkVersion -notmatch '^10\.') {
+    throw "Destiny Launcher requiere el SDK de .NET 10. SDK detectado: $sdkVersion"
+}
+
 $publishArgs = @(
     'publish', $projectPath,
     '--configuration', 'Release',
@@ -24,7 +36,7 @@ $publishArgs = @(
     '-p:DebugSymbols=false'
 )
 
-& dotnet @publishArgs
+& $dotnetCommand @publishArgs
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

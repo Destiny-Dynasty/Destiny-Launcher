@@ -6,7 +6,7 @@ El launcher ya admite un manifiesto HTTPS por edición (`destiny` y `destiny-lit
 
 - Un repositorio público sirve `manifests/destiny.json` y `manifests/destiny-lite.json` desde `raw.githubusercontent.com`. El launcher no necesita iniciar sesión ni consumir la API REST de GitHub.
 - Los archivos pequeños que tengamos permiso de distribuir pueden vivir como archivos normales del mismo repositorio, por ejemplo bajo `files/`. El generador les asigna un nombre direccionado por contenido (`SHA-256-nombre`): si cambia un mod, obtiene una URL nueva; si no cambia, el launcher reutiliza el mismo archivo y no lo vuelve a descargar.
-- Las URLs de cada archivo son independientes. Podemos mezclar GitHub Raw, assets de Releases y fuentes oficiales/CDN permitidas por los autores. Releases siguen siendo opcionales y útiles para ZIP completos, archivos grandes o una instalación inicial más eficiente.
+- Las URLs de cada archivo son independientes. Podemos mezclar GitHub Raw, assets de Releases y fuentes oficiales/CDN permitidas por los autores. Releases son opcionales y útiles para archivos grandes.
 - Mantener los manifiestos en Git permite revisar el historial de versiones. El repositorio normal no es buen almacén para binarios grandes o que se actualicen continuamente: los objetos anteriores permanecen en el historial. Para esos casos conviene usar Releases o la fuente oficial del mod.
 
 GitHub advierte a partir de 50 MiB y bloquea archivos normales de 100 MiB o más. El generador de modo Raw avisa en el primer umbral y falla en el segundo. [Límites de repositorios](https://docs.github.com/en/repositories/creating-and-managing-repositories/repository-limits) · [Archivos grandes](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github).
@@ -24,13 +24,13 @@ Genera una salida nueva y vacía por versión. `RepositoryFilesBaseUrl` termina 
   -OutputDirectory "$env:TEMP/destiny-1.5.0"
 ```
 
-En el checkout del repositorio de distribución, copia `repository-files/*` generado a `files/` y `manifests/destiny.json` generado a `manifests/destiny.json`; repite para Lite. Revisa los cambios, confirma y sube ambos directorios juntos. Los archivos de `files/` se agregan, no se sustituyen: los nombres con SHA mantienen válidas las versiones anteriores. Configura en Ajustes del launcher la URL estable del manifiesto, por ejemplo `https://raw.githubusercontent.com/OWNER/REPOSITORY/main/manifests/destiny.json`.
+En el checkout del repositorio de distribución, copia `repository-files/*` generado a `files/` y `manifests/destiny.json` generado a `manifests/destiny.json`; repite para Lite. Revisa los cambios, confirma y sube ambos directorios juntos. Los archivos de `files/` se agregan, no se sustituyen: los nombres con SHA mantienen válidas las versiones anteriores. El launcher apunta a estos manifiestos de forma interna; no se editan desde Ajustes.
 
 El generador conserva el modo basado en Releases existente. Pasa `-ReleaseBaseUrl https://github.com/OWNER/REPOSITORY/releases/download/ETIQUETA` para crear `release-assets/` en vez de `repository-files/`; cada entrada del manifiesto puede apuntar a un origen distinto.
 
 ## Primera instalación y actualizaciones
 
-Con un manifiesto configurado, el launcher instala desde los archivos enumerados en él. En una instalación vacía descargará todos los archivos de esa edición; en las siguientes comprobaciones sólo descargará los que tengan una diferencia de tamaño o SHA-256. Para una primera instalación grande se puede proporcionar además un ZIP convencional, pero la ruta de actualización incremental no depende de que cada versión tenga una Release completa.
+El launcher instala desde los archivos enumerados en el manifiesto. En una instalación vacía descargará todos los archivos de esa edición; en las siguientes comprobaciones sólo descargará los que tengan una diferencia de tamaño o SHA-256. No hace falta publicar un ZIP completo del modpack.
 
 Los archivos gestionados se restringen a `mods`, `config`, `defaultconfigs`, `resourcepacks`, `shaderpacks`, `kubejs` y `scripts`. El actualizador prepara las descargas en staging, comprueba tamaño y SHA-256 durante el streaming y aplica los cambios con respaldo temporal. Si falla la operación, intenta restaurar los archivos previos.
 

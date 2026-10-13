@@ -14,7 +14,6 @@ public partial class MainWindow : Window
     private readonly LauncherPaths _paths = new();
     private readonly ConfigService _configService;
     private readonly AppLogger _log;
-    private readonly ZipPackInstaller _zipInstaller;
     private readonly GitHubPackUpdater _manifestUpdater;
     private readonly MinecraftService _minecraft;
     private readonly PlayerHeadService _playerHeadService;
@@ -24,7 +23,6 @@ public partial class MainWindow : Window
     private PackUpdateCheck? _manifestCheck;
     private string? _manifestError;
     private bool _busy;
-    private bool _updatingControls;
     private int _manifestRefreshGeneration;
     private bool _statusPulseStarted;
     private string? _playerHeadUsername;
@@ -38,7 +36,6 @@ public partial class MainWindow : Window
         _loadRemoteSkinInPreview = loadRemoteSkinInPreview;
         _log = new AppLogger(_paths);
         _configService = new ConfigService(_paths);
-        _zipInstaller = new ZipPackInstaller(_paths, _log);
         _manifestUpdater = new GitHubPackUpdater(_paths, _log);
         _minecraft = new MinecraftService(_paths, _log);
         _playerHeadService = new PlayerHeadService(_paths);
@@ -61,37 +58,25 @@ public partial class MainWindow : Window
         SelectedEdition = PackEdition.Destiny,
         RamGb = 8,
         Destiny = new PackDefinition { Name = "Destiny", Slug = "destiny", Version = "1.4.7" },
-        DestinyLite = new PackDefinition { Name = "Destiny Lite", Slug = "destiny-lite", DownloadUrl = "", ManifestUrl = "", Version = "0.1.0" }
+        DestinyLite = new PackDefinition { Name = "Destiny Lite", Slug = "destiny-lite", Version = "0.1.0" }
     };
 
     private void Refresh()
     {
-        PlayerNameText.Text = string.IsNullOrWhiteSpace(_config.PlayerName) ? "Configurar perfil" : _config.PlayerName;
+        PlayerNameText.Text = string.IsNullOrWhiteSpace(_config.PlayerName) ? "Añadir nombre" : _config.PlayerName;
         PlayerInitial.Text = string.IsNullOrWhiteSpace(_config.PlayerName) ? "D" : _config.PlayerName[..1].ToUpperInvariant();
         RefreshPlayerHead();
         EditionText.Text = Pack.Name;
-        InstallPathText.Text = _paths.Instance(Pack.Slug);
-        InstallPathText.ToolTip = $"Carpeta del juego y del modpack: {_paths.Instance(Pack.Slug)}";
-        VersionText.Text = $"Minecraft {_config.MinecraftVersion}  ·  Fabric {_config.FabricLoaderVersion}";
-        HeroEditionText.Text = $"{Pack.Name.ToUpperInvariant()}  /  {_config.MinecraftVersion}";
-        LatestText.Text = $"Versión {TargetVersion}";
-        RamText.Text = $"{_config.RamGb} GB";
-
-        _updatingControls = true;
-        RamSlider.Value = Math.Clamp(_config.RamGb, 4, 12);
-        _updatingControls = false;
+        VersionText.Text = $"Minecraft {_config.MinecraftVersion}  ·  Fabric";
 
         var installedVersion = _previewMode ? "1.4.6" : _configService.InstalledVersion(Pack.Slug);
         var hasInstall = !string.IsNullOrEmpty(installedVersion);
         var updateAvailable = hasInstall && NeedsUpdate(installedVersion);
-        InstalledText.Text = hasInstall ? $"Instalada {installedVersion}" : "No instalado";
         PrimaryLabel.Text = !hasInstall ? "INSTALAR" : updateAvailable ? "ACTUALIZAR" : "JUGAR";
-        StatusText.Text = _manifestError is not null ? "No se pudo comprobar la versión" :
-            updateAvailable ? _manifestCheck?.HasChanges == true ? $"Actualización disponible · {_manifestCheck.ChangedFiles.Count} archivos" : "Actualización disponible" :
-            hasInstall ? "Listo para jugar" : "Listo para instalar";
+        StatusText.Text = _manifestError is not null ? "No disponible" : "Listo";
         PackInstalledVersionText.Text = hasInstall ? installedVersion : "—";
-        PackLatestVersionText.Text = TargetVersion;
-        PackStateText.Text = _manifestError is not null ? "NO VERIFICADO" : updateAvailable ? "ACTUALIZACIÓN" : hasInstall ? "AL DÍA" : "LISTO PARA INSTALAR";
+        PackLatestVersionText.Text = _manifestError is null ? TargetVersion : "—";
+        PackStateIndicator.ToolTip = _manifestError is not null ? "No disponible" : updateAvailable ? "Actualización disponible" : hasInstall ? "Actualizado" : "Sin instalar";
         PackStateDot.Fill = new SolidColorBrush(_manifestError is not null
             ? Color.FromRgb(177, 126, 76)
             : updateAvailable ? Color.FromRgb(222, 184, 98) : Color.FromRgb(185, 156, 83));
@@ -105,19 +90,6 @@ public partial class MainWindow : Window
             PackStateDot.BeginAnimation(UIElement.OpacityProperty, pulse);
             _statusPulseStarted = true;
         }
-        PackDetailText.Text = _manifestError is not null
-            ? "La instalación local se conserva. Revisa la conexión o la dirección del manifiesto."
-            : _manifestCheck is not null
-                ? updateAvailable
-                    ? _manifestCheck.ChangedFiles.Count > 0
-                        ? $"{_manifestCheck.ChangedFiles.Count} archivos por actualizar · {_manifestCheck.TotalFiles} en el manifiesto."
-                        : $"Nueva versión {TargetVersion}; todos los archivos ya están actualizados."
-                    : $"Los {_manifestCheck.TotalFiles} archivos del modpack están verificados."
-                : updateAvailable
-                    ? $"La versión {TargetVersion} está lista para instalar desde el origen configurado."
-                : string.IsNullOrWhiteSpace(Pack.ManifestUrl)
-                    ? hasInstall ? "El estado se basa en la versión del ZIP configurada." : "Configura el ZIP o el manifiesto del modpack en Ajustes."
-                    : "La verificación de archivos se realizará al conectar.";
         ApplyEditionStyle();
     }
 
@@ -154,16 +126,9 @@ public partial class MainWindow : Window
         var generation = Interlocked.Increment(ref _manifestRefreshGeneration);
         var pack = Pack;
         if (_previewMode) return;
-        if (string.IsNullOrWhiteSpace(pack.ManifestUrl))
-        {
-            _manifestCheck = null;
-            _manifestError = null;
-            Refresh();
-            return;
-        }
         try
         {
-            SetStatus("Comprobando archivos del modpack…");
+            SetStatus("Comprobando…");
             var progress = new Progress<(string status, double value)>(SetProgress);
             var check = await _manifestUpdater.CheckAsync(pack, progress, CancellationToken.None);
             if (generation != Volatile.Read(ref _manifestRefreshGeneration)) return;
@@ -193,13 +158,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        SetBusy(true, "Preparando el modpack…");
+        SetBusy(true, "Iniciando…");
         var finalStatus = "Minecraft iniciado";
         try
         {
             var progress = new Progress<(string status, double value)>(SetProgress);
             var pack = Pack;
-            if (!string.IsNullOrWhiteSpace(pack.ManifestUrl))
             {
                 var installedVersion = _configService.InstalledVersion(pack.Slug);
                 var manifestCheck = _manifestCheck;
@@ -212,12 +176,12 @@ public partial class MainWindow : Window
                     catch (HttpRequestException ex) when (!string.IsNullOrWhiteSpace(installedVersion) && (ex.StatusCode is null || (int)ex.StatusCode >= 500))
                     {
                         _log.Info($"GitHub unavailable; launching installed {pack.Slug} {installedVersion}.");
-                        finalStatus = "Sin conexión a GitHub · iniciando la versión instalada";
+                        finalStatus = "Sin conexión · usando instalación local";
                     }
                     catch (TaskCanceledException ex) when (!string.IsNullOrWhiteSpace(installedVersion))
                     {
                         _log.Info($"GitHub check timed out ({ex.Message}); launching installed {pack.Slug} {installedVersion}.");
-                        finalStatus = "Tiempo de espera agotado · iniciando la versión instalada";
+                        finalStatus = "Tiempo agotado · usando instalación local";
                     }
                 }
 
@@ -236,15 +200,6 @@ public partial class MainWindow : Window
                 else if (string.IsNullOrWhiteSpace(installedVersion))
                 {
                     throw new InvalidOperationException("No hay una instalación local y no se pudo consultar el manifiesto de GitHub.");
-                }
-            }
-            else
-            {
-                var installed = _configService.InstalledVersion(pack.Slug);
-                if (installed != pack.Version)
-                {
-                    await _zipInstaller.InstallAsync(pack, progress, CancellationToken.None);
-                    _configService.SaveInstalled(pack.Slug, pack.Version);
                 }
             }
 
@@ -267,11 +222,12 @@ public partial class MainWindow : Window
 
     private static string GetFriendlyError(Exception ex) => ex switch
     {
-        HttpRequestException => "No se pudo conectar. Comprueba tu conexión y las URLs configuradas.",
-        UnauthorizedAccessException => "Windows no permitió escribir los archivos del modpack.",
-        InvalidDataException => $"El paquete descargado no es válido. {ex.Message}",
-        IOException => $"No se pudo guardar o reemplazar un archivo. Comprueba el espacio disponible. {ex.Message}",
-        _ => $"No se pudo completar la operación. Revisa el registro del launcher para ver los detalles. {ex.Message}"
+        HttpRequestException { StatusCode: System.Net.HttpStatusCode.NotFound } => "Modpack no disponible.",
+        HttpRequestException => "Sin conexión.",
+        UnauthorizedAccessException => "Windows bloqueó la carpeta de instalación.",
+        InvalidDataException => "El paquete no es válido.",
+        IOException => "No se pudieron guardar los archivos.",
+        _ => "No se pudo completar la operación."
     };
 
     private void SetBusy(bool busy, string status)
@@ -280,7 +236,6 @@ public partial class MainWindow : Window
         PrimaryButton.IsEnabled = !busy;
         DestinyButton.IsEnabled = !busy;
         LiteButton.IsEnabled = !busy;
-        RamSlider.IsEnabled = !busy;
         ProfileButton.IsEnabled = !busy;
         ActionArrow.Visibility = busy ? Visibility.Collapsed : Visibility.Visible;
         if (busy) PrimaryLabel.Text = "PREPARANDO...";
@@ -305,14 +260,6 @@ public partial class MainWindow : Window
     }
 
     private void SetStatus(string status) => Dispatcher.Invoke(() => StatusText.Text = status);
-
-    private void RamSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        if (_updatingControls || _config is null || RamSlider is null) return;
-        _config.RamGb = (int)Math.Round(e.NewValue);
-        RamText.Text = $"{_config.RamGb} GB";
-        if (!_previewMode) _configService.Save(_config);
-    }
 
     private void Profile_Click(object sender, RoutedEventArgs e)
     {
@@ -478,9 +425,8 @@ public sealed class ProfileDialog : Window
         body.Children.Add(new TextBlock { Text = "Nombre de jugador", FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(183, 171, 143)) });
         _nameBox = new TextBox { Text = current, MaxLength = 16, Margin = new Thickness(0, 9, 0, 7) };
         body.Children.Add(_nameBox);
-        body.Children.Add(new TextBlock { Text = "Entre 3 y 16 letras, números o guion bajo.", FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(117, 109, 94)) });
-        var save = DialogButton("GUARDAR PERFIL", true);
-        save.Margin = new Thickness(0, 20, 0, 0);
+        var save = DialogButton("GUARDAR", true);
+        save.Margin = new Thickness(0, 16, 0, 0);
         save.HorizontalAlignment = HorizontalAlignment.Right;
         save.Click += (_, _) =>
         {
@@ -492,7 +438,7 @@ public sealed class ProfileDialog : Window
             DialogResult = true;
         };
         body.Children.Add(save);
-        DialogChrome.Create(this, "Perfil del jugador", body, 420, 252);
+        DialogChrome.Create(this, "Perfil", body, 420, 252);
         Loaded += (_, _) => { _nameBox.Focus(); _nameBox.SelectAll(); };
     }
 
@@ -519,12 +465,10 @@ public sealed class ProfileDialog : Window
 public sealed class SettingsDialog : Window
 {
     private readonly LauncherConfig _source;
-    private readonly TextBox _destinyZip;
-    private readonly TextBox _destinyManifest;
-    private readonly TextBox _liteZip;
-    private readonly TextBox _liteManifest;
-    private readonly TextBox _server;
     private readonly TextBox _installDirectory;
+    private readonly TextBox _ramValue;
+    private readonly Slider _ramSlider;
+    private bool _syncingRam;
 
     public LauncherConfig Config { get; private set; }
 
@@ -532,18 +476,38 @@ public sealed class SettingsDialog : Window
     {
         _source = source;
         Config = source;
-        var stack = new StackPanel { Margin = new Thickness(23, 18, 23, 18) };
+        var stack = new StackPanel { Margin = new Thickness(24, 18, 24, 20) };
         stack.Children.Add(SectionTitle("INSTALACIÓN"));
-        stack.Children.Add(new TextBlock { Text = "Carpeta principal de Destiny", FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(178, 167, 142)), Margin = new Thickness(0, 5, 0, 4) });
-        var pathRow = new Grid { Margin = new Thickness(0, 0, 0, 2) };
+        var pathRow = new Grid { Margin = new Thickness(0, 0, 0, 20) };
         pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _installDirectory = new TextBox { Text = string.IsNullOrWhiteSpace(source.InstallDirectory) ? LauncherPaths.DefaultInstallDirectory : source.InstallDirectory, MinHeight = 36, VerticalContentAlignment = VerticalAlignment.Center };
+        _installDirectory = new TextBox
+        {
+            Text = string.IsNullOrWhiteSpace(source.InstallDirectory) ? LauncherPaths.DefaultInstallDirectory : source.InstallDirectory,
+            MinHeight = 40,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            ToolTip = "El modpack Lite se guarda junto a esta carpeta, con el sufijo -Lite."
+        };
         pathRow.Children.Add(_installDirectory);
-        var browse = ProfileDialog.DialogButton("ELEGIR…", false);
-        browse.MinWidth = 86;
-        browse.Height = 36;
-        browse.Margin = new Thickness(8, 0, 0, 0);
+        var browse = ProfileDialog.DialogButton("", false);
+        browse.MinWidth = 46;
+        browse.Width = 46;
+        browse.Height = 40;
+        browse.Padding = new Thickness(0);
+        browse.Margin = new Thickness(9, 0, 0, 0);
+        browse.Content = new System.Windows.Shapes.Path
+        {
+            Data = IconGlyphs.Folder,
+            Width = 16,
+            Height = 16,
+            Stretch = System.Windows.Media.Stretch.Uniform,
+            Stroke = new SolidColorBrush(Color.FromRgb(201, 173, 112)),
+            StrokeThickness = 1.4,
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round,
+            StrokeLineJoin = PenLineJoin.Round
+        };
+        browse.ToolTip = "Elegir carpeta";
         Grid.SetColumn(browse, 1);
         browse.Click += (_, _) =>
         {
@@ -552,40 +516,87 @@ public sealed class SettingsDialog : Window
         };
         pathRow.Children.Add(browse);
         stack.Children.Add(pathRow);
-        stack.Children.Add(new TextBlock { Text = "Recomendada: %APPDATA%\\.minecraft\\versions\\DestinyDynasty. Destiny Lite se mantiene aislado en una carpeta hermana terminada en -Lite.", FontSize = 9, Foreground = new SolidColorBrush(Color.FromRgb(130, 120, 101)), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 12) });
-        stack.Children.Add(SectionTitle("DESTINY"));
-        _destinyZip = AddField(stack, "ZIP del paquete", source.Destiny.DownloadUrl);
-        _destinyManifest = AddField(stack, "Manifiesto HTTPS de GitHub (opcional)", source.Destiny.ManifestUrl, "Raw GitHub: manifests/destiny.json");
-        stack.Children.Add(SectionTitle("DESTINY LITE"));
-        _liteZip = AddField(stack, "ZIP del paquete", source.DestinyLite.DownloadUrl);
-        _liteManifest = AddField(stack, "Manifiesto HTTPS de GitHub (opcional)", source.DestinyLite.ManifestUrl, "Raw GitHub: manifests/destiny-lite.json");
-        stack.Children.Add(SectionTitle("CONEXIÓN"));
-        _server = AddField(stack, "Servidor de Destiny", source.ServerAddress);
-        stack.Children.Add(new TextBlock { Text = "Los manifiestos permiten descargar solo los mods que cambiaron.", FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(142, 131, 106)), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) });
+        stack.Children.Add(SectionTitle("MEMORIA"));
+        var ramRow = new Grid { Margin = new Thickness(0, 1, 0, 4) };
+        ramRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        ramRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        ramRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _ramSlider = new Slider
+        {
+            Minimum = 2,
+            Maximum = 16,
+            TickFrequency = 1,
+            IsSnapToTickEnabled = true,
+            Value = Math.Clamp(source.RamGb, 2, 16),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 14, 0),
+            ToolTip = "Arrastra para elegir hasta 16 GB"
+        };
+        _ramSlider.ValueChanged += RamSlider_ValueChanged;
+        ramRow.Children.Add(_ramSlider);
+        _ramValue = new TextBox
+        {
+            Text = source.RamGb.ToString(),
+            Width = 68,
+            Height = 38,
+            MaxLength = 7,
+            FontSize = 14,
+            Foreground = new SolidColorBrush(Color.FromRgb(243, 239, 229)),
+            Padding = new Thickness(5, 0, 5, 0),
+            TextAlignment = TextAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            ToolTip = "Valor en GB"
+        };
+        _ramValue.TextChanged += RamValue_TextChanged;
+        Grid.SetColumn(_ramValue, 1);
+        ramRow.Children.Add(_ramValue);
+        var ramUnit = new TextBlock { Text = "GB", FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(178, 167, 142)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        Grid.SetColumn(ramUnit, 2);
+        ramRow.Children.Add(ramUnit);
+        stack.Children.Add(ramRow);
 
-        var save = ProfileDialog.DialogButton("GUARDAR CAMBIOS", true);
+        var save = ProfileDialog.DialogButton("GUARDAR", true);
         save.HorizontalAlignment = HorizontalAlignment.Right;
         save.Margin = new Thickness(0, 18, 0, 0);
         save.Click += (_, _) =>
         {
             if (string.IsNullOrWhiteSpace(_installDirectory.Text) || !Path.IsPathFullyQualified(Environment.ExpandEnvironmentVariables(_installDirectory.Text.Trim())))
             {
-                MessageBox.Show(this, "Selecciona una ruta completa para instalar Minecraft y el modpack.", "Carpeta de instalación", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, "Elige una carpeta válida.", "Instalación", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            if (!int.TryParse(_ramValue.Text, out var ramGb) || ramGb is < 1 or > 1024)
+            {
+                MessageBox.Show(this, "Introduce un valor entre 1 y 1024 GB.", "Memoria", MessageBoxButton.OK, MessageBoxImage.Information);
+                _ramValue.Focus();
+                _ramValue.SelectAll();
                 return;
             }
             _source.InstallDirectory = Path.GetFullPath(Environment.ExpandEnvironmentVariables(_installDirectory.Text.Trim()));
-            _source.Destiny.DownloadUrl = _destinyZip.Text.Trim();
-            _source.Destiny.ManifestUrl = _destinyManifest.Text.Trim();
-            _source.DestinyLite.DownloadUrl = _liteZip.Text.Trim();
-            _source.DestinyLite.ManifestUrl = _liteManifest.Text.Trim();
-            _source.ServerAddress = _server.Text.Trim();
+            _source.RamGb = ramGb;
             Config = _source;
             DialogResult = true;
         };
         stack.Children.Add(save);
 
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = stack };
-        DialogChrome.Create(this, "Ajustes del launcher", scroll, 620, 740);
+        DialogChrome.Create(this, "Ajustes", stack, 560, 360);
+    }
+
+    private void RamSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_syncingRam || _ramValue is null) return;
+        _syncingRam = true;
+        _ramValue.Text = ((int)Math.Round(e.NewValue)).ToString();
+        _syncingRam = false;
+    }
+
+    private void RamValue_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_syncingRam || _ramSlider is null || !int.TryParse(_ramValue.Text, out var value) || value < 1) return;
+        _syncingRam = true;
+        _ramSlider.Value = Math.Clamp(value, _ramSlider.Minimum, _ramSlider.Maximum);
+        _syncingRam = false;
     }
 
     private static TextBlock SectionTitle(string title) => new()
@@ -597,12 +608,4 @@ public sealed class SettingsDialog : Window
         Margin = new Thickness(0, 4, 0, 9)
     };
 
-    private static TextBox AddField(Panel parent, string label, string value, string? hint = null)
-    {
-        parent.Children.Add(new TextBlock { Text = label, FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(178, 167, 142)), Margin = new Thickness(0, 5, 0, 4) });
-        var field = new TextBox { Text = value, MinHeight = 36, Margin = new Thickness(0, 0, 0, hint is null ? 10 : 3) };
-        parent.Children.Add(field);
-        if (hint is not null) parent.Children.Add(new TextBlock { Text = hint, FontSize = 9, Foreground = new SolidColorBrush(Color.FromRgb(117, 109, 94)), Margin = new Thickness(0, 0, 0, 8) });
-        return field;
-    }
 }

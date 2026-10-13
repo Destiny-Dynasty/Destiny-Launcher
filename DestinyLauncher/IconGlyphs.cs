@@ -14,6 +14,8 @@ public static class IconGlyphs
     public static Geometry Discord { get; } = Geometry.Parse("M7 7c3-2 7-2 10 0l2 11c-3 2-5 2-7 1-2 1-4 1-7-1L7 7z M9 12h.01 M15 12h.01 M9 15c2 1 4 1 6 0");
     public static Geometry Arrow { get; } = Geometry.Parse("M4 12h15 M13 6l6 6-6 6");
     public static Geometry Check { get; } = Geometry.Parse("M4 12l5 5L20 6");
+    public static Geometry Edit { get; } = Geometry.Parse("M4 16.5V20h3.5L19 8.5 15.5 5 4 16.5z M13.5 7l3.5 3.5");
+    public static Geometry Folder { get; } = Geometry.Parse("M3 6h7l2 2h9v11H3z M3 9h18");
     public static Geometry Minimize { get; } = Geometry.Parse("M5 12h14");
     public static Geometry Maximize { get; } = Geometry.Parse("M5 5h14v14H5z");
     public static Geometry Restore { get; } = Geometry.Parse("M8 5h11v11H8z M5 8v11h11");

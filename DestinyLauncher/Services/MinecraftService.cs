@@ -23,7 +23,7 @@ public sealed class MinecraftService
         progress.Report(("Instalando Fabric " + config.FabricLoaderVersion, .74));
         var fabric = new FabricInstaller(new HttpClient());
         var profile = await fabric.Install(config.MinecraftVersion, instance, config.FabricLoaderVersion);
-        var options = new MLaunchOption { Session = MSession.CreateOfflineSession(config.PlayerName), MaximumRamMb = config.RamGb * 1024, ServerIp = config.ServerAddress };
+        var options = new MLaunchOption { Session = MSession.CreateOfflineSession(config.PlayerName), MaximumRamMb = checked(config.RamGb * 1024), ServerIp = "destinydynasty.tatnikhost.net" };
         var process = await launcher.BuildProcessAsync(profile, options);
         process.Start(); _log.Info($"Minecraft launched: {config.PlayerName}, {profile}, {pack.Name}"); progress.Report(("Minecraft iniciado", 1));
     }

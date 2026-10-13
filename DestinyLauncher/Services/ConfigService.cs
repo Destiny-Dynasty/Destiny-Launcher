@@ -10,24 +10,33 @@ public sealed class ConfigService
     {
         try
         {
-            var config = File.Exists(_paths.ConfigFile)
-                ? JsonSerializer.Deserialize<LauncherConfig>(File.ReadAllText(_paths.ConfigFile)) ?? new()
-                : new();
+            var savedJson = File.Exists(_paths.ConfigFile) ? File.ReadAllText(_paths.ConfigFile) : null;
+            var config = savedJson is not null ? JsonSerializer.Deserialize<LauncherConfig>(savedJson) ?? new() : new();
             config.Destiny ??= new LauncherConfig().Destiny;
             config.DestinyLite ??= new LauncherConfig().DestinyLite;
             if (string.IsNullOrWhiteSpace(config.InstallDirectory)) config.InstallDirectory = LauncherPaths.DefaultInstallDirectory;
-            var oldZipPlaceholder = string.Equals(config.Destiny.DownloadUrl, "https://example.com/destiny.zip", StringComparison.OrdinalIgnoreCase)
-                                    || string.Equals(config.Destiny.DownloadUrl, "https://github.com/destiny/pack/releases/latest/download/destiny.zip", StringComparison.OrdinalIgnoreCase);
-            if (oldZipPlaceholder)
+            config.RamGb = Math.Clamp(config.RamGb, 1, 1024);
+            if (savedJson is not null && HasRemovedSettings(savedJson))
             {
-                config.Destiny.DownloadUrl = "";
-                if (string.IsNullOrWhiteSpace(config.Destiny.ManifestUrl))
-                    config.Destiny.ManifestUrl = PackDefinition.DefaultDestinyManifestUrl;
+                try { Save(config); } catch { }
             }
             return config;
         }
         catch { return new(); }
     }
+
+    private static bool HasRemovedSettings(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        if (root.TryGetProperty("ServerAddress", out _) || root.TryGetProperty("MinecraftVersion", out _) || root.TryGetProperty("FabricLoaderVersion", out _)) return true;
+        foreach (var packName in new[] { "Destiny", "DestinyLite" })
+        {
+            if (root.TryGetProperty(packName, out _)) return true;
+        }
+        return false;
+    }
+
     public void Save(LauncherConfig config) => File.WriteAllText(_paths.ConfigFile, JsonSerializer.Serialize(config, _json));
     public string InstalledVersion(string slug) { var file = Path.Combine(_paths.Instance(slug), "destiny-installed.json"); try { return File.Exists(file) ? JsonSerializer.Deserialize<InstalledPack>(File.ReadAllText(file))?.Version ?? "" : ""; } catch { return ""; } }
     public void SaveInstalled(string slug, string version) { var dir = _paths.Instance(slug); Directory.CreateDirectory(dir); File.WriteAllText(Path.Combine(dir, "destiny-installed.json"), JsonSerializer.Serialize(new InstalledPack { Version = version }, _json)); }
