@@ -60,12 +60,12 @@ public partial class MainWindow : Window
     private void ConfigureInitialWindowSize()
     {
         var workArea = SystemParameters.WorkArea;
-        var availableWidth = Math.Max(760, workArea.Width * .96);
-        var availableHeight = Math.Max(520, workArea.Height * .94);
-        MinWidth = Math.Min(900, availableWidth);
-        MinHeight = Math.Min(600, availableHeight);
-        Width = Math.Min(1120, availableWidth);
-        Height = Math.Min(700, availableHeight);
+        var availableWidth = Math.Max(1, workArea.Width * .90);
+        var availableHeight = Math.Max(1, workArea.Height * .88);
+        MinWidth = Math.Min(820, availableWidth);
+        MinHeight = Math.Min(560, availableHeight);
+        Width = Math.Min(1000, availableWidth);
+        Height = Math.Min(620, availableHeight);
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
     }
 
@@ -75,7 +75,7 @@ public partial class MainWindow : Window
 
         var width = ActualWidth;
         var height = ActualHeight > 0 ? ActualHeight : Height;
-        var compact = width < 1000 || height < 660;
+        var compact = width < 1040 || height < 680;
         var heroHeight = Math.Clamp(height * (compact ? .34 : .36), compact ? 180 : 240, 320);
 
         SidebarColumn.Width = new GridLength(compact ? 150 : 172);
