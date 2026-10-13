@@ -17,8 +17,8 @@ public sealed class PlayerHeadService : IDisposable
     {
         var cacheDirectory = Path.Combine(_paths.Cache, "player-heads");
         Directory.CreateDirectory(cacheDirectory);
-        // Include the render type so a previously cached 3D image cannot mask the /head/ endpoint.
-        var cacheIdentity = $"mc-heads/head/{username.ToLowerInvariant()}";
+        // Key by the exact render endpoint so cached images from older formats are never reused.
+        var cacheIdentity = $"api.mcheads.org/head/{username.ToLowerInvariant()}/128/hat";
         var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(cacheIdentity)));
         var cachePath = Path.Combine(cacheDirectory, $"{key}.png");
         byte[]? cached = null;
@@ -37,7 +37,7 @@ public sealed class PlayerHeadService : IDisposable
 
         try
         {
-            var url = $"https://mc-heads.net/head/{Uri.EscapeDataString(username)}/100.png";
+            var url = $"https://api.mcheads.org/head/{Uri.EscapeDataString(username)}/128/hat";
             using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
             if (response.Content.Headers.ContentLength is > MaxImageBytes)
