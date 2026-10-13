@@ -32,6 +32,9 @@ public partial class MainWindow : Window
     public MainWindow(bool previewMode = false, bool loadRemoteSkinInPreview = false, bool startOnSettingsPage = false)
     {
         InitializeComponent();
+        ConfigureInitialWindowSize();
+        SizeChanged += (_, _) => ApplyResponsiveLayout();
+        ApplyResponsiveLayout();
         _previewMode = previewMode;
         _loadRemoteSkinInPreview = loadRemoteSkinInPreview;
         _log = new AppLogger(_paths);
@@ -44,10 +47,54 @@ public partial class MainWindow : Window
 
         WindowFrame.SizeChanged += (_, _) => UpdateFrameClip();
         StateChanged += (_, _) => UpdateWindowFrame();
-        Loaded += async (_, _) => await RefreshManifestAsync();
+        Loaded += async (_, _) =>
+        {
+            ApplyResponsiveLayout();
+            await RefreshManifestAsync();
+        };
         UpdateWindowFrame();
         Refresh();
         if (startOnSettingsPage) ShowSettingsPage();
+    }
+
+    private void ConfigureInitialWindowSize()
+    {
+        var workArea = SystemParameters.WorkArea;
+        var availableWidth = Math.Max(760, workArea.Width * .96);
+        var availableHeight = Math.Max(520, workArea.Height * .94);
+        MinWidth = Math.Min(900, availableWidth);
+        MinHeight = Math.Min(600, availableHeight);
+        Width = Math.Min(1120, availableWidth);
+        Height = Math.Min(700, availableHeight);
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+    }
+
+    private void ApplyResponsiveLayout()
+    {
+        if (HeroRow is null || ActualWidth <= 0) return;
+
+        var width = ActualWidth;
+        var height = ActualHeight > 0 ? ActualHeight : Height;
+        var compact = width < 1000 || height < 660;
+        var heroHeight = Math.Clamp(height * (compact ? .34 : .36), compact ? 180 : 240, 320);
+
+        SidebarColumn.Width = new GridLength(compact ? 150 : 172);
+        HeroRow.Height = new GridLength(heroHeight);
+        HomeBody.Margin = compact ? new Thickness(14, 14, 14, 14) : new Thickness(20, 18, 20, 18);
+        HomeBody.RowDefinitions[1].Height = new GridLength(compact ? 42 : 48);
+        ProfileColumn.Width = new GridLength(compact ? 236 : 278);
+        RightPanel.RowDefinitions[0].Height = new GridLength(compact ? 78 : 94);
+        SummaryLayout.Margin = compact ? new Thickness(16, 14, 16, 14) : new Thickness(24, 20, 24, 20);
+        SummaryLayout.ColumnDefinitions[0].Width = new GridLength(compact ? 68 : 78);
+        SummaryLayout.ColumnDefinitions[2].Width = new GridLength(compact ? 160 : 208);
+        EditionEmblem.Width = EditionEmblem.Height = compact ? 58 : 70;
+        PrimaryButton.Width = compact ? 160 : 208;
+        PrimaryButton.Height = compact ? 58 : 70;
+        DestinyButton.MinWidth = LiteButton.MinWidth = compact ? 88 : 104;
+        DestinyButton.Width = LiteButton.Width = compact ? 88 : double.NaN;
+        DestinyButton.FontSize = LiteButton.FontSize = compact ? 9 : 11;
+        DestinyButton.Padding = LiteButton.Padding = compact ? new Thickness(4, 0, 4, 0) : new Thickness(14, 0, 14, 0);
+        DestinyButton.Margin = LiteButton.Margin = compact ? new Thickness(0, 0, 6, 0) : new Thickness(0, 0, 9, 0);
     }
 
     private PackDefinition Pack => _config.SelectedEdition == PackEdition.Destiny ? _config.Destiny : _config.DestinyLite;
@@ -556,6 +603,8 @@ public sealed class SettingsPage : UserControl
             VerticalContentAlignment = VerticalAlignment.Center,
             ToolTip = "El modpack Lite se guarda junto a esta carpeta, con el sufijo -Lite."
         };
+        _installDirectory.CaretIndex = _installDirectory.Text.Length;
+        _installDirectory.Loaded += (_, _) => _installDirectory.ScrollToEnd();
         pathRow.Children.Add(_installDirectory);
         var browse = ProfileDialog.DialogButton("", false);
         browse.MinWidth = 46;

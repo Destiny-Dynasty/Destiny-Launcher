@@ -25,9 +25,20 @@ public partial class App : Application
             await RenderPreviewAsync(e.Args[1], includePlayerSkin: true);
             return;
         }
+        if (e.Args.Length == 2 && e.Args[0].Equals("--render-preview-compact", StringComparison.OrdinalIgnoreCase))
+        {
+            await RenderPreviewAsync(e.Args[1], includePlayerSkin: false, previewWidth: 960, previewHeight: 640);
+            return;
+        }
         if (e.Args.Length == 2 && e.Args[0].Equals("--render-settings-preview", StringComparison.OrdinalIgnoreCase))
         {
             RenderSettingsPreview(e.Args[1]);
+            Shutdown();
+            return;
+        }
+        if (e.Args.Length == 2 && e.Args[0].Equals("--render-settings-preview-compact", StringComparison.OrdinalIgnoreCase))
+        {
+            RenderSettingsPreview(e.Args[1], 960, 640);
             Shutdown();
             return;
         }
@@ -42,10 +53,8 @@ public partial class App : Application
         MainWindow.Show();
     }
 
-    private async Task RenderPreviewAsync(string outputPath, bool includePlayerSkin)
+    private async Task RenderPreviewAsync(string outputPath, bool includePlayerSkin, int previewWidth = 1120, int previewHeight = 700)
     {
-        const int previewWidth = 1320;
-        const int previewHeight = 830;
         var window = new MainWindow(previewMode: true, loadRemoteSkinInPreview: includePlayerSkin)
         {
             WindowState = WindowState.Normal,
@@ -81,10 +90,10 @@ public partial class App : Application
         }
     }
 
-    private static void RenderSettingsPreview(string outputPath)
+    private static void RenderSettingsPreview(string outputPath, int width = 1120, int height = 700)
     {
         var window = new MainWindow(previewMode: true, startOnSettingsPage: true);
-        RenderDialog(window, outputPath, 1320, 830);
+        RenderDialog(window, outputPath, width, height);
     }
 
     private static void RenderProfilePreview(string outputPath) => RenderDialog(new ProfileDialog("Shady935"), outputPath, 420, 252);
