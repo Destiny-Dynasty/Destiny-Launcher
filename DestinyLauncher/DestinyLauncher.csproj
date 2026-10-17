@@ -15,6 +15,7 @@
   <ItemGroup>
     <Resource Include="Assets\destiny-launcher.ico" />
     <Resource Include="Assets\destiny-hero-gold-v3.png" />
+    <Resource Include="Assets\destiny-hero-gold-v2.png" />
     <Resource Include="Assets\experiment\obsidian-gold-v1\obsidian-texture.png" />
     <Resource Include="Assets\experiment\obsidian-gold-v1\card-surface-v2.png" />
     <Resource Include="Assets\experiment\obsidian-gold-v1\primary-button-plate.png" />

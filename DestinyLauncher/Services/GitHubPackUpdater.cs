@@ -130,10 +130,13 @@ public sealed class GitHubPackUpdater
         try
         {
             var downloadNumber = 0;
+            long downloadedBytes = 0;
+            var totalDownloadBytes = update.ChangedFiles.Sum(file => file.Size);
             foreach (var file in update.ChangedFiles)
             {
                 token.ThrowIfCancellationRequested();
                 ValidateFile(file);
+                progress?.Report(($"Descargando modpack · {downloadedBytes}/{totalDownloadBytes} bytes", .4 + .48 * downloadNumber / Math.Max(1, update.ChangedFiles.Count)));
                 var target = SafeTargetPath(instance, NormalizePath(file.Path));
                 if (File.Exists(target) && !oldManaged.Contains(NormalizePath(file.Path)))
                     throw new IOException($"El archivo «{file.Path}» ya existe y no pertenece al launcher. Se conservó sin cambios.");
@@ -151,6 +154,7 @@ public sealed class GitHubPackUpdater
                 {
                     var buffer = new byte[131072];
                     long received = 0;
+                    var lastProgress = Environment.TickCount64;
                     int count;
                     while ((count = await input.ReadAsync(buffer, token)) > 0)
                     {
@@ -159,6 +163,11 @@ public sealed class GitHubPackUpdater
                             throw new InvalidDataException($"La descarga de «{file.Path}» supera el tamaño declarado en el manifiesto.");
                         hasher.AppendData(buffer, 0, count);
                         await output.WriteAsync(buffer.AsMemory(0, count), token);
+                        if (Environment.TickCount64 - lastProgress >= 120)
+                        {
+                            progress?.Report(($"Descargando modpack · {downloadedBytes + received}/{totalDownloadBytes} bytes", .4 + .48 * (downloadNumber + (file.Size > 0 ? (double)received / file.Size : 0)) / Math.Max(1, update.ChangedFiles.Count)));
+                            lastProgress = Environment.TickCount64;
+                        }
                     }
 
                     var actualHash = Convert.ToHexString(hasher.GetHashAndReset());
@@ -167,7 +176,8 @@ public sealed class GitHubPackUpdater
                 }
 
                 downloadNumber++;
-                progress?.Report(($"Descargando modpack · {downloadNumber}/{update.ChangedFiles.Count}", .4 + .48 * downloadNumber / Math.Max(1, update.ChangedFiles.Count)));
+                downloadedBytes += file.Size;
+                progress?.Report(($"Descargando modpack · {downloadedBytes}/{totalDownloadBytes} bytes", .4 + .48 * downloadNumber / Math.Max(1, update.ChangedFiles.Count)));
             }
 
             var affected = update.Manifest.Files.Select(x => NormalizePath(x.Path)).Where(x => update.ChangedFiles.Any(f => NormalizePath(f.Path).Equals(x, StringComparison.OrdinalIgnoreCase)))

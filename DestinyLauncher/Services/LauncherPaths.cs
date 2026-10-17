@@ -9,7 +9,11 @@ public sealed class LauncherPaths
     public string Temp => Path.Combine(Root, "temp");
     public string InstallDirectory { get; private set; } = DefaultInstallDirectory;
     public static string DefaultInstallDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "versions", "DestinyDynasty");
-    public LauncherPaths(string? root = null) => Root = root ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DestinyLauncher");
+    public LauncherPaths(string? root = null)
+    {
+        Root = Path.GetFullPath(root ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DestinyLauncher"));
+        if (root is not null) InstallDirectory = Path.Combine(Root, "instances", "Destiny");
+    }
     public void SetInstallDirectory(string? path) => InstallDirectory = Path.GetFullPath(string.IsNullOrWhiteSpace(path) ? DefaultInstallDirectory : Environment.ExpandEnvironmentVariables(path.Trim()));
     public string Instance(string slug) => string.Equals(slug, "destiny-lite", StringComparison.OrdinalIgnoreCase) ? InstallDirectory + "-Lite" : InstallDirectory;
     public void Ensure() { foreach (var p in new[] { Root, Cache, Logs, Temp }) Directory.CreateDirectory(p); }

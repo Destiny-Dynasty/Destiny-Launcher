@@ -1,0 +1,213 @@
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Shell;
+using DestinyLauncher.Models;
+using DestinyLauncher.Services;
+
+namespace DestinyLauncher;
+
+internal static class DialogChrome
+{
+    internal static void Create(Window owner, string title, UIElement body, double width, double height)
+    {
+        owner.Title = title;
+        owner.Width = Math.Min(width, SystemParameters.WorkArea.Width - 24);
+        owner.Height = Math.Min(height, SystemParameters.WorkArea.Height - 24);
+        owner.WindowStyle = WindowStyle.None;
+        owner.ResizeMode = ResizeMode.NoResize;
+        owner.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        owner.Background = (Brush)Application.Current.FindResource("Canvas");
+        owner.Foreground = (Brush)Application.Current.FindResource("Ink");
+        owner.ShowInTaskbar = false;
+        owner.UseLayoutRounding = true;
+        WindowChrome.SetWindowChrome(owner, new WindowChrome { CaptionHeight = 48, ResizeBorderThickness = new Thickness(0), GlassFrameThickness = new Thickness(0), UseAeroCaptionButtons = false });
+        var frame = new Border { BorderBrush = (Brush)Application.Current.FindResource("GoldDim"), BorderThickness = new Thickness(1) };
+        var layout = new Grid();
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(48) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        var bar = new Grid { Background = (Brush)Application.Current.FindResource("Panel") };
+        bar.Children.Add(new TextBlock { Text = title, FontFamily = new FontFamily("Georgia"), FontSize = 18, Margin = new Thickness(24, 0, 55, 0), VerticalAlignment = VerticalAlignment.Center });
+        var close = new Button { Style = (Style)Application.Current.FindResource("CloseControl"), Content = "×", FontSize = 20, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, ToolTip = "Cerrar" };
+        AutomationProperties.SetName(close, "Cerrar diálogo");
+        WindowChrome.SetIsHitTestVisibleInChrome(close, true);
+        close.Click += (_, _) => owner.Close();
+        bar.Children.Add(close);
+        layout.Children.Add(bar);
+        Grid.SetRow(body, 1);
+        layout.Children.Add(body);
+        frame.Child = layout;
+        owner.Content = frame;
+        owner.Loaded += (_, _) => UiMotion.Enter(body as FrameworkElement ?? frame);
+        owner.PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { owner.Close(); e.Handled = true; } };
+    }
+}
+
+public sealed class ProfileDialog : Window
+{
+    private readonly TextBox _nameBox;
+    public string PlayerName => _nameBox.Text.Trim();
+    public ProfileDialog(string current)
+    {
+        var body = new StackPanel { Margin = new Thickness(24, 20, 24, 24) };
+        body.Children.Add(new TextBlock { Text = "Tu nombre dentro de Destiny Dynasty.", Foreground = ResourceBrush("Muted"), FontSize = 13, Margin = new Thickness(0, 0, 0, 20), TextWrapping = TextWrapping.Wrap });
+        var nameLabel = new Label { Content = "Nombre de jugador", Padding = new Thickness(0, 0, 0, 8), Foreground = ResourceBrush("Ink"), FontSize = 12 };
+        body.Children.Add(nameLabel);
+        _nameBox = new TextBox { Text = current, MaxLength = 16, FontSize = 15 };
+        nameLabel.Target = _nameBox;
+        AutomationProperties.SetName(_nameBox, "Nombre de jugador");
+        AutomationProperties.SetAutomationId(_nameBox, "PlayerNameInput");
+        body.Children.Add(_nameBox);
+        var validation = new TextBlock { FontSize = 11, Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
+        AutomationProperties.SetLiveSetting(validation, AutomationLiveSetting.Polite);
+        body.Children.Add(validation);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 24, 0, 0) };
+        var cancel = DialogButton("Cancelar", false); cancel.IsCancel = true; cancel.Margin = new Thickness(0, 0, 10, 0); cancel.Click += (_, _) => Close();
+        var save = DialogButton("Guardar nombre", true); save.IsDefault = true;
+        void Validate(bool editing)
+        {
+            var valid = Regex.IsMatch(PlayerName, "^[A-Za-z0-9_]{3,16}$");
+            save.IsEnabled = valid;
+            validation.Text = valid || !editing ? "De 3 a 16 caracteres: letras, números o guion bajo (_)." : "Usa de 3 a 16 letras, números o guiones bajos, sin espacios.";
+            validation.Foreground = ResourceBrush(valid || !editing ? "Muted" : "Error");
+            _nameBox.BorderBrush = ResourceBrush(valid || !editing ? "Line" : "Error");
+        }
+        _nameBox.TextChanged += (_, _) => Validate(true);
+        Validate(false);
+        save.Click += (_, _) => { if (Regex.IsMatch(PlayerName, "^[A-Za-z0-9_]{3,16}$")) DialogResult = true; };
+        actions.Children.Add(cancel); actions.Children.Add(save); body.Children.Add(actions);
+        DialogChrome.Create(this, "Tu perfil", new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false }, 450, 326);
+        Loaded += (_, _) => { _nameBox.Focus(); _nameBox.SelectAll(); };
+    }
+    internal static Brush ResourceBrush(string key) => (Brush)Application.Current.FindResource(key);
+    internal static Button DialogButton(string label, bool primary) => new()
+    {
+        Style = (Style)Application.Current.FindResource(primary ? "GoldButton" : "QuietButton"),
+        Content = label, MinWidth = 108, Height = 40, Padding = new Thickness(16, 8, 16, 8)
+    };
+}
+
+internal static class LauncherDialog
+{
+    internal static bool Confirm(Window owner, string title, string message, string accept, string cancel) => Show(owner, title, message, accept, cancel);
+    internal static void Inform(Window owner, string title, string message) => Show(owner, title, message, "Entendido", null);
+    private static bool Show(Window owner, string title, string message, string accept, string? cancel)
+    {
+        var dialog = new Window { Owner = owner };
+        var body = new StackPanel { Margin = new Thickness(24, 22, 24, 24) };
+        body.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, Foreground = ProfileDialog.ResourceBrush("Muted"), FontSize = 13 });
+        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 24, 0, 0) };
+        if (cancel is not null)
+        {
+            var back = ProfileDialog.DialogButton(cancel, false); back.Margin = new Thickness(0, 0, 10, 0); back.IsDefault = true; back.IsCancel = true; back.Click += (_, _) => dialog.Close(); actions.Children.Add(back);
+        }
+        var proceed = ProfileDialog.DialogButton(accept, true); proceed.IsDefault = cancel is null; proceed.Click += (_, _) => dialog.DialogResult = true; actions.Children.Add(proceed);
+        body.Children.Add(actions);
+        DialogChrome.Create(dialog, title, body, 470, 230);
+        return dialog.ShowDialog() == true;
+    }
+}
+
+public sealed class SettingsPage : UserControl
+{
+    private readonly LauncherConfig _source;
+    private readonly TextBox _installDirectory;
+    private readonly TextBox _ramValue;
+    private readonly Slider _ramSlider;
+    private bool _syncingRam;
+    private bool _saved;
+    public bool HasChanges => !_saved && (_installDirectory.Text != _source.InstallDirectory || _ramValue.Text != _source.RamGb.ToString());
+    public Action? BackRequested { get; set; }
+    public Func<LauncherConfig, Task>? SaveRequested { get; set; }
+    internal void MarkSaved() => _saved = true;
+
+    public SettingsPage(LauncherConfig source)
+    {
+        _source = source;
+        TextBlock? validation = null;
+        var layout = new Grid { Margin = new Thickness(28, 24, 28, 20) };
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 20) };
+        heading.Children.Add(new TextBlock { Text = "Ajustes", FontFamily = new FontFamily("Georgia"), FontSize = 28 });
+        heading.Children.Add(Help("Prepara el launcher para tu equipo.", new Thickness(0, 7, 0, 0)));
+        layout.Children.Add(heading);
+        var content = new StackPanel();
+        var installation = Card();
+        var installBody = new StackPanel();
+        installBody.Children.Add(Title("Carpeta de instalación"));
+        installBody.Children.Add(Help("Aquí se guardan el juego y los archivos de Destiny.", new Thickness(0, 6, 0, 13)));
+        var pathRow = new Grid();
+        pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _installDirectory = new TextBox { Text = source.InstallDirectory, ToolTip = source.InstallDirectory };
+        AutomationProperties.SetName(_installDirectory, "Carpeta de instalación");
+        AutomationProperties.SetAutomationId(_installDirectory, "InstallDirectoryInput");
+        _installDirectory.TextChanged += (_, _) => { _installDirectory.ToolTip = _installDirectory.Text; _installDirectory.BorderBrush = ProfileDialog.ResourceBrush("Line"); if (validation is not null) validation.Visibility = Visibility.Collapsed; };
+        pathRow.Children.Add(_installDirectory);
+        var browse = ProfileDialog.DialogButton("", false); browse.MinWidth = 42; browse.Width = 42; browse.Padding = new Thickness(0); browse.Margin = new Thickness(10, 0, 0, 0); browse.ToolTip = "Elegir carpeta";
+        browse.Content = new System.Windows.Shapes.Path { Data = IconGlyphs.Folder, Width = 17, Height = 17, Stretch = Stretch.Uniform, Stroke = ProfileDialog.ResourceBrush("Gold"), StrokeThickness = 1.3 };
+        AutomationProperties.SetName(browse, "Elegir carpeta de instalación");
+        browse.Click += (_, _) =>
+        {
+            var picker = new Microsoft.Win32.OpenFolderDialog { Title = "Carpeta de instalación de Destiny", InitialDirectory = Directory.Exists(_installDirectory.Text) ? _installDirectory.Text : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Multiselect = false };
+            if (picker.ShowDialog(Window.GetWindow(this)) == true) _installDirectory.Text = picker.FolderName;
+        };
+        Grid.SetColumn(browse, 1); pathRow.Children.Add(browse); installBody.Children.Add(pathRow);
+        installBody.Children.Add(Help("Destiny Lite usa la carpeta hermana con el sufijo -Lite. Cambiar la ruta no mueve los archivos existentes.", new Thickness(0, 10, 0, 0)));
+        installation.Child = installBody; content.Children.Add(installation);
+        var memory = Card(); memory.Margin = new Thickness(0, 14, 0, 0);
+        var memoryBody = new StackPanel(); memoryBody.Children.Add(Title("Memoria del juego"));
+        memoryBody.Children.Add(Help("Deja memoria libre para Windows y otras aplicaciones.", new Thickness(0, 6, 0, 10)));
+        var ramRow = new Grid();
+        ramRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        ramRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        ramRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _ramSlider = new Slider { Minimum = 2, Maximum = 16, TickFrequency = 1, IsSnapToTickEnabled = true, Value = Math.Clamp(source.RamGb, 2, 16), Margin = new Thickness(0, 0, 22, 0), VerticalAlignment = VerticalAlignment.Center, ToolTip = "Selección rápida de 2 a 16 GB. También puedes escribir el valor." };
+        AutomationProperties.SetName(_ramSlider, "Memoria del juego en GB");
+        _ramSlider.ValueChanged += (_, e) => { if (_syncingRam || _ramValue is null) return; _syncingRam = true; _ramValue.Text = ((int)Math.Round(e.NewValue)).ToString(); _syncingRam = false; };
+        ramRow.Children.Add(_ramSlider);
+        _ramValue = new TextBox { Text = source.RamGb.ToString(), Width = 66, MaxLength = 4, TextAlignment = TextAlignment.Center };
+        AutomationProperties.SetName(_ramValue, "Memoria en GB");
+        AutomationProperties.SetAutomationId(_ramValue, "RamInput");
+        _ramValue.TextChanged += (_, _) => { _ramValue.BorderBrush = ProfileDialog.ResourceBrush("Line"); if (validation is not null) validation.Visibility = Visibility.Collapsed; if (_syncingRam || !int.TryParse(_ramValue.Text, out var value)) return; _syncingRam = true; _ramSlider.Value = Math.Clamp(value, 2, 16); _syncingRam = false; };
+        Grid.SetColumn(_ramValue, 1); ramRow.Children.Add(_ramValue);
+        var unit = new TextBlock { Text = "GB", Foreground = ProfileDialog.ResourceBrush("Muted"), Margin = new Thickness(9, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(unit, 2); ramRow.Children.Add(unit);
+        memoryBody.Children.Add(ramRow); memory.Child = memoryBody; content.Children.Add(memory);
+        var scroller = new ScrollViewer { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false, Padding = new Thickness(0, 0, 7, 0) };
+        Grid.SetRow(scroller, 1); layout.Children.Add(scroller);
+        var footer = new Grid { Margin = new Thickness(0, 16, 7, 0) };
+        footer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); footer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        validation = Help("", new Thickness(0, 0, 0, 10)); validation.Foreground = ProfileDialog.ResourceBrush("Error"); validation.Visibility = Visibility.Collapsed;
+        AutomationProperties.SetLiveSetting(validation, AutomationLiveSetting.Polite); footer.Children.Add(validation);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        var back = ProfileDialog.DialogButton("Volver", false); back.Margin = new Thickness(0, 0, 10, 0); back.Click += (_, _) => BackRequested?.Invoke(); actions.Children.Add(back);
+        var save = ProfileDialog.DialogButton("Guardar ajustes", true); actions.Children.Add(save);
+        save.Click += async (_, _) =>
+        {
+            void Error(string message, TextBox input) { validation.Text = message; validation.Visibility = Visibility.Visible; input.BorderBrush = ProfileDialog.ResourceBrush("Error"); input.Focus(); input.SelectAll(); }
+            string path;
+            try
+            {
+                path = Environment.ExpandEnvironmentVariables(_installDirectory.Text.Trim());
+                if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) { Error("Elige una ruta completa, por ejemplo C:\\Juegos\\Destiny.", _installDirectory); return; }
+                path = Path.GetFullPath(path);
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { Error("La ruta contiene caracteres no válidos. Elige otra carpeta.", _installDirectory); return; }
+            if (!int.TryParse(_ramValue.Text, out var ram) || ram is < 1 or > 1024) { Error("Introduce un número entero entre 1 y 1024 GB.", _ramValue); return; }
+            var updated = new LauncherConfig { PlayerName = source.PlayerName, SelectedEdition = source.SelectedEdition, InstallDirectory = path, RamGb = ram, MinecraftVersion = source.MinecraftVersion, FabricLoaderVersion = source.FabricLoaderVersion, Destiny = source.Destiny, DestinyLite = source.DestinyLite };
+            save.IsEnabled = false;
+            try { if (SaveRequested is not null) await SaveRequested(updated); }
+            catch (Exception ex) { Error(MainWindow.GetFriendlyError(ex), _installDirectory); }
+            finally { save.IsEnabled = true; }
+        };
+        Grid.SetRow(actions, 1); footer.Children.Add(actions); Grid.SetRow(footer, 2); layout.Children.Add(footer); Content = layout;
+    }
+    private static TextBlock Title(string text) => new() { Text = text, FontSize = 15, FontWeight = FontWeights.SemiBold };
+    private static TextBlock Help(string text, Thickness margin) => new() { Text = text, FontSize = 12, Foreground = ProfileDialog.ResourceBrush("Muted"), TextWrapping = TextWrapping.Wrap, Margin = margin };
+    private static Border Card() => new() { Background = ProfileDialog.ResourceBrush("Panel"), BorderBrush = ProfileDialog.ResourceBrush("Line"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(7), Padding = new Thickness(20, 17, 20, 18) };
+}

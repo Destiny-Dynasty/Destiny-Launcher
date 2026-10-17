@@ -27,7 +27,7 @@ public partial class App : Application
         }
         if (e.Args.Length == 2 && e.Args[0].Equals("--render-preview-compact", StringComparison.OrdinalIgnoreCase))
         {
-            await RenderPreviewAsync(e.Args[1], includePlayerSkin: false, previewWidth: 1000, previewHeight: 620);
+            await RenderPreviewAsync(e.Args[1], includePlayerSkin: false, previewWidth: 820, previewHeight: 560);
             return;
         }
         if (e.Args.Length == 2 && e.Args[0].Equals("--render-settings-preview", StringComparison.OrdinalIgnoreCase))
@@ -38,7 +38,7 @@ public partial class App : Application
         }
         if (e.Args.Length == 2 && e.Args[0].Equals("--render-settings-preview-compact", StringComparison.OrdinalIgnoreCase))
         {
-            RenderSettingsPreview(e.Args[1], 1000, 620);
+            RenderSettingsPreview(e.Args[1], 820, 560);
             Shutdown();
             return;
         }
@@ -49,7 +49,13 @@ public partial class App : Application
             return;
         }
 
-        MainWindow = new MainWindow();
+        string? dataRoot = null;
+        if (e.Args.Length == 2 && e.Args[0].Equals("--data-root", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!Path.IsPathFullyQualified(e.Args[1])) { Shutdown(2); return; }
+            dataRoot = Path.GetFullPath(e.Args[1]);
+        }
+        MainWindow = new MainWindow(dataRoot: dataRoot);
         MainWindow.Show();
     }
 
@@ -62,6 +68,7 @@ public partial class App : Application
             Height = previewHeight,
             ShowInTaskbar = false,
             ShowActivated = false,
+            WindowStartupLocation = WindowStartupLocation.Manual,
             Left = -32000,
             Top = -32000
         };
@@ -96,7 +103,7 @@ public partial class App : Application
         RenderDialog(window, outputPath, width, height);
     }
 
-    private static void RenderProfilePreview(string outputPath) => RenderDialog(new ProfileDialog("Shady935"), outputPath, 420, 252);
+    private static void RenderProfilePreview(string outputPath) => RenderDialog(new ProfileDialog("Shady935"), outputPath, 450, 326);
 
     private static void RenderDialog(Window dialog, string outputPath, int width, int height)
     {

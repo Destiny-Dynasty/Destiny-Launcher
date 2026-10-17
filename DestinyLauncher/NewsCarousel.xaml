@@ -1,0 +1,51 @@
+<UserControl x:Class="DestinyLauncher.NewsCarousel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:DestinyLauncher"
+    Focusable="True" FocusVisualStyle="{StaticResource KeyboardFocus}"
+    AutomationProperties.Name="Novedades de Destiny Dynasty"
+    PreviewKeyDown="Carousel_KeyDown">
+    <UserControl.Resources>
+        <Style x:Key="CarouselControl" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Width" Value="28"/><Setter Property="Height" Value="30"/><Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/><Setter Property="Background" Value="#C4141512"/>
+            <Setter Property="BorderBrush" Value="#80745B"/><Setter Property="FontSize" Value="16"/>
+            <Setter Property="local:UiMotion.Feedback" Value="False"/>
+        </Style>
+        <Style x:Key="SlideDot" TargetType="RadioButton">
+            <Setter Property="Width" Value="24"/><Setter Property="Height" Value="24"/>
+            <Setter Property="Cursor" Value="Hand"/><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
+                <Grid Background="Transparent"><Border x:Name="Dot" Width="5" Height="5" CornerRadius="3" Background="#B3D5C7AB"/></Grid>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsChecked" Value="True"><Setter TargetName="Dot" Property="Width" Value="16"/><Setter TargetName="Dot" Property="Background" Value="#F1D398"/></Trigger>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Dot" Property="Background" Value="White"/></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+    </UserControl.Resources>
+    <Grid>
+        <Border x:Name="PictureFrame" CornerRadius="8" Background="#191A16">
+            <Grid x:Name="PictureViewport" SizeChanged="Picture_SizeChanged">
+                <Image x:Name="PreviousImage" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" IsHitTestVisible="False"/>
+                <Image x:Name="CurrentImage" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" IsHitTestVisible="False"/>
+                <Button x:Name="OpenSlideButton" Click="OpenSlide_Click" Background="Transparent" BorderThickness="0" Padding="0" MinHeight="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <Button.Template><ControlTemplate TargetType="Button"><Border Background="Transparent"/></ControlTemplate></Button.Template>
+                </Button>
+                <Border x:Name="CaptionSurface" VerticalAlignment="Bottom" Padding="13,22,13,27" Opacity="0" IsHitTestVisible="False">
+                    <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#0010100F"/><GradientStop Color="#ED10100F" Offset=".45"/><GradientStop Color="#F710100F" Offset="1"/></LinearGradientBrush></Border.Background>
+                    <TextBlock x:Name="CaptionText" FontSize="12" Foreground="#F2EBDD" TextTrimming="CharacterEllipsis"/>
+                </Border>
+                <Grid x:Name="HoverControls" Opacity="0" IsHitTestVisible="False">
+                    <Button x:Name="PreviousButton" Style="{StaticResource CarouselControl}" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,12" Click="Previous_Click" Content="‹" ToolTip="Novedad anterior" AutomationProperties.Name="Novedad anterior"/>
+                    <Button x:Name="NextButton" Style="{StaticResource CarouselControl}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,12" Click="Next_Click" Content="›" ToolTip="Siguiente novedad" AutomationProperties.Name="Siguiente novedad"/>
+                </Grid>
+                <Border VerticalAlignment="Bottom" Height="26" IsHitTestVisible="False">
+                    <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#0010100F"/><GradientStop Color="#8C10100F" Offset="1"/></LinearGradientBrush></Border.Background>
+                </Border>
+                <StackPanel x:Name="Indicators" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,1"/>
+            </Grid>
+        </Border>
+        <Border CornerRadius="8" BorderBrush="#8A8A7148" BorderThickness="1" IsHitTestVisible="False"/>
+    </Grid>
+</UserControl>

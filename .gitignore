@@ -3,6 +3,7 @@
 **/obj/
 /publish/
 /publish-experiment/
+/publish-experiment-2/
 
 # Generated visual previews and local editor state.
 /artifacts/

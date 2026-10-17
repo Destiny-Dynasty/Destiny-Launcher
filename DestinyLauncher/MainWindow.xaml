@@ -2,150 +2,170 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:DestinyLauncher"
-        Title="Destiny Launcher" Icon="/DestinyLauncher;component/Assets/destiny-launcher.ico" Width="1000" Height="620" MinWidth="820" MinHeight="560" WindowStartupLocation="CenterScreen"
-        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="CanResize"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Destiny Launcher" Icon="/DestinyLauncher;component/Assets/destiny-launcher.ico"
+        Width="1000" Height="620" MinWidth="760" MinHeight="500" WindowStartupLocation="CenterScreen"
+        WindowStyle="None" Background="Transparent" Foreground="{StaticResource Ink}" ResizeMode="CanMinimize"
         UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display">
+    <shell:WindowChrome.WindowChrome>
+        <!-- With glass disabled, WindowChrome passes CornerRadius as the Win32 ellipse diameter.
+             Use 36 here to match the visible 18-DIP frame radius and avoid an opaque outer crescent. -->
+        <shell:WindowChrome CaptionHeight="40" ResizeBorderThickness="0" CornerRadius="36" GlassFrameThickness="0" UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
     <Window.Resources>
-        <ImageBrush x:Key="ObsidianAmbient" ImageSource="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/obsidian-texture.png" Stretch="UniformToFill" TileMode="Tile" ViewportUnits="Absolute" Viewport="0,0,420,420" Opacity=".10"/>
-        <ImageBrush x:Key="ObsidianCard" ImageSource="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/card-surface-v2.png" Stretch="UniformToFill" Opacity=".28"/>
-        <Style x:Key="NavItem" TargetType="Button">
-            <Setter Property="Height" Value="52"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="#9C9588"/>
-            <Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="15,0"/><Setter Property="Margin" Value="0,3"/>
-            <Setter Property="FontSize" Value="13"/><Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="9"><Grid><Border x:Name="Indicator" Width="3" Background="Transparent" CornerRadius="2" HorizontalAlignment="Left"/><ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="12,0,0,0"/></Grid></Border><ControlTemplate.Triggers><DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="Selected"><Setter TargetName="Shell" Property="Background" Value="#211C11"/><Setter TargetName="Indicator" Property="Background" Value="#C9A250"/><Setter Property="Foreground" Value="#F1D18A"/></DataTrigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Shell" Property="Background" Value="#1C1A15"/><Setter Property="Foreground" Value="#F1E6CE"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Shell" Property="Background" Value="#272216"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+        <!-- Decode a shared, small source first; Fant resampling then resolves the final DPI size.
+             The original full-detail artwork remains unchanged in the banner. -->
+        <BitmapImage x:Key="SmallEmblem" UriSource="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/destiny-emblem.png" DecodePixelWidth="112" CacheOption="OnLoad"/>
+        <Style x:Key="SmallBrandMark" TargetType="Image">
+            <Setter Property="Source" Value="{StaticResource SmallEmblem}"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality"/>
         </Style>
-        <Style x:Key="EditionChip" TargetType="Button">
-            <Setter Property="Height" Value="40"/><Setter Property="MinWidth" Value="104"/><Setter Property="Padding" Value="14,0"/><Setter Property="Margin" Value="0,0,9,0"/>
-            <Setter Property="Background" Value="#18150F18"/><Setter Property="Foreground" Value="#BFB394"/>
-            <Setter Property="FontSize" Value="11"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Grid x:Name="Chip" RenderTransformOrigin="0.5,0.5"><Grid.RenderTransform><ScaleTransform x:Name="ChipScale"/></Grid.RenderTransform><Image Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/edition-selector-plate.png" Stretch="Fill" Opacity=".92" IsHitTestVisible="False"/><Border x:Name="ChipTint" Background="{TemplateBinding Background}" CornerRadius="6" IsHitTestVisible="False"/><Border x:Name="ChipEdge" BorderBrush="#66D7B65F" BorderThickness=".7" CornerRadius="6" Opacity=".38" IsHitTestVisible="False"/><ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"><ContentPresenter.RenderTransform><TranslateTransform Y="-0.5"/></ContentPresenter.RenderTransform></ContentPresenter></Grid><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ChipEdge" Property="Opacity" Value=".9"/><Setter Property="Foreground" Value="#FFF0C2"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Chip" Property="Opacity" Value=".86"/></Trigger><EventTrigger RoutedEvent="Mouse.MouseEnter"><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="ChipScale" Storyboard.TargetProperty="ScaleX" To="1.035" Duration="0:0:0.13"/><DoubleAnimation Storyboard.TargetName="ChipScale" Storyboard.TargetProperty="ScaleY" To="1.035" Duration="0:0:0.13"/></Storyboard></BeginStoryboard></EventTrigger><EventTrigger RoutedEvent="Mouse.MouseLeave"><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="ChipScale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.16"/><DoubleAnimation Storyboard.TargetName="ChipScale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.16"/></Storyboard></BeginStoryboard></EventTrigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
-        </Style>
-        <Style x:Key="QuietButton" TargetType="Button">
-            <Setter Property="Height" Value="40"/><Setter Property="Padding" Value="14,0"/><Setter Property="Background" Value="#191813"/><Setter Property="Foreground" Value="#D3C9B3"/>
-            <Setter Property="BorderBrush" Value="#393326"/><Setter Property="BorderThickness" Value="1"/><Setter Property="FontSize" Value="10"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Quiet" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Quiet" Property="Background" Value="#252116"/><Setter TargetName="Quiet" Property="BorderBrush" Value="#8E713B"/><Setter Property="Foreground" Value="#F5D898"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
-        </Style>
-        <Style x:Key="PrimaryAction" TargetType="Button">
-            <Setter Property="Foreground" Value="#F4E2B7"/><Setter Property="FontSize" Value="16"/><Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Background" Value="Transparent"/><Setter Property="Padding" Value="18,0"/><Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Grid x:Name="Action" RenderTransformOrigin="0.5,0.5"><Grid.RenderTransform><ScaleTransform x:Name="ActionScale"/></Grid.RenderTransform><Grid.Effect><DropShadowEffect Color="#BA8737" BlurRadius="16" ShadowDepth="0" Opacity=".32"/></Grid.Effect><Image Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/primary-button-plate.png" Stretch="Fill" IsHitTestVisible="False"/><ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"><ContentPresenter.RenderTransform><TranslateTransform Y="-1.2"/></ContentPresenter.RenderTransform></ContentPresenter></Grid><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Action" Property="Effect"><Setter.Value><DropShadowEffect Color="#F0B849" BlurRadius="27" ShadowDepth="0" Opacity=".64"/></Setter.Value></Setter></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Action" Property="Opacity" Value=".86"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Action" Property="Opacity" Value=".48"/></Trigger><EventTrigger RoutedEvent="Mouse.MouseEnter"><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="ActionScale" Storyboard.TargetProperty="ScaleX" To="1.025" Duration="0:0:0.14"/><DoubleAnimation Storyboard.TargetName="ActionScale" Storyboard.TargetProperty="ScaleY" To="1.025" Duration="0:0:0.14"/></Storyboard></BeginStoryboard></EventTrigger><EventTrigger RoutedEvent="Mouse.MouseLeave"><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="ActionScale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.17"/><DoubleAnimation Storyboard.TargetName="ActionScale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.17"/></Storyboard></BeginStoryboard></EventTrigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
-        </Style>
-        <Style x:Key="WindowControl" TargetType="Button">
-            <Setter Property="Width" Value="42"/><Setter Property="Height" Value="36"/><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="#B6AD9D"/><Setter Property="BorderThickness" Value="0"/><Setter Property="FontSize" Value="17"/><Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Control" Background="{TemplateBinding Background}" CornerRadius="6"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Control" Property="Background" Value="#242119"/><Setter Property="Foreground" Value="#F2D58E"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
-        </Style>
-        <Style x:Key="Card" TargetType="Border"><Setter Property="Background" Value="{StaticResource ObsidianCard}"/><Setter Property="BorderBrush" Value="#927443"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="11"/><Setter Property="Effect"><Setter.Value><DropShadowEffect Color="#9E7836" BlurRadius="12" ShadowDepth="0" Opacity=".12"/></Setter.Value></Setter></Style>
-        <Geometry x:Key="CardCorner">M 0,18 L 0,5 L 5,0 L 18,0 M 0,11 L 7,4 M 7,0 L 14,7 L 18,7</Geometry>
-        <ControlTemplate x:Key="CardOrnamentTemplate" TargetType="Control">
-            <Grid IsHitTestVisible="False">
-                <Path Data="{StaticResource CardCorner}" Width="16" Height="16" Stretch="Fill" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4" Stroke="#C6A35D" StrokeThickness=".8" Opacity=".82"/>
-                <Path Data="{StaticResource CardCorner}" Width="16" Height="16" Stretch="Fill" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4" Stroke="#C6A35D" StrokeThickness=".8" Opacity=".82" RenderTransformOrigin=".5,.5"><Path.RenderTransform><ScaleTransform ScaleX="-1"/></Path.RenderTransform></Path>
-                <Path Data="{StaticResource CardCorner}" Width="16" Height="16" Stretch="Fill" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="4" Stroke="#C6A35D" StrokeThickness=".8" Opacity=".82" RenderTransformOrigin=".5,.5"><Path.RenderTransform><ScaleTransform ScaleY="-1"/></Path.RenderTransform></Path>
-                <Path Data="{StaticResource CardCorner}" Width="16" Height="16" Stretch="Fill" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="4" Stroke="#C6A35D" StrokeThickness=".8" Opacity=".82" RenderTransformOrigin=".5,.5"><Path.RenderTransform><ScaleTransform ScaleX="-1" ScaleY="-1"/></Path.RenderTransform></Path>
-                <Path Data="M 0,5 L 5,0 L 10,5 L 5,10 Z" Width="10" Height="10" Stretch="Fill" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,-1,0,0" Fill="#17130D" Stroke="#B9914A" StrokeThickness=".8"/>
-            </Grid>
-        </ControlTemplate>
-        <Geometry x:Key="FrameCorner">M 0,28 L 0,8 L 8,0 L 28,0 M 0,16 L 7,9 M 9,0 L 16,7 M 0,28 L 9,19 L 9,13 L 15,13 L 22,6 M 9,19 L 19,19 L 28,10</Geometry>
     </Window.Resources>
-
-    <Border x:Name="WindowFrame" Margin="8" CornerRadius="20" Background="#090908" BorderBrush="#403725" BorderThickness="1">
-        <Border.Effect><DropShadowEffect Color="#000000" BlurRadius="34" ShadowDepth="8" Opacity=".58"/></Border.Effect>
-        <Grid ClipToBounds="True">
-            <Grid.RowDefinitions><RowDefinition Height="52"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Border Grid.Row="0" CornerRadius="19,19,0,0" Background="{StaticResource ObsidianAmbient}" BorderBrush="#45391F" BorderThickness="0,0,0,1">
-                <Grid x:Name="TitleBar" Background="Transparent" PreviewMouseLeftButtonDown="TitleBar_PreviewMouseLeftButtonDown">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0">
-                        <Image Width="28" Height="28" Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/destiny-emblem.png" Stretch="Uniform"/>
-                        <TextBlock Text="Destiny Launcher" FontSize="14" FontWeight="SemiBold" Foreground="#E9E2D3" VerticalAlignment="Center" Margin="10,0,0,0"/>
+    <Border x:Name="WindowFrame" CornerRadius="18" BorderThickness="0" Background="{StaticResource Canvas}">
+        <Grid>
+            <Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Border x:Name="TitleBarSurface" CornerRadius="18,18,0,0" BorderBrush="#302B22" BorderThickness="0,0,0,1" Background="#121310">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+                        <Image x:Name="TitleEmblem" Width="28" Height="28" Style="{StaticResource SmallBrandMark}"/>
+                        <TextBlock Text="Destiny Launcher" FontSize="12" FontWeight="SemiBold" Margin="9,0,0,0" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TestModeText" Text="DATOS AISLADOS" Foreground="{StaticResource Gold}" FontSize="9" Margin="16,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"/>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,11,0">
-                        <Button Style="{StaticResource WindowControl}" Click="Minimize_Click" ToolTip="Minimizar"><Path Data="{x:Static local:IconGlyphs.Minimize}" Width="13" Height="13" Stretch="Uniform" Stroke="#B6AD9D" StrokeThickness="1.3" StrokeStartLineCap="Round"/></Button>
-                        <Button Style="{StaticResource WindowControl}" Click="Maximize_Click" ToolTip="Maximizar o restaurar"><Path x:Name="WindowStateIcon" Data="{x:Static local:IconGlyphs.Maximize}" Width="12" Height="12" Stretch="Uniform" Stroke="#B6AD9D" StrokeThickness="1.2"/></Button>
-                        <Button Style="{StaticResource WindowControl}" Click="Close_Click" ToolTip="Cerrar"><Path Data="{x:Static local:IconGlyphs.Close}" Width="13" Height="13" Stretch="Uniform" Stroke="#C1B8A7" StrokeThickness="1.3" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/></Button>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button Style="{StaticResource WindowControl}" Click="Minimize_Click" ToolTip="Minimizar" AutomationProperties.Name="Minimizar"><Path Data="{x:Static local:IconGlyphs.Minimize}" Width="11" Height="11" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1"/></Button>
+                        <Button Style="{StaticResource CloseControl}" Click="Close_Click" ToolTip="Cerrar" AutomationProperties.Name="Cerrar"><Path Data="{x:Static local:IconGlyphs.Close}" Width="12" Height="12" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2"/></Button>
                     </StackPanel>
                 </Grid>
             </Border>
-
             <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="172"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Background="{StaticResource ObsidianAmbient}" BorderBrush="#39301E" BorderThickness="0,0,1,0">
+                <Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="80"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Border Background="#131410" BorderBrush="#302D23" BorderThickness="0,0,1,0">
                     <Grid>
-                        <Image Width="150" Height="150" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,38" Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/destiny-emblem.png" Stretch="Uniform" Opacity=".16" IsHitTestVisible="False" RenderOptions.BitmapScalingMode="HighQuality"/>
-                        <StackPanel Margin="12,30,12,0">
-                            <Button x:Name="HomeNav" Tag="Selected" Style="{StaticResource NavItem}" Click="Home_Click"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="25"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path x:Name="HomeNavIcon" Data="{x:Static local:IconGlyphs.Home}" Width="18" Height="18" Stretch="Uniform" Stroke="#E3BF6A" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><TextBlock Grid.Column="1" Text="Inicio" VerticalAlignment="Center"/></Grid></Button>
-                            <Rectangle Height="1" Fill="#29251B" Margin="12,14,12,14"/>
-                            <Button x:Name="SettingsNav" Tag="Unselected" Style="{StaticResource NavItem}" Click="Settings_Click"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="25"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path x:Name="SettingsNavIcon" Data="{x:Static local:IconGlyphs.Settings}" Width="18" Height="18" Stretch="Uniform" Stroke="#A89B7E" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><TextBlock Grid.Column="1" Text="Ajustes" VerticalAlignment="Center"/></Grid></Button>
+                        <StackPanel Margin="0,18,0,0">
+                            <Button x:Name="HomeNav" Tag="Selected" Style="{StaticResource NavItem}" Click="Home_Click" AutomationProperties.Name="Inicio" ToolTip="Inicio">
+                                <StackPanel><Path Data="{x:Static local:IconGlyphs.Home}" Width="20" Height="20" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" StrokeLineJoin="Round"/><TextBlock Text="Inicio" FontSize="10" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center" Margin="0,6,0,0"/></StackPanel>
+                            </Button>
+                            <Button x:Name="InstallationNav" Style="{StaticResource NavItem}" Click="Installation_Click" AutomationProperties.Name="Instalación" ToolTip="Administrar instalación">
+                                <StackPanel><Path Data="{x:Static local:IconGlyphs.Cube}" Width="20" Height="20" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" StrokeLineJoin="Round"/><TextBlock Text="Instalación" FontSize="9" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center" Margin="0,6,0,0"/></StackPanel>
+                            </Button>
+                            <Button x:Name="SettingsNav" Style="{StaticResource NavItem}" Click="Settings_Click" AutomationProperties.Name="Ajustes" ToolTip="Ajustes">
+                                <StackPanel><Path Data="{x:Static local:IconGlyphs.Settings}" Width="20" Height="20" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"/><TextBlock Text="Ajustes" FontSize="10" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center" Margin="0,6,0,0"/></StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <StackPanel VerticalAlignment="Bottom" Margin="0,0,0,18" IsHitTestVisible="False">
+                            <Image x:Name="SidebarEmblem" Width="40" Height="40" Style="{StaticResource SmallBrandMark}" Opacity=".85"/>
+                            <TextBlock x:Name="LauncherVersionText" FontSize="9" Foreground="{StaticResource Subtle}" HorizontalAlignment="Center" Margin="0,7,0,0"/>
                         </StackPanel>
                     </Grid>
                 </Border>
-
-                <Grid x:Name="PageHost" Grid.Column="1" Background="{StaticResource ObsidianAmbient}">
-                  <Grid x:Name="HomeView">
-                    <Grid.RowDefinitions><RowDefinition x:Name="HeroRow" Height="320"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                    <Border Grid.Row="0" Background="#15120D" ClipToBounds="True">
-                        <Grid>
-                            <Image Source="/DestinyLauncher;component/Assets/destiny-hero-gold-v3.png" Stretch="UniformToFill" Opacity=".96"/>
-                            <Rectangle><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="1,0"><GradientStop Color="#CF090908" Offset="0"/><GradientStop Color="#8C090908" Offset=".15"/><GradientStop Color="#3018130B" Offset=".46"/><GradientStop Color="#56110E09" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
-                            <Rectangle><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#480A0908" Offset="0"/><GradientStop Color="#10000000" Offset=".48"/><GradientStop Color="#C9100E0A" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
-                            <Image Width="320" Height="186" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0" Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/destiny-combination-mark.png" Stretch="Uniform" Opacity=".96" RenderOptions.BitmapScalingMode="HighQuality"/>
-                        </Grid>
-                    </Border>
-
-                    <Grid x:Name="HomeBody" Grid.Row="1" Margin="20,18,20,18">
-                        <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="48"/></Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="ProfileColumn" Width="278"/></Grid.ColumnDefinitions>
-
-                        <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}" Padding="0" Margin="0,0,14,0">
-                            <Grid>
-                            <Grid x:Name="SummaryLayout" Margin="24,20"><Grid.ColumnDefinitions><ColumnDefinition Width="78"/><ColumnDefinition Width="*"/><ColumnDefinition Width="208"/></Grid.ColumnDefinitions>
-                                <Image x:Name="EditionEmblem" Width="70" Height="70" VerticalAlignment="Center" Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/destiny-emblem.png" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
-                                <StackPanel Grid.Column="1" Margin="10,0,10,0" VerticalAlignment="Center"><TextBlock x:Name="EditionText" Text="Destiny" FontFamily="Georgia" FontSize="24" FontWeight="SemiBold"/><TextBlock x:Name="VersionText" Text="Minecraft 1.20.1  ·  Fabric" Foreground="#928A79" FontSize="11" Margin="0,5,0,15"/><StackPanel Orientation="Horizontal"><Button x:Name="DestinyButton" Content="DESTINY" Tag="Destiny" Click="Edition_Click" Style="{StaticResource EditionChip}"/><Button x:Name="LiteButton" Content="DESTINY LITE" Tag="DestinyLite" Click="Edition_Click" Style="{StaticResource EditionChip}"/></StackPanel></StackPanel>
-                                <Button x:Name="PrimaryButton" Grid.Column="2" Style="{StaticResource PrimaryAction}" Width="208" Height="70" HorizontalAlignment="Right" VerticalAlignment="Center" Click="Primary_Click"><Button.Content><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock x:Name="PrimaryLabel" Text="INSTALAR" Foreground="#F4E2B7" VerticalAlignment="Center" TextAlignment="Center"><TextBlock.RenderTransform><TranslateTransform Y="-1.2"/></TextBlock.RenderTransform></TextBlock><Path x:Name="ActionArrow" Data="{x:Static local:IconGlyphs.Arrow}" Width="16" Height="16" Stretch="Uniform" Stroke="#F0CF79" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" VerticalAlignment="Center" Margin="9,0,0,0"/></StackPanel></Button.Content></Button>
+                <Grid Grid.Column="1" x:Name="PageHost">
+                    <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Grid.Background><ImageBrush ImageSource="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/obsidian-texture.png" Opacity=".045" Stretch="UniformToFill"/></Grid.Background>
+                    <Grid x:Name="HomeView">
+                        <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <ScrollViewer x:Name="HomeScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" CanContentScroll="False" Focusable="False">
+                            <Grid x:Name="Hero" Height="{Binding ViewportHeight, ElementName=HomeScroll}" MinHeight="280" ClipToBounds="True">
+                                <Image Source="/DestinyLauncher;component/Assets/destiny-hero-gold-v3.png" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                <Rectangle><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="1,0"><GradientStop Color="#B510100F"/><GradientStop Color="#2010100F" Offset=".6"/><GradientStop Color="#3810100F" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
+                                <Rectangle><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#1810100F"/><GradientStop Color="#0010100F" Offset=".4"/><GradientStop Color="#C510100F" Offset=".9"/><GradientStop Color="#FF10100F" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
+                                <Image x:Name="HeroMark" Width="250" Height="148" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="28,22,0,0" Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/destiny-combination-mark.png" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                <local:NewsCarousel x:Name="News" Width="350" Height="156" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="28,0,0,22"/>
+                                <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,20,28,0" Background="#B5151612" BorderBrush="#4A4130" BorderThickness="1" CornerRadius="4" Padding="10,5">
+                                    <TextBlock x:Name="VersionText" Text="Minecraft 1.20.1 · Fabric" Foreground="#D6CDBB" FontSize="10"/>
+                                </Border>
+                                <StackPanel x:Name="ProfilePanel" Width="234" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,26">
+                                    <TextBlock Text="PERFIL OFFLINE" Style="{StaticResource Eyebrow}" Margin="0,0,0,9"/>
+                                    <Button x:Name="ProfileButton" Click="Profile_Click" Padding="13,12" MinHeight="78" HorizontalContentAlignment="Stretch" Background="#ED181916" BorderBrush="#625239" ToolTip="Editar tu nombre de jugador" AutomationProperties.Name="Editar nombre de jugador">
+                                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/></Grid.ColumnDefinitions>
+                                            <Border Width="44" Height="48" Background="#29271E" BorderBrush="#665232" BorderThickness="1" CornerRadius="5" VerticalAlignment="Center">
+                                                <Grid Margin="4"><TextBlock x:Name="PlayerInitial" Text="D" FontFamily="{StaticResource DisplayFont}" FontSize="23" Foreground="{StaticResource GoldBright}" VerticalAlignment="Center" HorizontalAlignment="Center"/><Image x:Name="PlayerHead" Visibility="Collapsed" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/></Grid>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center"><TextBlock x:Name="PlayerNameText" Text="Añadir nombre" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="Editar nombre" FontSize="10" Foreground="{StaticResource Muted}" Margin="0,6,0,0"/></StackPanel>
+                                            <Path Grid.Column="2" Data="{x:Static local:IconGlyphs.Edit}" Width="13" Height="13" Stretch="Uniform" Stroke="{StaticResource Gold}" StrokeThickness="1.3" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                </StackPanel>
                             </Grid>
-                            <Control Template="{StaticResource CardOrnamentTemplate}" Focusable="False" IsHitTestVisible="False"/>
+                        </ScrollViewer>
+                        <Border x:Name="LaunchPanel" Grid.Row="1" BorderBrush="#49402F" BorderThickness="0,1,0,0" Margin="28,0,28,18" Padding="0,16,0,0">
+                            <Grid x:Name="LaunchLayout">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="228"/></Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <StackPanel x:Name="InstallSummary" Margin="0,0,20,0" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal"><TextBlock x:Name="EditionText" Text="Destiny" Style="{StaticResource SectionTitle}"/><Border Margin="12,0,0,0" Padding="7,3" Background="#23251F" CornerRadius="4" VerticalAlignment="Center"><TextBlock x:Name="PackStateText" Text="Sin instalar" FontSize="10" Foreground="{StaticResource Muted}"/></Border></StackPanel>
+                                    <WrapPanel Margin="0,9,0,0">
+                                        <TextBlock Text="Instalada  " Foreground="{StaticResource Muted}" FontSize="11"/><TextBlock x:Name="PackInstalledVersionText" FontSize="11" Margin="0,0,20,0" MaxWidth="140" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="Disponible  " Foreground="{StaticResource Muted}" FontSize="11"/><TextBlock x:Name="PackLatestVersionText" FontSize="11" MaxWidth="140" TextTrimming="CharacterEllipsis"/>
+                                    </WrapPanel>
+                                    <Button x:Name="ManageInstallationButton" Click="Installation_Click" Content="Administrar instalación →" HorizontalAlignment="Left" Background="Transparent" Foreground="{StaticResource GoldBright}" BorderThickness="0" Padding="0,5" MinHeight="28" Margin="0,5,0,0" FontSize="11"/>
+                                </StackPanel>
+                                <StackPanel x:Name="ActionPanel" Grid.Column="1" VerticalAlignment="Center">
+                                    <Button x:Name="PrimaryButton" Style="{StaticResource GoldButton}" Height="54" Click="Primary_Click" AutomationProperties.Name="Acción principal">
+                                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="PrimaryLabel" Text="INSTALAR" FontSize="14" FontWeight="Bold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center"/><Path x:Name="ActionArrow" Grid.Column="1" Data="{x:Static local:IconGlyphs.Arrow}" Width="15" Height="15" Stretch="Uniform" Stroke="#4A3519" StrokeThickness="1.5" Margin="12,0,0,0"/></Grid>
+                                    </Button>
+                                    <TextBlock x:Name="ActionHint" Foreground="{StaticResource Muted}" FontSize="10" TextAlignment="Center" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                </StackPanel>
                             </Grid>
                         </Border>
-
-                        <Grid x:Name="RightPanel" Grid.Row="0" Grid.Column="1">
-                            <Grid.RowDefinitions><RowDefinition Height="94"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                            <Border Style="{StaticResource Card}" Padding="0">
-                                <Grid>
-                                    <Grid Margin="14,12">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="68"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <Grid Width="62" Height="62" VerticalAlignment="Center" ClipToBounds="False">
-                                            <TextBlock x:Name="PlayerInitial" Text="D" FontFamily="Georgia" FontSize="27" Foreground="#D8B966" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            <Image x:Name="PlayerHead" Visibility="Collapsed" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="NearestNeighbor" ClipToBounds="False"/>
-                                        </Grid>
-                                        <TextBlock Grid.Column="1" x:Name="PlayerNameText" Text="Añadir nombre" FontFamily="Georgia" FontSize="18" VerticalAlignment="Center" Margin="9,0,0,0"/>
-                                        <Button x:Name="ProfileButton" Grid.Column="2" Width="34" Height="34" Click="Profile_Click" Background="Transparent" Foreground="#BEB08D" BorderBrush="#5A4930" BorderThickness="1" VerticalAlignment="Center" ToolTip="Editar"><Path Data="{x:Static local:IconGlyphs.Edit}" Width="14" Height="14" Stretch="Uniform" Stroke="#C9AD70" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/></Button>
-                                    </Grid>
-                                    <Control Template="{StaticResource CardOrnamentTemplate}" Focusable="False" IsHitTestVisible="False"/>
-                                </Grid>
-                            </Border>
-                            <Border Grid.Row="1" Style="{StaticResource Card}" Padding="0" Margin="0,10,0,0">
-                                <Grid>
-                                    <Grid Margin="15,13" VerticalAlignment="Center">
-                                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="1"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="PACK" FontFamily="Georgia" FontSize="14" Foreground="#D4B361" VerticalAlignment="Center"/><Border x:Name="PackStateIndicator" Grid.Column="1" Width="18" Height="18" Background="#211D14" BorderBrush="#3B3323" BorderThickness="1" CornerRadius="9" VerticalAlignment="Center"><Ellipse x:Name="PackStateDot" Width="7" Height="7" Fill="#BFA45C"/></Border></Grid>
-                                        <Rectangle Grid.Row="1" Height="1" Fill="#302B20" Margin="0,12,0,12"/>
-                                        <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="1"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="INSTALADA" FontSize="9" FontWeight="Bold" Foreground="#918875"/><TextBlock x:Name="PackInstalledVersionText" Text="—" FontFamily="Georgia" FontSize="18" Foreground="#E5DDCC" Margin="0,5,0,0"/></StackPanel><Rectangle Grid.Column="1" Width="1" Fill="#302B20" Margin="0,1"/><StackPanel Grid.Column="2" Margin="15,0,0,0"><TextBlock Text="ÚLTIMA" FontSize="9" FontWeight="Bold" Foreground="#918875"/><TextBlock x:Name="PackLatestVersionText" Text="0.1.0" FontFamily="Georgia" FontSize="18" Foreground="#E5DDCC" Margin="0,5,0,0"/></StackPanel></Grid>
-                                    </Grid>
-                                    <Control Template="{StaticResource CardOrnamentTemplate}" Focusable="False" IsHitTestVisible="False"/>
-                                </Grid>
-                            </Border>
-                        </Grid>
-
-                        <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Background="#100F0C" BorderBrush="#2B271D" BorderThickness="1" CornerRadius="8" Margin="0,12,0,0" Padding="14,8"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock x:Name="StatusText" Text="Listo" Foreground="#CBC2B0" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/><ProgressBar x:Name="Progress" Grid.Column="1" Height="4" Maximum="1" Value="0" VerticalAlignment="Center" Visibility="Collapsed" Background="#242017" Foreground="#D1AB5A"/></Grid></Border>
                     </Grid>
-                  </Grid>
-                  <ContentControl x:Name="SettingsPageHost" Visibility="Collapsed"/>
+                    <Grid x:Name="InstallationView" Visibility="Collapsed" Margin="28,24,28,20">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <StackPanel Margin="0,0,0,20"><TextBlock Text="Instalación" FontFamily="{StaticResource DisplayFont}" FontSize="28"/><TextBlock Text="La variante que usarás en tu próxima partida." Foreground="{StaticResource Muted}" Margin="0,7,0,0" FontSize="12"/></StackPanel>
+                        <ScrollViewer x:Name="InstallationScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False" Padding="0,0,7,0">
+                            <StackPanel>
+                                <StackPanel x:Name="EditionSelector">
+                                    <Grid KeyboardNavigation.TabNavigation="Once">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <RadioButton x:Name="DestinyButton" GroupName="Edition" Style="{StaticResource EditionOption}" Tag="Destiny" Click="Edition_Click" Margin="0,0,12,0" AutomationProperties.Name="Destiny, experiencia completa">
+                                            <StackPanel><TextBlock Text="Destiny" FontFamily="{StaticResource DisplayFont}" FontSize="22"/><TextBlock Text="La experiencia completa" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="DestinyState" FontSize="11" Foreground="{StaticResource GoldBright}" Margin="0,12,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                        </RadioButton>
+                                        <RadioButton x:Name="LiteButton" Grid.Column="1" GroupName="Edition" Style="{StaticResource EditionOption}" Tag="DestinyLite" Click="Edition_Click" AutomationProperties.Name="Destiny Lite, alternativa ligera">
+                                            <StackPanel><TextBlock Text="Destiny Lite" FontFamily="{StaticResource DisplayFont}" FontSize="22"/><TextBlock Text="Una alternativa ligera" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="LiteState" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,12,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                        </RadioButton>
+                                    </Grid>
+                                    <TextBlock Text="Seleccionar una variante no descarga ni cambia los archivos del juego." FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                                </StackPanel>
+                                <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="7" Padding="18,16" Margin="0,20,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="VARIANTE ACTIVA" Style="{StaticResource Eyebrow}"/>
+                                        <TextBlock Text="{Binding Text, ElementName=EditionText}" Style="{StaticResource SectionTitle}" Margin="0,8,0,0"/>
+                                        <WrapPanel Margin="0,12,0,0">
+                                            <TextBlock Text="Instalada  " FontSize="12" Foreground="{StaticResource Muted}"/><TextBlock Text="{Binding Text, ElementName=PackInstalledVersionText}" MaxWidth="160" TextTrimming="CharacterEllipsis" FontSize="12" Margin="0,0,24,0"/>
+                                            <TextBlock Text="Disponible  " FontSize="12" Foreground="{StaticResource Muted}"/><TextBlock Text="{Binding Text, ElementName=PackLatestVersionText}" MaxWidth="160" TextTrimming="CharacterEllipsis" FontSize="12"/>
+                                        </WrapPanel>
+                                        <TextBlock Text="CARPETA DEL JUEGO" Style="{StaticResource Eyebrow}" Margin="0,18,0,0"/>
+                                        <TextBlock x:Name="InstallationPathText" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,7,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                        <Grid Grid.Row="2" Margin="0,18,7,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Button Content="Volver a Inicio" Click="Home_Click" HorizontalAlignment="Left" Style="{StaticResource QuietButton}"/>
+                            <Button x:Name="InstallPrimaryButton" Grid.Column="1" MinWidth="210" Height="46" Style="{StaticResource GoldButton}" Click="Primary_Click"><TextBlock Text="{Binding Text, ElementName=PrimaryLabel}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" FontWeight="Bold" FontSize="13"/></Button>
+                        </Grid>
+                    </Grid>
+                    <ContentControl x:Name="SettingsPageHost" Visibility="Collapsed"/>
+                    <Border x:Name="StatusFooter" Grid.Row="1" Background="#161713" BorderBrush="#302D24" BorderThickness="0,1,0,0">
+                        <Grid>
+                            <ProgressBar x:Name="Progress" VerticalAlignment="Top" Height="3" Minimum="0" Maximum="1" Value="0" Visibility="Collapsed"/>
+                            <Grid Margin="26,14,26,15">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <Ellipse x:Name="StatusDot" Width="5" Height="5" Fill="{StaticResource Gold}" VerticalAlignment="Top" Margin="0,6,0,0"/>
+                                <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock x:Name="StatusText" Text="Preparando launcher" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/><TextBlock x:Name="StatusDetail" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0"/></StackPanel>
+                                <Button x:Name="RetryCheckButton" Grid.Column="2" Content="Comprobar" Click="RetryCheck_Click" Style="{StaticResource QuietButton}" VerticalAlignment="Center" Visibility="Collapsed"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
                 </Grid>
             </Grid>
-            <Grid x:Name="FrameOrnaments" Grid.RowSpan="2" IsHitTestVisible="False">
-                <Border Margin="3" CornerRadius="17" BorderBrush="#4D3D20" BorderThickness=".6"/>
-                <Path Data="{StaticResource FrameCorner}" Width="16" Height="16" Stretch="Fill" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="4" Stroke="#C09A4D" StrokeThickness=".9" Opacity=".82" RenderTransformOrigin=".5,.5"><Path.RenderTransform><ScaleTransform ScaleY="-1"/></Path.RenderTransform></Path>
-                <Path Data="{StaticResource FrameCorner}" Width="16" Height="16" Stretch="Fill" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="4" Stroke="#C09A4D" StrokeThickness=".9" Opacity=".82" RenderTransformOrigin=".5,.5"><Path.RenderTransform><ScaleTransform ScaleX="-1" ScaleY="-1"/></Path.RenderTransform></Path>
+            <!-- Paint over full-bleed surfaces: a transparent border gutter would expose the black HWND backing. -->
+            <Grid x:Name="WindowOutline" Grid.RowSpan="2" IsHitTestVisible="False">
+                <Rectangle x:Name="OutlineTop" Height="1" VerticalAlignment="Top"/>
+                <Rectangle x:Name="OutlineBottom" Height="1" VerticalAlignment="Bottom"/>
+                <Rectangle x:Name="OutlineLeft" Width="1" HorizontalAlignment="Left"/>
+                <Rectangle x:Name="OutlineRight" Width="1" HorizontalAlignment="Right"/>
             </Grid>
         </Grid>
     </Border>

@@ -1,63 +1,112 @@
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using DestinyLauncher.Models;
 using DestinyLauncher.Services;
-
-if (args.Length != 2)
-{
-    Console.Error.WriteLine("Usage: PackUpdaterSmoke <v1-manifest-url> <v2-manifest-url>");
-    return 2;
-}
 
 var tempRoot = Path.Combine(Path.GetTempPath(), $"destiny-pack-smoke-{Guid.NewGuid():N}");
 try
 {
     var paths = new LauncherPaths(tempRoot);
-    var logger = new AppLogger(paths);
-    var updater = new GitHubPackUpdater(paths, logger);
-    using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-    var pack = new PackDefinition { Name = "Destiny test fixture", Slug = "destiny", ManifestUrl = args[0] };
-
-    var initial = await updater.CheckAsync(pack, null, cancellation.Token);
-    Require(initial.ChangedFiles.Count == 2, $"V1 should install two fixture files, got {initial.ChangedFiles.Count}.");
-    await updater.ApplyAsync(pack, initial, null, cancellation.Token);
-
-    var alreadyCurrent = await updater.CheckAsync(pack, null, cancellation.Token);
-    Require(!alreadyCurrent.HasChanges, "A second V1 check should not find downloads or removals.");
-
+    Require(paths.Instance("destiny").StartsWith(tempRoot, StringComparison.OrdinalIgnoreCase), "The test instance must be isolated.");
+    Require(paths.Instance("destiny-lite") == paths.Instance("destiny") + "-Lite", "Lite must keep its separate sibling path.");
+    var fixture = new FixtureHandler();
+    var updater = new GitHubPackUpdater(paths, new AppLogger(paths), new HttpClient(fixture));
+    using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+    var token = cancellation.Token;
+    var pack = new PackDefinition();
+    var initial = await updater.CheckAsync(pack, null, token);
+    Require(fixture.LastManifestUri?.AbsoluteUri == "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack/main/manifests/destiny.json", "The full pack must keep its existing repository.");
+    Require(initial.ChangedFiles.Count == 2, "Initial installation must download two fixture files.");
+    await updater.ApplyAsync(pack, initial, null, token);
+    Require(!(await updater.CheckAsync(pack, null, token)).HasChanges, "Rechecking must be a no-op.");
     var instance = paths.Instance(pack.Slug);
-    var preservedFile = Path.Combine(instance, "mods", "kept.txt");
-    await File.WriteAllTextAsync(preservedFile, "local player edit", cancellation.Token);
+    var kept = Path.Combine(instance, "mods", "kept.txt");
+    await File.WriteAllTextAsync(kept, "local player edit", token);
+    Directory.CreateDirectory(Path.Combine(instance, "saves"));
+    var personal = Path.Combine(instance, "saves", "world.txt");
+    await File.WriteAllTextAsync(personal, "personal world", token);
+    fixture.Version = 2;
+    var update = await updater.CheckAsync(pack, null, token);
+    Require(update.ChangedFiles.Count == 1 && update.ChangedFiles[0].Path == "mods/alpha.txt", "Only the changed managed file should download.");
+    Require(update.PreservedOverrides.Contains("mods/kept.txt", StringComparer.OrdinalIgnoreCase), "Player edits must be identified.");
+    await updater.ApplyAsync(pack, update, null, token);
+    Require(await File.ReadAllTextAsync(Path.Combine(instance, "mods", "alpha.txt"), token) == "alpha fixture version 2", "The update was not applied.");
+    Require(await File.ReadAllTextAsync(kept, token) == "local player edit", "The player edit was overwritten.");
+    Require(!(await updater.CheckAsync(pack, null, token)).HasChanges, "The updated files should be current.");
+    Console.WriteLine("PASS: isolated install, no-op check, incremental update and preserved player edits.");
 
-    pack.ManifestUrl = args[1];
-    var update = await updater.CheckAsync(pack, null, cancellation.Token);
-    Require(update.ChangedFiles.Count == 1, $"V2 should download exactly one changed file, got {update.ChangedFiles.Count}.");
-    Require(update.ChangedFiles[0].Path == "mods/alpha.txt", "V2 should change only mods/alpha.txt.");
-    Require(update.PreservedOverrides.Contains("mods/kept.txt", StringComparer.OrdinalIgnoreCase), "The local edit should be recognized as an override.");
-    await updater.ApplyAsync(pack, update, null, cancellation.Token);
+    fixture.Version = 3;
+    fixture.CorruptDownload = true;
+    var badDownload = await updater.CheckAsync(pack, null, token);
+    await Reject<InvalidDataException>(() => updater.ApplyAsync(pack, badDownload, null, token));
+    Require(await File.ReadAllTextAsync(Path.Combine(instance, "mods", "alpha.txt"), token) == "alpha fixture version 2", "A corrupt download changed installed files.");
+    Require(await File.ReadAllTextAsync(personal, token) == "personal world", "A personal file changed.");
+    Console.WriteLine("PASS: bad SHA-256 is rejected without changing installed or personal files.");
 
-    var alpha = await File.ReadAllTextAsync(Path.Combine(instance, "mods", "alpha.txt"), cancellation.Token);
-    var kept = await File.ReadAllTextAsync(preservedFile, cancellation.Token);
-    Require(alpha.Trim() == "alpha fixture version 2", "The changed fixture file was not updated to V2.");
-    Require(kept == "local player edit", "The local override was overwritten.");
+    fixture.CorruptDownload = false;
+    fixture.BadPath = "saves/world.txt";
+    await Reject<InvalidDataException>(() => updater.CheckAsync(pack, null, token));
+    fixture.BadPath = "mods/../../outside.txt";
+    await Reject<InvalidDataException>(() => updater.CheckAsync(pack, null, token));
+    fixture.BadPath = null;
+    using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+    await Reject<OperationCanceledException>(() => updater.CheckAsync(pack, null, cancelled.Token));
+    Require(await File.ReadAllTextAsync(personal, token) == "personal world", "Validation/cancellation modified personal files.");
+    Console.WriteLine("PASS: protected paths, traversal and cancellation preserve user data.");
 
-    var final = await updater.CheckAsync(pack, null, cancellation.Token);
-    Require(!final.HasChanges, "A final V2 check should find no remaining pack changes.");
-    Require(final.PreservedOverrides.Contains("mods/kept.txt", StringComparer.OrdinalIgnoreCase), "The local override should remain tracked.");
-
-    Console.WriteLine("PASS: V1 install, no-op recheck, one-file V2 update, local edit preserved, final hashes current.");
+    var lite = new PackDefinition { Name = "Destiny Lite", Slug = "destiny-lite" };
+    fixture.LiteUnavailable = true;
+    await Reject<HttpRequestException>(() => updater.CheckAsync(lite, null, token));
+    Require(!Directory.Exists(paths.Instance(lite.Slug)), "An unpublished Lite feed must not create an empty installation.");
+    Require(fixture.LastManifestUri?.AbsoluteUri == "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack-Lite/main/manifests/destiny-lite.json", "Lite must use its independent repository.");
+    fixture.LiteUnavailable = false;
+    var liteCheck = await updater.CheckAsync(lite, null, token);
+    Require(liteCheck.Manifest.PackId == "destiny-lite" && liteCheck.ChangedFiles.Count == 2, "The future Lite feed must use the existing manifest contract.");
+    await updater.ApplyAsync(lite, liteCheck, null, token);
+    Require(await File.ReadAllTextAsync(Path.Combine(paths.Instance(lite.Slug), "mods", "alpha.txt"), token) == "alpha fixture version 3", "Lite files must install in their own instance.");
+    Require(await File.ReadAllTextAsync(Path.Combine(instance, "mods", "alpha.txt"), token) == "alpha fixture version 2"
+        && await File.ReadAllTextAsync(kept, token) == "local player edit", "Installing Lite must not change the full pack or its player edits.");
+    Console.WriteLine("PASS: unpublished Lite does not install; its independent feed and instance preserve the full pack.");
     return 0;
 }
-catch (Exception ex)
-{
-    Console.Error.WriteLine($"FAIL: {ex.Message}");
-    return 1;
-}
+catch (Exception ex) { Console.Error.WriteLine($"FAIL: {ex}"); return 1; }
 finally
 {
-    try { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, recursive: true); }
-    catch { /* Temporary test cleanup must not hide the result. */ }
+    // The root is generated here and all test paths are children of this directory.
+    if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, recursive: true);
 }
-
-static void Require(bool condition, string message)
+static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+static async Task Reject<T>(Func<Task> action) where T : Exception
 {
-    if (!condition) throw new InvalidOperationException(message);
+    try { await action(); } catch (T) { return; }
+    throw new InvalidOperationException($"Expected {typeof(T).Name}.");
+}
+sealed class FixtureHandler : HttpMessageHandler
+{
+    public int Version { get; set; } = 1;
+    public bool CorruptDownload { get; set; }
+    public string? BadPath { get; set; }
+    public bool LiteUnavailable { get; set; }
+    public Uri? LastManifestUri { get; private set; }
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var alpha = Encoding.UTF8.GetBytes($"alpha fixture version {Version}");
+        var kept = Encoding.UTF8.GetBytes("kept fixture version 1");
+        var path = request.RequestUri!.AbsolutePath;
+        byte[] bytes;
+        if (path.EndsWith(".json", StringComparison.Ordinal))
+        {
+            LastManifestUri = request.RequestUri;
+            var isLite = path.EndsWith("/destiny-lite.json", StringComparison.Ordinal);
+            if (isLite && LiteUnavailable) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+            var manifest = new PackManifest { PackId = isLite ? "destiny-lite" : "destiny", Version = $"1.0.{Version}", Files = [File(BadPath ?? "mods/alpha.txt", alpha), File("mods/kept.txt", kept)] };
+            bytes = JsonSerializer.SerializeToUtf8Bytes(manifest);
+        }
+        else bytes = path.EndsWith("alpha.txt", StringComparison.Ordinal) ? (CorruptDownload ? Enumerable.Repeat((byte)'x', alpha.Length).ToArray() : alpha) : kept;
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
+    }
+    private static PackManifestFile File(string path, byte[] data) => new() { Path = path, Url = $"https://fixture.invalid/{path}", Sha256 = Convert.ToHexString(SHA256.HashData(data)), Size = data.Length };
 }

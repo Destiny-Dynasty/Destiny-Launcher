@@ -6,7 +6,7 @@ public enum PackEdition { Destiny, DestinyLite }
 public sealed class PackDefinition
 {
     public const string DefaultDestinyManifestUrl = "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack/main/manifests/destiny.json";
-    public const string DefaultDestinyLiteManifestUrl = "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack/main/manifests/destiny-lite.json";
+    public const string DefaultDestinyLiteManifestUrl = "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack-Lite/main/manifests/destiny-lite.json";
 
     public string Name { get; init; } = "Destiny";
     public string Slug { get; init; } = "destiny";
