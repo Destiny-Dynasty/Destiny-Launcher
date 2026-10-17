@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
 using CmlLib.Core;
@@ -12,7 +13,7 @@ public sealed class MinecraftService
     private static readonly HttpClient FabricMetaClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private readonly LauncherPaths _paths; private readonly AppLogger _log;
     public MinecraftService(LauncherPaths paths, AppLogger log) { _paths = paths; _log = log; }
-    public async Task PrepareAndLaunchAsync(LauncherConfig config, PackDefinition pack, IProgress<(string status, double value)> progress, CancellationToken token)
+    public async Task<Process> PrepareAndLaunchAsync(LauncherConfig config, PackDefinition pack, IProgress<(string status, double value)> progress, CancellationToken token)
     {
         var instance = new MinecraftPath(_paths.Instance(pack.Slug)); var launcher = new MinecraftLauncher(instance);
         progress.Report(("Preparando Minecraft 1.20.1", .05)); launcher.ByteProgressChanged += (_, e) => { if (e.TotalBytes > 0) progress.Report(("Preparando Minecraft", .05 + (double)e.ProgressedBytes / e.TotalBytes * .55)); };
@@ -21,11 +22,23 @@ public sealed class MinecraftService
         config.FabricLoaderVersion = await GetLatestStableFabricAsync(config.MinecraftVersion, config.FabricLoaderVersion, token);
         _log.Info($"Using Fabric Loader {config.FabricLoaderVersion} for Minecraft {config.MinecraftVersion}.");
         progress.Report(("Instalando Fabric " + config.FabricLoaderVersion, .74));
-        var fabric = new FabricInstaller(new HttpClient());
+        using var fabricClient = new HttpClient();
+        var fabric = new FabricInstaller(fabricClient);
         var profile = await fabric.Install(config.MinecraftVersion, instance, config.FabricLoaderVersion);
         var options = new MLaunchOption { Session = MSession.CreateOfflineSession(config.PlayerName), MaximumRamMb = checked(config.RamGb * 1024), ServerIp = "destinydynasty.tatnikhost.net" };
-        var process = await launcher.BuildProcessAsync(profile, options);
-        process.Start(); _log.Info($"Minecraft launched: {config.PlayerName}, {profile}, {pack.Name}"); progress.Report(("Minecraft iniciado", 1));
+        var process = await launcher.BuildProcessAsync(profile, options, token);
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            // Keep the actual Java process handle. Do not capture its output or poll all Java
+            // processes: the launcher only needs the exit notification for this game session.
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.CreateNoWindow = true;
+            if (!process.Start()) throw new InvalidOperationException("Minecraft no devolvió un proceso al iniciarse.");
+        }
+        catch { process.Dispose(); throw; }
+        _log.Info($"Minecraft launched: PID {process.Id}, {config.PlayerName}, {profile}, {pack.Name}");
+        return process;
     }
 
     private async Task<string> GetLatestStableFabricAsync(string minecraftVersion, string fallback, CancellationToken token)

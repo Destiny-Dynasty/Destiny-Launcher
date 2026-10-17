@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -22,6 +23,13 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        // A real, isolated child process exercises OS exit notifications without installing
+        // Minecraft, starting Java, or reading any of the player's files.
+        if (args.Length == 3 && args[0] == "--game-process")
+        {
+            Thread.Sleep(int.Parse(args[1]));
+            return int.Parse(args[2]);
+        }
         _output = Path.GetFullPath(args.FirstOrDefault() ?? "artifacts/ui-refinement");
         _remoteSkin = args.Contains("--remote-skin");
         Directory.CreateDirectory(_output);
@@ -31,7 +39,8 @@ internal static class Program
         {
             try
             {
-                await Audit();
+                if (args.Contains("--lifecycle-only")) await AuditGameLifetime();
+                else await Audit();
                 File.WriteAllText(Path.Combine(_output, "ui-test-results.json"), JsonSerializer.Serialize(new { passed = Passed.Count, checks = Passed, skipped = Skipped, note = "State fixtures and WPF render targets; DPI images do not change the Windows display setting." }, new JsonSerializerOptions { WriteIndented = true }));
                 Console.WriteLine($"PASS: {Passed.Count} UI assertions; captures at {_output}");
                 application.Shutdown(0);
@@ -307,6 +316,113 @@ internal static class Program
         Assert(profileSave.IsEnabled, "Valid offline name can be saved");
         Assert(profileSave.IsDefault && Descendants<Button>(profile).Any(b => b.IsCancel), "Profile supports Enter and Escape");
         profile.Close();
+        await AuditGameLifetime();
+    }
+
+    private static async Task AuditGameLifetime()
+    {
+        var root = Path.Combine(_output, "game-lifetime-data", Guid.NewGuid().ToString("N"));
+        var window = new MainWindow(previewMode: true, dataRoot: root)
+            { ShowInTaskbar = false, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -32000, Top = -32000 };
+        window.Show();
+        await Idle();
+        window.SetAuditState("1.4.7", Check("1.4.7", false));
+        var news = Get<NewsCarousel>(window, "News");
+        var width = window.Width;
+        var height = window.Height;
+        using (var unstarted = new Process())
+        {
+            try { await window.FollowGameProcessAsync(unstarted); throw new Exception("Unstarted game accepted"); }
+            catch (InvalidOperationException) { }
+            Assert(window.IsVisible, "An unstarted game process cannot hide the launcher");
+        }
+
+        window.SetAuditProgress("Preparando Minecraft", .4);
+        using var unrelated = StartGameFixture(30000, 0);
+        using (var game = StartGameFixture(11000, 0))
+        {
+            var filesBefore = Directory.GetFiles(root, "*", SearchOption.AllDirectories)
+                .Where(f => !f.EndsWith(".log")).ToDictionary(f => f, File.ReadAllBytes);
+            var session = window.FollowGameProcessAsync(game);
+            Assert(!window.IsVisible && !session.IsCompleted, "Launcher hides while the actual game process remains alive");
+            Assert(!Get<Button>(window, "PrimaryButton").IsEnabled && !Get<Button>(window, "InstallationNav").IsEnabled,
+                "Play and installation stay locked during the game session");
+            Assert(!news.IsPlaying && !Get<ProgressBar>(window, "Progress").IsIndeterminate,
+                "Hidden launcher stops carousel and indeterminate progress animations");
+            var heartbeats = 0;
+            var responsiveness = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+            responsiveness.Tick += (_, _) => heartbeats++;
+            responsiveness.Start();
+            await Task.Delay(650);
+            responsiveness.Stop();
+            Assert(heartbeats >= 2, "OS process wait leaves the UI dispatcher responsive");
+            var rejectedDuplicate = false;
+            try { await window.FollowGameProcessAsync(game); }
+            catch (InvalidOperationException) { rejectedDuplicate = true; }
+            Assert(rejectedDuplicate, "A second game watcher cannot replace the active session");
+            var slide = news.CurrentIndex;
+            using var self = Process.GetCurrentProcess();
+            self.Refresh();
+            var cpuBefore = self.TotalProcessorTime;
+            var elapsed = Stopwatch.StartNew();
+            await Task.Delay(6000);
+            self.Refresh();
+            var cpuMs = (self.TotalProcessorTime - cpuBefore).TotalMilliseconds;
+            var cpuPercentOneCore = cpuMs / elapsed.Elapsed.TotalMilliseconds * 100;
+            File.WriteAllText(Path.Combine(_output, "background-measurement.json"), JsonSerializer.Serialize(new
+            {
+                sampleSeconds = elapsed.Elapsed.TotalSeconds,
+                cpuMilliseconds = cpuMs,
+                cpuPercentOfOneCore = cpuPercentOneCore,
+                workingSetMiB = self.WorkingSet64 / 1048576d,
+                privateMiB = self.PrivateMemorySize64 / 1048576d,
+                note = "Isolated WPF test host, potentially including prior render tests; not the published launcher or a real Minecraft session. No forced GC or working-set trimming."
+            }, new JsonSerializerOptions { WriteIndented = true }));
+            Assert(!session.IsCompleted && !window.IsVisible && !news.IsPlaying && news.CurrentIndex == slide,
+                "Carousel remains stopped beyond its normal five-second interval throughout the game");
+            var exitCode = await session.WaitAsync(TimeSpan.FromSeconds(10));
+            window.EndAuditProgress();
+            Assert(filesBefore.All(f => File.Exists(f.Key) && f.Value.SequenceEqual(File.ReadAllBytes(f.Key))),
+                "Background wait and restoration preserve the isolated profile and installation files");
+            window.SetAuditState("1.4.7", Check("1.4.7", false));
+            Assert(exitCode == 0 && window.IsVisible && window.WindowState == WindowState.Normal,
+                "Normal game exit restores the launcher automatically");
+            Assert(!unrelated.HasExited, "Restoration follows the launched process, independent of unrelated processes");
+            Assert(window.Width == width && window.Height == height && Get<Button>(window, "PrimaryButton").IsEnabled,
+                "Restored launcher retains its size and can launch another session");
+            Capture(window, "game-exit-restored");
+        }
+        // Never leave the test's own long-lived helper behind. This is not Java or user data.
+        unrelated.Kill();
+        await unrelated.WaitForExitAsync();
+
+        window.SetAuditProgress("Preparando Minecraft", .7);
+        window.WindowState = WindowState.Minimized;
+        using (var crash = StartGameFixture(350, 23))
+        {
+            var exitCode = await window.FollowGameProcessAsync(crash).WaitAsync(TimeSpan.FromSeconds(5));
+            window.EndAuditProgress();
+            Assert(exitCode == 23 && window.IsVisible && window.WindowState == WindowState.Normal,
+                "Abnormal game exit restores even a previously minimized launcher and retains the error code");
+        }
+        using (var instant = StartGameFixture(0, 7))
+        {
+            await instant.WaitForExitAsync();
+            window.SetAuditProgress("Preparando Minecraft", .7);
+            Assert(await window.FollowGameProcessAsync(instant) == 7 && window.IsVisible,
+                "An already-exited game is handled without losing the exit notification");
+            window.EndAuditProgress();
+        }
+        window.Close();
+    }
+
+    private static Process StartGameFixture(int milliseconds, int exitCode)
+    {
+        var start = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, CreateNoWindow = true };
+        start.ArgumentList.Add("--game-process");
+        start.ArgumentList.Add(milliseconds.ToString());
+        start.ArgumentList.Add(exitCode.ToString());
+        return Process.Start(start)!;
     }
     private static PackUpdateCheck Check(string version, bool changed, string slug = "destiny") => new(new PackManifest { PackId = slug, Version = version }, changed ? [new PackManifestFile { Path = "mods/fixture.jar" }] : [], [], []);
     private static string Text(Window w, string name) => Get<TextBlock>(w, name).Text;

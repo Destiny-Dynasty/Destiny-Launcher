@@ -63,7 +63,7 @@ public partial class NewsCarousel : UserControl
         UpdatePlayback();
     }
 
-    internal void SuspendPlayback(bool suspended) { _suspended = suspended; UpdatePlayback(); }
+    internal void SuspendPlayback(bool suspended) { _suspended = suspended; if (suspended) SettleTransition(); UpdatePlayback(); }
     private bool CanPlay => IsLoaded && IsVisible && _slides.Count > 1 && !_suspended && !_transitioning
         && !CaptionRevealed && _window is { IsActive: true, WindowState: not WindowState.Minimized } && SystemParameters.ClientAreaAnimation;
 

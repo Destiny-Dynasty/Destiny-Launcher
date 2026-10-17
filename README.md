@@ -8,7 +8,7 @@ Launcher de escritorio para el modpack Destiny, construido con WPF y .NET 10.
 - Compilación local: `dotnet build DestinyLauncher/DestinyLauncher.csproj -c Release`
 - Publicación para Windows x64: `tools/Publish-Launcher.ps1`
 - La salida de publicación se reemplaza en `publish/`; no se versiona en Git.
-- Publicación experimental refinada: `tools/Publish-Launcher-Experiment.ps1`, con salida fija en `publish-experiment-2/`, autocontenida para Windows x64 y en un solo ejecutable. El script comprueba que `publish-experiment/` mantiene sus archivos, fechas y SHA-256; nunca se usa como salida ni como carpeta temporal.
+- La interfaz refinada es la versión principal. La publicación es autocontenida para Windows x64 y genera un solo ejecutable, sin requerir una instalación de .NET.
 - Destiny consulta `Destiny-Dynasty/Modpack/main/manifests/destiny.json`, con los archivos alojados en las releases de ese repositorio.
 - Destiny Lite consulta `Destiny-Dynasty/Modpack-Lite/main/manifests/destiny-lite.json`. El repositorio está preparado para su primera publicación; mientras no exista un pack real no se publica un manifiesto vacío ni una versión ficticia.
 
@@ -23,7 +23,7 @@ El launcher descarga Minecraft Java 1.20.1, instala Fabric y después sincroniza
 Para abrir una sesión con configuración, caché, registros e instalaciones de prueba independientes:
 
 ```powershell
-.\publish-experiment-2\DestinyLauncher.exe --data-root E:\Destiny\Launcher\artifacts\ui-refinement\manual-data
+.\publish\DestinyLauncher.exe --data-root E:\Destiny\Launcher\artifacts\ui-refinement\manual-data
 ```
 
 En una raíz nueva, Destiny se instala dentro de `instances/Destiny` y Lite dentro de `instances/Destiny-Lite`. La ventana indica `DATOS AISLADOS`. Sin este argumento se conservan las rutas habituales del launcher. Los comandos de renderizado también usan datos temporales aislados.
@@ -46,6 +46,14 @@ Inicio presenta el pack activo, el perfil y la acción principal. La selección 
 Los emblemas pequeños comparten una imagen decodificada a 112 píxeles y remuestreo `HighQuality` de WPF; el título la presenta a 28 px y la barra lateral a 40 px. El arte original del banner se conserva. El marco usa un radio de 18 px, con recorte del contenido y región nativa de `WindowChrome`.
 
 La ventana tiene tamaño fijo: 1000 × 620 unidades de WPF, respetando el escalado de Windows. Si el área útil del escritorio es menor, se ajusta una sola vez al abrir y queda bloqueada en ese tamaño. Solo permite mover, minimizar y cerrar; no hay botón de maximizar ni bordes redimensionables. `WindowWorkArea.cs` bloquea también los comandos nativos de maximización y cambio de tamaño, incluido el doble clic en la barra de título. Las herramientas de vista previa conservan el cambio programático de tamaño para verificar distribución y escalado sin afectar a sesiones reales.
+
+## Durante la partida
+
+La ventana permanece visible mientras comprueba, descarga y prepara los archivos. Solo se oculta después de iniciar correctamente el proceso de Minecraft. El launcher conserva el identificador de ese proceso y espera su cierre con `Process.WaitForExitAsync`, mediante una notificación del sistema operativo, sin sondeos ni un hilo bloqueado. Al terminar el juego, vuelve a mostrar y activar la ventana en su tamaño normal; un código de salida distinto de cero se muestra como error y permite reintentar. Un fallo anterior al arranque mantiene la ventana visible.
+
+Mientras está oculto no hay temporizador del carrusel, animación de progreso ni peticiones pendientes de novedades o skins. Los botones de juego e instalación permanecen bloqueados durante esa sesión. La espera no captura la salida continua de Java ni escribe logs por cada línea del juego: Minecraft mantiene sus registros habituales en la instancia. El launcher conserva en memoria la interfaz para recuperarla rápidamente; su consumo de RAM no puede ser cero. No se fuerza el vaciado de memoria de Windows ni se cierra Minecraft si termina el launcher.
+
+`UiSmoke` también comprueba ocultación, espera sin bloquear WPF, retorno normal, salida con error, proceso ya terminado, sesiones consecutivas y pausa del carrusel durante más de cinco segundos. Usa procesos auxiliares propios y datos aislados, sin arrancar Java ni modificar partidas reales. Guarda una muestra de CPU y memoria del proceso de pruebas; no equivale a una medición de una partida real.
 
 ## Novedades del launcher
 

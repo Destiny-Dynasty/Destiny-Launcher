@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Automation;
@@ -21,6 +22,7 @@ public partial class MainWindow : Window
     private readonly bool _previewMode;
     private readonly bool _loadRemoteSkinInPreview;
     private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource _optionalActivity = new();
     private CancellationTokenSource? _manifestCancellation;
     private readonly Dictionary<PackEdition, PackUpdateCheck> _editionChecks = [];
     private LauncherConfig _config;
@@ -32,6 +34,8 @@ public partial class MainWindow : Window
     private bool _operationFailed;
     private int _manifestRefreshGeneration;
     private bool _closed;
+    private bool _initialLoadStarted;
+    private bool _gameRunning;
     private string? _playerHeadUsername;
     private CancellationTokenSource? _playerHeadCancellation;
     private Task? _playerHeadLoadTask;
@@ -59,7 +63,15 @@ public partial class MainWindow : Window
         StateChanged += (_, _) => UpdateWindowFrame();
         Hero.SizeChanged += (_, _) => ApplyResponsiveLayout();
         News.SetSlides(NewsFeedService.BundledSamples());
-        Loaded += async (_, _) => { ApplyResponsiveLayout(); if (!_previewMode) _ = LoadNewsAsync(); await RefreshManifestAsync(); };
+        Loaded += async (_, _) =>
+        {
+            ApplyResponsiveLayout();
+            // Showing the window again after a game must not repeat startup requests.
+            if (_initialLoadStarted) return;
+            _initialLoadStarted = true;
+            if (!_previewMode) _ = LoadNewsAsync();
+            await RefreshManifestAsync();
+        };
         TestModeText.Visibility = dataRoot is not null ? Visibility.Visible : Visibility.Collapsed;
         LauncherVersionText.Text = $"v{typeof(MainWindow).Assembly.GetName().Version?.ToString(3)}";
         UpdateWindowFrame();
@@ -114,14 +126,15 @@ public partial class MainWindow : Window
     private string Installed(PackDefinition pack) => _configService.InstalledVersion(pack.Slug);
     private async Task LoadNewsAsync()
     {
+        var token = _optionalActivity.Token;
         try
         {
-            var cached = await _newsFeed.ReadCacheAsync(_lifetime.Token);
-            if (!_closed && cached is not null) News.SetSlides(cached);
-            var fresh = await _newsFeed.RefreshAsync(_lifetime.Token);
-            if (!_closed) { News.SetSlides(fresh); _log.Info($"Novedades disponibles: {fresh.Count}"); }
+            var cached = await _newsFeed.ReadCacheAsync(token);
+            if (!_closed && !token.IsCancellationRequested && cached is not null) News.SetSlides(cached);
+            var fresh = await _newsFeed.RefreshAsync(token);
+            if (!_closed && !token.IsCancellationRequested) { News.SetSlides(fresh); _log.Info($"Novedades disponibles: {fresh.Count}"); }
         }
-        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception ex)
         {
             // Optional editorial content must never replace installation status or block Play.
@@ -259,8 +272,8 @@ public partial class MainWindow : Window
         if (_previewMode) { SetNotice("Vista de prueba", "Las operaciones del juego están desactivadas en esta vista.", "Gold"); return; }
         ShowHomePage();
         SetBusy(true, "Comprobando archivos");
-        string finalStatus = "Minecraft iniciado";
-        string finalDetail = "El juego se ha abierto en una ventana independiente.";
+        string finalStatus = "Partida terminada";
+        string finalDetail = "Minecraft se ha cerrado. Puedes volver a jugar cuando quieras.";
         try
         {
             var progress = new Progress<(string status, double value)>(SetProgress);
@@ -273,11 +286,10 @@ public partial class MainWindow : Window
                 catch (HttpRequestException ex) when (!string.IsNullOrWhiteSpace(installedVersion) && (ex.StatusCode is null || (int)ex.StatusCode >= 500))
                 {
                     _log.Info($"GitHub unavailable; launching installed {pack.Slug} {installedVersion}.");
-                    finalDetail = "No se pudo comprobar el modpack. Se ha usado la instalación local.";
                 }
                 catch (TaskCanceledException) when (!string.IsNullOrWhiteSpace(installedVersion))
                 {
-                    finalDetail = "La consulta agotó el tiempo de espera. Se ha usado la instalación local.";
+                    _log.Info($"Manifest request timed out; launching installed {pack.Slug} {installedVersion}.");
                 }
             }
             if (manifestCheck is not null)
@@ -298,8 +310,17 @@ public partial class MainWindow : Window
             }
             else if (string.IsNullOrWhiteSpace(installedVersion))
                 throw new InvalidOperationException("No hay una instalación local ni un manifiesto disponible.");
-            await _minecraft.PrepareAndLaunchAsync(_config, pack, progress, _lifetime.Token);
-            _configService.Save(_config);
+            using var process = await _minecraft.PrepareAndLaunchAsync(_config, pack, progress, _lifetime.Token);
+            // A settings write failure after a successful start must never abandon the game
+            // handle or leave the launcher visible for the rest of the session.
+            TrySaveConfig();
+            var exitCode = await FollowGameProcessAsync(process);
+            if (exitCode != 0)
+            {
+                _operationFailed = true;
+                finalStatus = "Minecraft se cerró con un error";
+                finalDetail = $"Código de salida: {exitCode}. Puedes volver a intentarlo. Si se repite, revisa los registros de la instancia.";
+            }
         }
         catch (Exception ex)
         {
@@ -310,9 +331,52 @@ public partial class MainWindow : Window
         }
         finally
         {
-            SetBusy(false, "");
-            Refresh();
-            SetNotice(finalStatus, finalDetail, _operationFailed ? "Error" : "Success", animate: true);
+            if (!_closed)
+            {
+                SetBusy(false, "");
+                Refresh();
+                SetNotice(finalStatus, finalDetail, _operationFailed ? "Error" : "Success", animate: true);
+            }
+        }
+    }
+
+    // The caller owns/disposes the process. Waiting uses the OS exit event, not a timer,
+    // a blocked worker thread, or the lifetime of an unrelated Java process.
+    internal async Task<int> FollowGameProcessAsync(Process process)
+    {
+        if (_gameRunning) throw new InvalidOperationException("Ya hay una partida en curso.");
+        _ = process.Id; // Reject an unstarted process before hiding any UI.
+        _gameRunning = true;
+        try
+        {
+            _optionalActivity.Cancel();
+            _playerHeadCancellation?.Cancel();
+            News.SuspendPlayback(true);
+            Progress.IsIndeterminate = false;
+            Progress.BeginAnimation(System.Windows.Controls.Primitives.RangeBase.ValueProperty, null);
+            Progress.Visibility = Visibility.Collapsed;
+            PrimaryLabel.Text = "EN PARTIDA";
+            ActionHint.Text = "El launcher volverá cuando cierres Minecraft";
+            SetNotice("Minecraft en ejecución", "El launcher permanece en segundo plano durante la partida.", "Success");
+            if (!process.HasExited) Hide();
+            await process.WaitForExitAsync(_lifetime.Token);
+            var exitCode = process.ExitCode;
+            _log.Info($"Minecraft exited: PID {process.Id}, code {exitCode}.");
+            return exitCode;
+        }
+        finally
+        {
+            _gameRunning = false;
+            if (!_closed)
+            {
+                _optionalActivity.Dispose();
+                _optionalActivity = new CancellationTokenSource();
+                if (PlayerHead.Source is null) _playerHeadUsername = null;
+                // Also restore a launcher that was minimized while Minecraft was preparing.
+                WindowState = WindowState.Normal;
+                Show();
+                Activate();
+            }
         }
     }
 
@@ -323,6 +387,7 @@ public partial class MainWindow : Window
         OperationCanceledException => "La conexión tardó demasiado. Revisa tu conexión y vuelve a intentarlo.",
         UnauthorizedAccessException => "No hay permiso para escribir en la carpeta. Elige otra ubicación en Ajustes.",
         InvalidDataException => "Los archivos recibidos no son válidos. Vuelve a intentarlo; si persiste, contacta con el equipo de Destiny.",
+        Win32Exception => "Windows no pudo iniciar Minecraft. Comprueba que Java y los archivos de la instancia estén disponibles e inténtalo de nuevo.",
         IOException => "No se pudieron guardar los archivos. Comprueba el espacio disponible y que la carpeta no esté en uso.",
         _ => "Revisa la conexión y la carpeta de instalación en Ajustes antes de volver a intentarlo."
     };
@@ -345,14 +410,14 @@ public partial class MainWindow : Window
         if (busy)
         {
             PrimaryLabel.Text = "PREPARANDO…";
-            ActionHint.Text = "Mantén el launcher abierto";
+            ActionHint.Text = "Se ocultará al iniciar Minecraft";
             SetNotice(status, "Preparando los archivos de tu partida.", "Gold");
         }
     }
 
     private void SetProgress((string status, double value) update)
     {
-        if (_closed) return;
+        if (_closed || _gameRunning || (!_busy && !_checkingManifest)) return;
         StatusText.Text = LauncherPresentation.ProgressStatus(update.status);
         StatusDetail.Text = _busy ? "Mantén el launcher abierto hasta que termine la operación." : "Consultando la versión disponible y los archivos locales.";
         // Backend values combine different phases. Only show determinate progress when a real
@@ -403,7 +468,7 @@ public partial class MainWindow : Window
         PlayerHead.Visibility = Visibility.Collapsed;
         PlayerInitial.Visibility = Visibility.Visible;
         if (!Regex.IsMatch(username ?? "", "^[A-Za-z0-9_]{3,16}$")) return;
-        _playerHeadCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _playerHeadCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, _optionalActivity.Token);
         _playerHeadLoadTask = LoadPlayerHeadAsync(username!, _playerHeadCancellation.Token);
     }
 
@@ -537,6 +602,8 @@ public partial class MainWindow : Window
     {
         _closed = true;
         _lifetime.Cancel();
+        _optionalActivity.Cancel();
+        _optionalActivity.Dispose();
         _manifestCancellation?.Cancel();
         _manifestCancellation?.Dispose();
         _playerHeadCancellation?.Cancel();

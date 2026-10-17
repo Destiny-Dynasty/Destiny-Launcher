@@ -11,6 +11,14 @@ if (-not (Test-Path -LiteralPath $projectPath)) {
     throw "No se encontró el proyecto: $projectPath"
 }
 
+if ((Test-Path -LiteralPath $outputPath) -and
+    ((Get-Item -LiteralPath $outputPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    throw "La salida publish no puede ser un enlace o una unión de directorios: $outputPath"
+}
+$runningOutput = Get-Process DestinyLauncher -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -eq (Join-Path $outputPath 'DestinyLauncher.exe') }
+if ($runningOutput) { throw 'Cierra el launcher de publish antes de volver a publicarlo.' }
+
 New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
 $dotnetCommand = if (Test-Path -LiteralPath $localSdkPath) {
     $localSdkPath
