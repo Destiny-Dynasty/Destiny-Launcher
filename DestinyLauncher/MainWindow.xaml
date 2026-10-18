@@ -42,6 +42,7 @@
                 <Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="80"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <Border Background="#131410" BorderBrush="#302D23" BorderThickness="0,0,1,0">
                     <Grid>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <StackPanel Margin="0,18,0,0">
                             <Button x:Name="HomeNav" Tag="Selected" Style="{StaticResource NavItem}" Click="Home_Click" AutomationProperties.Name="Inicio" ToolTip="Inicio">
                                 <StackPanel><Path Data="{x:Static local:IconGlyphs.Home}" Width="20" Height="20" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" StrokeLineJoin="Round"/><TextBlock Text="Inicio" FontSize="10" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center" Margin="0,6,0,0"/></StackPanel>
@@ -53,7 +54,19 @@
                                 <StackPanel><Path Data="{x:Static local:IconGlyphs.Settings}" Width="20" Height="20" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"/><TextBlock Text="Ajustes" FontSize="10" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center" Margin="0,6,0,0"/></StackPanel>
                             </Button>
                         </StackPanel>
-                        <StackPanel VerticalAlignment="Bottom" Margin="0,0,0,18" IsHitTestVisible="False">
+                        <StackPanel x:Name="SocialLinks" Grid.Row="2" Margin="0,4,0,12">
+                            <Border Height="1" Background="{StaticResource Line}" Margin="24,0,24,8"/>
+                            <Button x:Name="DiscordLink" Style="{StaticResource SocialButton}" Tag="https://dsc.gg/destiny-dynasty-mc" Click="SocialLink_Click" ToolTip="Discord · Comunidad de Destiny Dynasty" AutomationProperties.Name="Abrir Discord de Destiny Dynasty">
+                                <Path Data="{x:Static local:IconGlyphs.Discord}" Width="21" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
+                            <Button x:Name="YouTubeLink" Style="{StaticResource SocialButton}" Tag="https://www.youtube.com/@destiny_dynasty" Click="SocialLink_Click" ToolTip="YouTube · Canal de Destiny Dynasty" AutomationProperties.Name="Abrir YouTube de Destiny Dynasty">
+                                <Path Data="{x:Static local:IconGlyphs.YouTube}" Width="21" Height="17" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
+                            <Button x:Name="XLink" Style="{StaticResource SocialButton}" Tag="https://x.com/DestinyDynasty_" Click="SocialLink_Click" ToolTip="X · Novedades de Destiny Dynasty" AutomationProperties.Name="Abrir X de Destiny Dynasty">
+                                <Path Data="{x:Static local:IconGlyphs.X}" Width="17" Height="17" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
+                        </StackPanel>
+                        <StackPanel Grid.Row="3" VerticalAlignment="Bottom" Margin="0,0,0,12" IsHitTestVisible="False">
                             <Image x:Name="SidebarEmblem" Width="40" Height="40" Style="{StaticResource SmallBrandMark}" Opacity=".85"/>
                             <TextBlock x:Name="LauncherVersionText" FontSize="9" Foreground="{StaticResource Subtle}" HorizontalAlignment="Center" Margin="0,7,0,0"/>
                         </StackPanel>

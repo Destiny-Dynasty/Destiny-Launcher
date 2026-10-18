@@ -78,6 +78,16 @@ internal static class Program
         preview.Width = 1000; preview.Height = 620;
         await Idle();
         preview.SetAuditState("", playerName: "");
+        var openedLinks = new List<Uri>();
+        preview.OpenExternalLink = openedLinks.Add;
+        foreach (var (name, address) in new[] { ("DiscordLink", "https://dsc.gg/destiny-dynasty-mc"), ("YouTubeLink", "https://www.youtube.com/@destiny_dynasty"), ("XLink", "https://x.com/DestinyDynasty_") })
+        {
+            var button = Get<Button>(preview, name);
+            Assert(button.IsVisible && button.Focusable && button.ToolTip is string && button.MinHeight >= 36, $"{name} is visible, keyboard accessible and labelled");
+            button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert(openedLinks[^1].AbsoluteUri == address && Get<Grid>(preview, "HomeView").IsVisible,
+                $"{name} opens the exact HTTPS address without changing the launcher page");
+        }
         var news = Get<NewsCarousel>(preview, "News");
         Assert(news.SlideCount == 2, "Two bundled samples appear before any network request");
         Assert(((Border)news.FindName("CaptionSurface")).Opacity == 0, "News is image-only until hover or keyboard focus");
@@ -302,6 +312,10 @@ internal static class Program
                 Capture(preview, "home-remote-skin");
             }
         }
+        preview.Width = 680; preview.Height = 480; await Idle();
+        var settingsBounds = Get<Button>(preview, "SettingsNav").TransformToAncestor(preview).TransformBounds(new Rect(Get<Button>(preview, "SettingsNav").RenderSize));
+        var socialBounds = Get<StackPanel>(preview, "SocialLinks").TransformToAncestor(preview).TransformBounds(new Rect(Get<StackPanel>(preview, "SocialLinks").RenderSize));
+        Assert(socialBounds.Top >= settingsBounds.Bottom && socialBounds.Bottom <= preview.ActualHeight, "Social links fit below navigation at the smallest audited height");
         preview.Close();
 
         var profile = new ProfileDialog("MMMMMMMMMMMMMMMM") { ShowActivated = false, Left = -32000, Top = -32000, WindowStartupLocation = WindowStartupLocation.Manual };

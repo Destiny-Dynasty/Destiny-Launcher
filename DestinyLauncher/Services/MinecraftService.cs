@@ -13,7 +13,7 @@ public sealed class MinecraftService
     private static readonly HttpClient FabricMetaClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private readonly LauncherPaths _paths; private readonly AppLogger _log;
     public MinecraftService(LauncherPaths paths, AppLogger log) { _paths = paths; _log = log; }
-    public async Task<Process> PrepareAndLaunchAsync(LauncherConfig config, PackDefinition pack, IProgress<(string status, double value)> progress, CancellationToken token)
+    public async Task<MinecraftGameSession> PrepareAndLaunchAsync(LauncherConfig config, PackDefinition pack, IProgress<(string status, double value)> progress, CancellationToken token)
     {
         var instance = new MinecraftPath(_paths.Instance(pack.Slug)); var launcher = new MinecraftLauncher(instance);
         progress.Report(("Preparando Minecraft 1.20.1", .05)); launcher.ByteProgressChanged += (_, e) => { if (e.TotalBytes > 0) progress.Report(("Preparando Minecraft", .05 + (double)e.ProgressedBytes / e.TotalBytes * .55)); };
@@ -24,21 +24,38 @@ public sealed class MinecraftService
         progress.Report(("Instalando Fabric " + config.FabricLoaderVersion, .74));
         using var fabricClient = new HttpClient();
         var fabric = new FabricInstaller(fabricClient);
-        var profile = await fabric.Install(config.MinecraftVersion, instance, config.FabricLoaderVersion);
+        var profile = await PrepareFabricAsync(launcher, fabric, instance, config.MinecraftVersion, config.FabricLoaderVersion, progress, token);
         var options = new MLaunchOption { Session = MSession.CreateOfflineSession(config.PlayerName), MaximumRamMb = checked(config.RamGb * 1024), ServerIp = "destinydynasty.tatnikhost.net" };
         var process = await launcher.BuildProcessAsync(profile, options, token);
         try
         {
             token.ThrowIfCancellationRequested();
-            // Keep the actual Java process handle. Do not capture its output or poll all Java
-            // processes: the launcher only needs the exit notification for this game session.
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.CreateNoWindow = true;
-            if (!process.Start()) throw new InvalidOperationException("Minecraft no devolvió un proceso al iniciarse.");
+            _log.Info($"Starting Minecraft: {config.PlayerName}, {profile}, {pack.Name}");
+            var session = MinecraftGameSession.Start(process);
+            return session;
         }
         catch { process.Dispose(); throw; }
-        _log.Info($"Minecraft launched: PID {process.Id}, {config.PlayerName}, {profile}, {pack.Name}");
-        return process;
+    }
+
+    internal static async Task<string> PrepareFabricAsync(MinecraftLauncher launcher, FabricInstaller installer, MinecraftPath instance,
+        string minecraftVersion, string loaderVersion, IProgress<(string status, double value)> progress, CancellationToken token)
+    {
+        var profile = await InstallFabricAsync(installer, instance, minecraftVersion, loaderVersion, token);
+        // FabricInstaller only writes profile JSON. Resolve and install its inherited files
+        // (including the loader, intermediary and ASM) before constructing the Java classpath.
+        progress.Report(("Preparando bibliotecas de Fabric", .8));
+        await launcher.InstallAsync(profile, token);
+        return profile;
+    }
+
+    internal static async Task<string> InstallFabricAsync(FabricInstaller installer, MinecraftPath instance, string minecraftVersion, string loaderVersion, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        // The (gameVersion, path, string) overload means a custom PROFILE NAME, not a loader
+        // version; it silently selects the latest loader instead of the requested stable one.
+        var profile = await installer.Install(minecraftVersion, loaderVersion, instance);
+        token.ThrowIfCancellationRequested();
+        return profile;
     }
 
     private async Task<string> GetLatestStableFabricAsync(string minecraftVersion, string fallback, CancellationToken token)

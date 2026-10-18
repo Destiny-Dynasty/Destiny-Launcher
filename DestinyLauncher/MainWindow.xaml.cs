@@ -82,6 +82,7 @@ public partial class MainWindow : Window
     private PackDefinition Pack => _config.SelectedEdition == PackEdition.Destiny ? _config.Destiny : _config.DestinyLite;
     internal Task PlayerHeadLoadTask => _playerHeadLoadTask ?? Task.CompletedTask;
     internal LauncherPaths DataPaths => _paths;
+    internal Action<Uri> OpenExternalLink { get; set; } = uri => Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
 
     private void ConfigureInitialWindowSize()
     {
@@ -310,16 +311,24 @@ public partial class MainWindow : Window
             }
             else if (string.IsNullOrWhiteSpace(installedVersion))
                 throw new InvalidOperationException("No hay una instalación local ni un manifiesto disponible.");
-            using var process = await _minecraft.PrepareAndLaunchAsync(_config, pack, progress, _lifetime.Token);
+            using var session = await _minecraft.PrepareAndLaunchAsync(_config, pack, progress, _lifetime.Token);
             // A settings write failure after a successful start must never abandon the game
             // handle or leave the launcher visible for the rest of the session.
             TrySaveConfig();
-            var exitCode = await FollowGameProcessAsync(process);
+            var exitCode = await FollowGameProcessAsync(session.Process);
             if (exitCode != 0)
             {
                 _operationFailed = true;
                 finalStatus = "Minecraft se cerró con un error";
-                finalDetail = $"Código de salida: {exitCode}. Puedes volver a intentarlo. Si se repite, revisa los registros de la instancia.";
+                var errors = await session.ReadErrorsAsync();
+                finalDetail = $"Código de salida: {exitCode}. Puedes volver a intentarlo.";
+                if (!string.IsNullOrWhiteSpace(errors))
+                {
+                    var errorFile = Path.Combine(_paths.Logs, $"minecraft-startup-{DateTime.Now:yyyyMMdd-HHmmss}-{session.Process.Id}.log");
+                    await File.WriteAllTextAsync(errorFile, errors, _lifetime.Token);
+                    _log.Error($"Minecraft stderr saved to {errorFile}");
+                    finalDetail += " Se guardó el detalle de Java en los registros del launcher.";
+                }
             }
         }
         catch (Exception ex)
@@ -489,6 +498,15 @@ public partial class MainWindow : Window
     private void Home_Click(object sender, RoutedEventArgs e) => ShowHomePage();
     private void Installation_Click(object sender, RoutedEventArgs e) => ShowInstallationPage();
     private void Settings_Click(object sender, RoutedEventArgs e) => ShowSettingsPage();
+    private void SocialLink_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string address } || !Uri.TryCreate(address, UriKind.Absolute, out var uri) || uri.Scheme != "https") return;
+        try { OpenExternalLink(uri); }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+        {
+            LauncherDialog.Inform(this, "No se pudo abrir el enlace", "Windows no pudo abrir el navegador predeterminado. Vuelve a intentarlo más tarde.");
+        }
+    }
     private void ShowHomePage()
     {
         if (SettingsPageHost.Content is SettingsPage { HasChanges: true } && !DiscardSettings()) return;
