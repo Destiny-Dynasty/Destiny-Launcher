@@ -16,6 +16,10 @@ Launcher de escritorio para el modpack Destiny, construido con WPF y .NET 10.
 
 La configuración, el perfil, la caché y los logs se guardan bajo `%LOCALAPPDATA%\DestinyLauncher`, separados de los archivos de la aplicación para conservarlos al actualizar o desinstalar el launcher. Por defecto, el juego y los archivos del modpack Destiny se instalan en `%APPDATA%\.minecraft\versions\DestinyDynasty`; Destiny Lite usa la carpeta hermana `DestinyDynasty-Lite`. La carpeta principal se puede cambiar desde Ajustes.
 
+En Ajustes se edita únicamente la carpeta base, por defecto `%APPDATA%\.minecraft\versions`. El nombre final se muestra bloqueado y se añade al guardar. La configuración conserva la ruta completa para mantener la compatibilidad; si ya había una instalación con un nombre personalizado se conserva ese nombre. Abrir o guardar otros ajustes no mueve ni renombra archivos existentes.
+
+Los argumentos de Java se guardan en `JavaArguments` y se aplican a ambas variantes. «Restablecer» devuelve el campo a `-XX:+UseG1GC -XX:MaxGCPauseMillis=200`; los cambios se aplican con «Guardar ajustes». Se usa una base conservadora de G1 para Java 17, de acuerdo con las [recomendaciones de Oracle](https://docs.oracle.com/en/java/javase/17/gctuning/garbage-first-garbage-collector-tuning.html), sin prometer mejoras universales de rendimiento ni fijar tamaños de regiones o generaciones. La RAM sigue generando `-Xmx` desde su selector, salvo que el usuario lo indique explícitamente entre sus argumentos. Un campo vacío desactiva estos extras, manteniendo los argumentos obligatorios del perfil y del sistema. Los argumentos admiten comillas dobles y rutas de Windows con espacios; los errores de comillas se muestran al guardar.
+
 El launcher descarga Minecraft Java 1.20.1, instala Fabric y después sincroniza los archivos del modpack desde su manifiesto. En cada instalación consulta Fabric Meta para elegir el loader estable más reciente compatible con Minecraft 1.20.1; si el servicio no está disponible, utiliza la versión fijada en el manifiesto o la configuración.
 
 ## Pruebas de interfaz y aislamiento

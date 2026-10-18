@@ -282,7 +282,7 @@ internal static class Program
         save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         Assert(Descendants<TextBlock>(settings).Any(t => t.Text.Contains("Elige una ruta completa") && t.IsVisible), "Invalid install path has an inline message");
         Capture(preview, "settings-path-validation");
-        pathInput.Text = preview.DataPaths.Instances;
+        pathInput.Text = LauncherPaths.InstallationBaseDirectory(preview.DataPaths.Instances);
         ramInput.Text = "0"; save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         Assert(Descendants<TextBlock>(settings).Any(t => t.Text.Contains("entre 1 y 1024") && t.IsVisible), "Invalid memory has an inline message");
         Capture(preview, "settings-memory-validation");
@@ -405,6 +405,12 @@ internal static class Program
         Layout();
         Get<Button>(window, "SettingsNav").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Layout();
         var settings = (SettingsPage)Get<ContentControl>(window, "SettingsPageHost").Content;
+        var baseInput = Descendants<TextBox>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "InstallDirectoryInput");
+        var javaInput = Descendants<TextBox>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "JavaArgumentsInput");
+        var fixedFolder = Descendants<TextBlock>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "FixedInstallationFolder");
+        Assert(baseInput.Text == LauncherPaths.InstallationBaseDirectory(window.DataPaths.Instances) && fixedFolder.Text == "\\Destiny",
+            "Only the installation parent is editable; the existing final folder is fixed");
+        Assert(javaInput.Text == LauncherConfig.DefaultJavaArguments, "Java arguments start with the launcher defaults");
         Assert(!Descendants<TextBlock>(settings).Any(t => t.Text.Contains("carpeta hermana") || t.Text.Contains("Prepara el launcher") || t.Text.Contains("Deja memoria libre")), "Settings keep labels and validation without filler paragraphs");
         var slider = Descendants<Slider>(settings).Single();
         var ram = Descendants<TextBox>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "RamInput");
@@ -428,8 +434,24 @@ internal static class Program
         save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         Assert(saved is null && Descendants<TextBlock>(settings).Any(t => t.Text.Contains("entre 1 y 1024")), "RAM validation remains available after removing help paragraphs");
         ram.Text = "12";
+        javaInput.Text = "-Ddestiny.test=custom";
         save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        Assert(saved?.RamGb == 12, "Polished RAM control submits the unchanged settings contract");
+        Assert(saved?.RamGb == 12 && saved.JavaArguments == "-Ddestiny.test=custom" && saved.InstallDirectory == window.DataPaths.Instances,
+            "Saving JVM flags and RAM preserves the existing full installation path");
+        javaInput.Text = "-Dtest=\"unfinished";
+        saved = null;
+        save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(saved is null && Descendants<TextBlock>(settings).Any(t => t.Text.Contains("comillas")), "Invalid JVM quoting is reported without saving");
+        Descendants<Button>(settings).Single(b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "ResetJavaArguments")
+            .RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(javaInput.Text == LauncherConfig.DefaultJavaArguments, "Restore defaults replaces only the Java arguments field");
+        var newBase = Path.Combine(_output, "new base");
+        baseInput.Text = newBase;
+        save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(saved?.InstallDirectory == Path.Combine(newBase, "Destiny") && !Directory.Exists(newBase),
+            "Changing the base preserves the fixed name without moving or creating files");
+        baseInput.Text = LauncherPaths.InstallationBaseDirectory(window.DataPaths.Instances);
+        save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         Layout(); CaptureContent("settings");
         foreach (var (width, height) in new[] { (820d, 560d), (760d, 500d), (680d, 480d) })
         {
@@ -442,6 +464,10 @@ internal static class Program
             CaptureContent($"settings-{width}x{height}");
         }
         Assert(!window.IsVisible && PresentationSource.FromVisual(root) is null, "Headless checks finish without opening or activating any window");
+        var liteSettings = new SettingsPage(new LauncherConfig { InstallDirectory = window.DataPaths.Instances, SelectedEdition = PackEdition.DestinyLite });
+        liteSettings.Measure(new Size(800, 540)); liteSettings.Arrange(new Rect(0, 0, 800, 540)); liteSettings.UpdateLayout();
+        Assert(Descendants<TextBlock>(liteSettings).Any(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "FixedInstallationFolder" && t.Text == "\\Destiny-Lite"),
+            "Lite displays its fixed sibling folder while sharing the same editable base");
         window.Close();
         var profile = new ProfileDialog("Player_123");
         var profileRoot = (FrameworkElement)profile.Content;

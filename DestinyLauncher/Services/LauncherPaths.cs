@@ -16,5 +16,13 @@ public sealed class LauncherPaths
     }
     public void SetInstallDirectory(string? path) => InstallDirectory = Path.GetFullPath(string.IsNullOrWhiteSpace(path) ? DefaultInstallDirectory : Environment.ExpandEnvironmentVariables(path.Trim()));
     public string Instance(string slug) => string.Equals(slug, "destiny-lite", StringComparison.OrdinalIgnoreCase) ? InstallDirectory + "-Lite" : InstallDirectory;
+    // Keep the persisted full path compatible with existing installations. Only its parent
+    // is editable in Settings; the existing instance name is preserved, including custom names.
+    public static string InstallationFolderName(string instanceDirectory) => Path.GetFileName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(Environment.ExpandEnvironmentVariables(instanceDirectory))));
+    public static string InstallationBaseDirectory(string instanceDirectory)
+    {
+        var fullPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(instanceDirectory));
+        return Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(fullPath)) ?? fullPath;
+    }
     public void Ensure() { foreach (var p in new[] { Root, Cache, Logs, Temp }) Directory.CreateDirectory(p); }
 }

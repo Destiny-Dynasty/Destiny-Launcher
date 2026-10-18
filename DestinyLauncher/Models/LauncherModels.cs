@@ -18,9 +18,11 @@ public sealed class PackDefinition
 }
 public sealed class LauncherConfig
 {
+    public const string DefaultJavaArguments = "-XX:+UseG1GC -XX:MaxGCPauseMillis=200";
     public string PlayerName { get; set; } = "";
     public PackEdition SelectedEdition { get; set; } = PackEdition.Destiny;
     public int RamGb { get; set; } = 8;
+    public string JavaArguments { get; set; } = DefaultJavaArguments;
     public string InstallDirectory { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "versions", "DestinyDynasty");
     [JsonIgnore]
     public string MinecraftVersion { get; set; } = "1.20.1";

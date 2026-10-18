@@ -117,9 +117,13 @@ public sealed class SettingsPage : UserControl
     private readonly TextBox _installDirectory;
     private readonly TextBox _ramValue;
     private readonly Slider _ramSlider;
+    private readonly TextBox _javaArguments;
+    private readonly string _installationFolderName;
+    private readonly string _originalBaseDirectory;
     private bool _syncingRam;
     private bool _saved;
-    public bool HasChanges => !_saved && (_installDirectory.Text != _source.InstallDirectory || _ramValue.Text != _source.RamGb.ToString());
+    public bool HasChanges => !_saved && (_installDirectory.Text != _originalBaseDirectory || _ramValue.Text != _source.RamGb.ToString()
+        || _javaArguments.Text != _source.JavaArguments);
     public Action? BackRequested { get; set; }
     public Func<LauncherConfig, Task>? SaveRequested { get; set; }
     internal void MarkSaved() => _saved = true;
@@ -127,6 +131,8 @@ public sealed class SettingsPage : UserControl
     public SettingsPage(LauncherConfig source)
     {
         _source = source;
+        _installationFolderName = LauncherPaths.InstallationFolderName(source.InstallDirectory);
+        _originalBaseDirectory = LauncherPaths.InstallationBaseDirectory(source.InstallDirectory);
         TextBlock? validation = null;
         var layout = new Grid { Margin = new Thickness(28, 24, 28, 20) };
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -142,20 +148,30 @@ public sealed class SettingsPage : UserControl
         var pathRow = new Grid { Margin = new Thickness(0, 16, 0, 0) };
         pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _installDirectory = new TextBox { Text = source.InstallDirectory, ToolTip = source.InstallDirectory };
+        pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _installDirectory = new TextBox { Text = _originalBaseDirectory, ToolTip = _originalBaseDirectory };
         AutomationProperties.SetName(_installDirectory, "Carpeta de instalación");
         AutomationProperties.SetAutomationId(_installDirectory, "InstallDirectoryInput");
         _installDirectory.TextChanged += (_, _) => { _installDirectory.ToolTip = _installDirectory.Text; _installDirectory.BorderBrush = ProfileDialog.ResourceBrush("Line"); if (validation is not null) validation.Visibility = Visibility.Collapsed; };
         pathRow.Children.Add(_installDirectory);
-        var browse = ProfileDialog.DialogButton("", false); browse.MinWidth = 42; browse.Width = 42; browse.Padding = new Thickness(0); browse.Margin = new Thickness(10, 0, 0, 0); browse.ToolTip = "Elegir carpeta";
+        var folderName = new TextBlock
+        {
+            Text = "\\" + _installationFolderName + (source.SelectedEdition == PackEdition.DestinyLite ? "-Lite" : ""),
+            FontSize = 12, Foreground = ProfileDialog.ResourceBrush("Muted"), VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(10, 0, 0, 0)
+        };
+        AutomationProperties.SetName(folderName, "Nombre fijo de la carpeta del juego");
+        AutomationProperties.SetAutomationId(folderName, "FixedInstallationFolder");
+        Grid.SetColumn(folderName, 1); pathRow.Children.Add(folderName);
+        var browse = ProfileDialog.DialogButton("", false); browse.MinWidth = 42; browse.Width = 42; browse.Padding = new Thickness(0); browse.Margin = new Thickness(10, 0, 0, 0); browse.ToolTip = "Elegir carpeta base";
         browse.Content = new System.Windows.Shapes.Path { Data = IconGlyphs.Folder, Width = 19, Height = 19, Stretch = Stretch.Uniform, Fill = ProfileDialog.ResourceBrush("Gold") };
-        AutomationProperties.SetName(browse, "Elegir carpeta de instalación");
+        AutomationProperties.SetName(browse, "Elegir carpeta base de instalación");
         browse.Click += (_, _) =>
         {
-            var picker = new Microsoft.Win32.OpenFolderDialog { Title = "Carpeta de instalación de Destiny", InitialDirectory = Directory.Exists(_installDirectory.Text) ? _installDirectory.Text : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Multiselect = false };
+            var picker = new Microsoft.Win32.OpenFolderDialog { Title = "Carpeta base de instalación", InitialDirectory = Directory.Exists(_installDirectory.Text) ? _installDirectory.Text : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Multiselect = false };
             if (picker.ShowDialog(Window.GetWindow(this)) == true) _installDirectory.Text = picker.FolderName;
         };
-        Grid.SetColumn(browse, 1); pathRow.Children.Add(browse); installBody.Children.Add(pathRow);
+        Grid.SetColumn(browse, 2); pathRow.Children.Add(browse); installBody.Children.Add(pathRow);
         installation.Child = installBody; content.Children.Add(installation);
         var memory = Card(); memory.Margin = new Thickness(0, 14, 0, 0);
         var memoryBody = new StackPanel(); memoryBody.Children.Add(Title("Memoria del juego"));
@@ -179,6 +195,27 @@ public sealed class SettingsPage : UserControl
         valueBadge.Child = valueContents;
         Grid.SetColumn(valueBadge, 1); ramRow.Children.Add(valueBadge);
         memoryBody.Children.Add(ramRow); memory.Child = memoryBody; content.Children.Add(memory);
+        var java = Card(); java.Margin = new Thickness(0, 14, 0, 0);
+        var javaBody = new StackPanel();
+        var javaHeading = new Grid();
+        javaHeading.ColumnDefinitions.Add(new ColumnDefinition());
+        javaHeading.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var javaTitle = Title("Argumentos de Java"); javaTitle.VerticalAlignment = VerticalAlignment.Center;
+        javaHeading.Children.Add(javaTitle);
+        var resetJava = ProfileDialog.DialogButton("Restablecer", false);
+        resetJava.Height = 30; resetJava.MinHeight = 30; resetJava.MinWidth = 0; resetJava.Padding = new Thickness(12, 4, 12, 4); resetJava.FontSize = 11;
+        AutomationProperties.SetAutomationId(resetJava, "ResetJavaArguments");
+        AutomationProperties.SetName(resetJava, "Restablecer argumentos de Java");
+        Grid.SetColumn(resetJava, 1); javaHeading.Children.Add(resetJava);
+        javaBody.Children.Add(javaHeading);
+        _javaArguments = new TextBox { Text = source.JavaArguments, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
+            MinHeight = 74, MaxHeight = 120, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontFamily = new FontFamily("Consolas"), FontSize = 12,
+            Margin = new Thickness(0, 12, 0, 0), MaxLength = 8192 };
+        AutomationProperties.SetName(_javaArguments, "Argumentos de Java");
+        AutomationProperties.SetAutomationId(_javaArguments, "JavaArgumentsInput");
+        _javaArguments.TextChanged += (_, _) => { _javaArguments.BorderBrush = ProfileDialog.ResourceBrush("Line"); if (validation is not null) validation.Visibility = Visibility.Collapsed; };
+        resetJava.Click += (_, _) => _javaArguments.Text = LauncherConfig.DefaultJavaArguments;
+        javaBody.Children.Add(_javaArguments); java.Child = javaBody; content.Children.Add(java);
         var scroller = new ScrollViewer { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false, Padding = new Thickness(0, 0, 7, 0) };
         Grid.SetRow(scroller, 1); layout.Children.Add(scroller);
         var footer = new Grid { Margin = new Thickness(0, 16, 7, 0) };
@@ -196,11 +233,14 @@ public sealed class SettingsPage : UserControl
             {
                 path = Environment.ExpandEnvironmentVariables(_installDirectory.Text.Trim());
                 if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) { Error("Elige una ruta completa, por ejemplo C:\\Juegos\\Destiny.", _installDirectory); return; }
-                path = Path.GetFullPath(path);
+                path = Path.Combine(Path.GetFullPath(path), _installationFolderName);
             }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { Error("La ruta contiene caracteres no válidos. Elige otra carpeta.", _installDirectory); return; }
             if (!int.TryParse(_ramValue.Text, out var ram) || ram is < 1 or > 1024) { Error("Introduce un número entero entre 1 y 1024 GB.", _ramValue); return; }
-            var updated = new LauncherConfig { PlayerName = source.PlayerName, SelectedEdition = source.SelectedEdition, InstallDirectory = path, RamGb = ram, MinecraftVersion = source.MinecraftVersion, FabricLoaderVersion = source.FabricLoaderVersion, Destiny = source.Destiny, DestinyLite = source.DestinyLite };
+            try { JavaArguments.Parse(_javaArguments.Text); }
+            catch (FormatException ex) { Error(ex.Message, _javaArguments); return; }
+            var updated = new LauncherConfig { PlayerName = source.PlayerName, SelectedEdition = source.SelectedEdition, InstallDirectory = path,
+                RamGb = ram, JavaArguments = _javaArguments.Text, MinecraftVersion = source.MinecraftVersion, FabricLoaderVersion = source.FabricLoaderVersion, Destiny = source.Destiny, DestinyLite = source.DestinyLite };
             save.IsEnabled = false;
             try { if (SaveRequested is not null) await SaveRequested(updated); }
             catch (Exception ex) { Error(MainWindow.GetFriendlyError(ex), _installDirectory); }

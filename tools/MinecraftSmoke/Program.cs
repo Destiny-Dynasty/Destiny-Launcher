@@ -12,6 +12,7 @@ using CmlLib.Core.Version;
 using CmlLib.Core.VersionLoader;
 using System.IO.Compression;
 using DestinyLauncher.Services;
+using DestinyLauncher.Models;
 
 if (args.FirstOrDefault() == "--error-fixture")
 {
@@ -28,6 +29,34 @@ void Assert(bool condition, string message)
     if (!condition) throw new InvalidOperationException(message);
     checks.Add(message);
 }
+
+var defaults = new LauncherConfig { PlayerName = "Fixture", RamGb = 1 };
+var launchOptions = MinecraftService.CreateLaunchOptions(defaults);
+Assert(launchOptions.ExtraJvmArguments.SelectMany(a => a.Values).SequenceEqual(new[] { "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200" }),
+    "Launcher G1 defaults replace the library's experimental tuning flags");
+Assert(launchOptions.MaximumRamMb == 1024, "RAM setting still controls the normal maximum heap");
+var quotedFlags = """-Ddestiny.path="C:\Game Folder\\" -Ddestiny.quote="a\"b" -Xmx128m""";
+var parsedFlags = JavaArguments.Parse(quotedFlags);
+Assert(parsedFlags.SequenceEqual(new[] { "-Ddestiny.path=C:\\Game Folder\\", "-Ddestiny.quote=a\"b", "-Xmx128m" }),
+    "Custom JVM parsing preserves Windows paths, spaces, trailing backslashes and escaped quotes");
+Assert(JavaArguments.Parse(" \r\n ").Length == 0, "An intentionally empty JVM field adds no flags");
+try { JavaArguments.Parse("-Dtest=\"unfinished"); throw new Exception("Unclosed quote accepted"); }
+catch (FormatException) { checks.Add("Unclosed JVM quotes are rejected before launch"); }
+var configPaths = new LauncherPaths(Path.Combine(root, "config-fixture"));
+var configStore = new ConfigService(configPaths);
+var savedLocation = Path.Combine(root, "Existing Custom Instance");
+File.WriteAllText(configPaths.ConfigFile, JsonSerializer.Serialize(new { PlayerName = "Fixture", RamGb = 4, InstallDirectory = savedLocation }));
+var legacyConfig = configStore.Load();
+Assert(legacyConfig.InstallDirectory == savedLocation && legacyConfig.JavaArguments == LauncherConfig.DefaultJavaArguments,
+    "Old configuration gains default JVM flags without moving or renaming its installation");
+legacyConfig.JavaArguments = quotedFlags;
+configStore.Save(legacyConfig);
+Assert(configStore.Load().JavaArguments == quotedFlags, "Custom flags round-trip through persisted settings");
+legacyConfig.JavaArguments = "";
+configStore.Save(legacyConfig);
+Assert(configStore.Load().JavaArguments == "", "Empty saved JVM flags remain intentionally empty");
+Assert(LauncherPaths.InstallationBaseDirectory(savedLocation) == root && LauncherPaths.InstallationFolderName(savedLocation) == "Existing Custom Instance",
+    "Splitting the editable base preserves custom instance folder names");
 
 var requests = new List<string>();
 var profileJson = """
@@ -88,6 +117,21 @@ if (args.Contains("--live-fabric"))
 var java = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "versions", "DestinyDynasty", "runtime", "windows-x64", "java-runtime-gamma", "bin", "java.exe");
 if (File.Exists(java))
 {
+    defaults.JavaArguments = LauncherConfig.DefaultJavaArguments + " " + quotedFlags + " -Xms16m -XshowSettings:properties -version";
+    var javaOptions = MinecraftService.CreateLaunchOptions(defaults);
+    javaOptions.JavaPath = java;
+    using (var versionProcess = await LibraryTestLauncher(path, http).BuildProcessAsync(profile, javaOptions))
+    {
+        JavaArguments.CorrectWindowsQuoting(versionProcess.StartInfo, javaOptions.ExtraJvmArguments.SelectMany(a => a.Values));
+        Assert(!versionProcess.StartInfo.Arguments.Contains("-Xmx1024m"), "An explicit custom heap flag does not produce a conflicting duplicate");
+        using var versionSession = MinecraftGameSession.Start(versionProcess);
+        await versionSession.Process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        var output = await versionSession.ReadErrorsAsync();
+        await File.WriteAllTextAsync(Path.Combine(root, "java-flags-check.log"), output);
+        Assert(versionSession.Process.ExitCode == 0 && output.Contains("java.version = 17"), "Installed Java 17 accepts the default flags through the real launch builder");
+        Assert(output.Contains("destiny.path = C:\\Game Folder\\") && output.Contains("destiny.quote = a\"b"),
+            "Real Java receives quoted custom properties exactly, without launching Minecraft");
+    }
     var missingLoader = new Process { StartInfo = new ProcessStartInfo(java) { WorkingDirectory = root } };
     missingLoader.StartInfo.ArgumentList.Add("-cp");
     missingLoader.StartInfo.ArgumentList.Add(Path.Combine(root, "missing-fabric-loader.jar"));

@@ -15,6 +15,7 @@ public sealed class MinecraftService
     public MinecraftService(LauncherPaths paths, AppLogger log) { _paths = paths; _log = log; }
     public async Task<MinecraftGameSession> PrepareAndLaunchAsync(LauncherConfig config, PackDefinition pack, IProgress<(string status, double value)> progress, CancellationToken token)
     {
+        var options = CreateLaunchOptions(config);
         var instance = new MinecraftPath(_paths.Instance(pack.Slug)); var launcher = new MinecraftLauncher(instance);
         progress.Report(("Preparando Minecraft 1.20.1", .05)); launcher.ByteProgressChanged += (_, e) => { if (e.TotalBytes > 0) progress.Report(("Preparando Minecraft", .05 + (double)e.ProgressedBytes / e.TotalBytes * .55)); };
         await launcher.InstallAsync(config.MinecraftVersion, token);
@@ -25,8 +26,8 @@ public sealed class MinecraftService
         using var fabricClient = new HttpClient();
         var fabric = new FabricInstaller(fabricClient);
         var profile = await PrepareFabricAsync(launcher, fabric, instance, config.MinecraftVersion, config.FabricLoaderVersion, progress, token);
-        var options = new MLaunchOption { Session = MSession.CreateOfflineSession(config.PlayerName), MaximumRamMb = checked(config.RamGb * 1024), ServerIp = "destinydynasty.tatnikhost.net" };
         var process = await launcher.BuildProcessAsync(profile, options, token);
+        JavaArguments.CorrectWindowsQuoting(process.StartInfo, options.ExtraJvmArguments.SelectMany(a => a.Values));
         try
         {
             token.ThrowIfCancellationRequested();
@@ -36,6 +37,16 @@ public sealed class MinecraftService
         }
         catch { process.Dispose(); throw; }
     }
+
+    internal static MLaunchOption CreateLaunchOptions(LauncherConfig config) => new()
+    {
+        Session = MSession.CreateOfflineSession(config.PlayerName),
+        MaximumRamMb = checked(config.RamGb * 1024),
+        ServerIp = "destinydynasty.tatnikhost.net",
+        // Explicitly replace CmlLib's extra tuning defaults. Mandatory profile/platform
+        // arguments remain intact; empty user text deliberately means no extra JVM flags.
+        ExtraJvmArguments = [new MArgument(JavaArguments.Parse(config.JavaArguments))]
+    };
 
     internal static async Task<string> PrepareFabricAsync(MinecraftLauncher launcher, FabricInstaller installer, MinecraftPath instance,
         string minecraftVersion, string loaderVersion, IProgress<(string status, double value)> progress, CancellationToken token)

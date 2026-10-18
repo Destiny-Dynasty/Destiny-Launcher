@@ -16,6 +16,7 @@ public sealed class ConfigService
             config.DestinyLite ??= new LauncherConfig().DestinyLite;
             if (string.IsNullOrWhiteSpace(config.InstallDirectory)) config.InstallDirectory = LauncherPaths.DefaultInstallDirectory;
             config.RamGb = Math.Clamp(config.RamGb, 1, 1024);
+            config.JavaArguments ??= LauncherConfig.DefaultJavaArguments;
             if (savedJson is not null && HasRemovedSettings(savedJson))
             {
                 try { Save(config); } catch { }

@@ -398,6 +398,7 @@ public partial class MainWindow : Window
         UnauthorizedAccessException => "No hay permiso para escribir en la carpeta. Elige otra ubicación en Ajustes.",
         InvalidDataException => "Los archivos recibidos no son válidos. Vuelve a intentarlo; si persiste, contacta con el equipo de Destiny.",
         Win32Exception => "Windows no pudo iniciar Minecraft. Comprueba que Java y los archivos de la instancia estén disponibles e inténtalo de nuevo.",
+        FormatException => "Revisa los argumentos de Java en Ajustes.",
         IOException => "No se pudieron guardar los archivos. Comprueba el espacio disponible y que la carpeta no esté en uso.",
         _ => "Revisa la conexión y la carpeta de instalación en Ajustes antes de volver a intentarlo."
     };
