@@ -487,8 +487,11 @@ public partial class MainWindow : Window
             Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
         foreach (var name in _config.Accounts)
         {
-            var item = new MenuItem { Header = name, Style = (Style)FindResource("AccountMenuItem"),
+            var identity = new AccountIdentity { DataContext = name };
+            if (!_previewMode || _loadRemoteSkinInPreview) identity.SetValue(AccountIdentity.HeadServiceProperty, _playerHeadService);
+            var item = new MenuItem { Header = identity, Style = (Style)FindResource("AccountMenuItem"),
                 IsCheckable = true, IsChecked = name.Equals(_config.PlayerName, StringComparison.OrdinalIgnoreCase) };
+            System.Windows.Automation.AutomationProperties.SetName(item, name);
             item.Click += (_, _) => SetActiveAccount(name);
             menu.Items.Add(item);
         }
@@ -497,7 +500,8 @@ public partial class MainWindow : Window
         manage.Click += (_, _) =>
         {
             if (_busy) return;
-            var dialog = new AccountsDialog(_config.Accounts, _config.PlayerName, SaveAccounts) { Owner = this };
+            var dialog = new AccountsDialog(_config.Accounts, _config.PlayerName, SaveAccounts,
+                !_previewMode || _loadRemoteSkinInPreview ? _playerHeadService : null) { Owner = this };
             dialog.ShowDialog();
         };
         menu.Items.Add(manage);

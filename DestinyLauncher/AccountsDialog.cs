@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
+using DestinyLauncher.Services;
 
 namespace DestinyLauncher;
 
@@ -17,8 +18,9 @@ internal sealed class AccountsEditor : UserControl
     internal event Action? SaveRequested;
     internal event Action? CancelRequested;
 
-    internal AccountsEditor(IEnumerable<string> names, string active)
+    internal AccountsEditor(IEnumerable<string> names, string active, PlayerHeadService? heads = null)
     {
+        if (heads is not null) SetValue(AccountIdentity.HeadServiceProperty, heads);
         _names = new(names);
         var body = new Grid { Margin = new Thickness(24, 20, 24, 24) };
         foreach (var height in new[] { GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto })
@@ -45,6 +47,7 @@ internal sealed class AccountsEditor : UserControl
             Foreground = ProfileDialog.ResourceBrush("Ink"), BorderBrush = ProfileDialog.ResourceBrush("Line"),
             BorderThickness = new Thickness(1), ItemContainerStyle = (Style)Application.Current.FindResource("AccountListItem"),
             SelectionMode = SelectionMode.Single, Padding = new Thickness(4), Margin = new Thickness(0, 4, 0, 0) };
+        _list.ItemTemplate = new DataTemplate { VisualTree = new FrameworkElementFactory(typeof(AccountIdentity)) };
         AutomationProperties.SetName(_list, "Cuentas guardadas");
         AutomationProperties.SetAutomationId(_list, "AccountsList");
         _list.SelectedItem = _names.FirstOrDefault(n => n.Equals(active, StringComparison.OrdinalIgnoreCase));
@@ -88,9 +91,9 @@ internal sealed class AccountsEditor : UserControl
 internal sealed class AccountsDialog : Window
 {
     internal AccountsEditor Editor { get; }
-    internal AccountsDialog(IEnumerable<string> names, string active, Func<IEnumerable<string>, bool> save)
+    internal AccountsDialog(IEnumerable<string> names, string active, Func<IEnumerable<string>, bool> save, PlayerHeadService? heads = null)
     {
-        Editor = new AccountsEditor(names, active);
+        Editor = new AccountsEditor(names, active, heads);
         Editor.SaveRequested += () => { if (save(Editor.AccountNames)) DialogResult = true; else Editor.ShowSaveError(); };
         Editor.CancelRequested += Close;
         DialogChrome.Create(this, "Cuentas", Editor, 520, 440);

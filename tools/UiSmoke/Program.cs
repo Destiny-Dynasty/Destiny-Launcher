@@ -504,15 +504,18 @@ internal static class Program
         profileName.Text = "ab";
         Assert(!profileSave.IsEnabled && Descendants<TextBlock>(profileRoot).Any(t => t.Visibility == Visibility.Visible && t.Text.StartsWith("Usa de 3 a 16")), "Invalid profile retains its useful validation message");
         profile.Close();
-        AuditAccountsEditor();
+        await AuditAccountsEditor();
         AuditAccountPersistence();
         await AuditSkinCache();
     }
 
-    private static void AuditAccountsEditor()
+    private static async Task AuditAccountsEditor()
     {
         var original = new[] { "First_Player", "Second_Player" };
-        var editor = new AccountsEditor(original, "First_Player");
+        var skinPaths = new LauncherPaths(Path.Combine(_output, "account-portrait-data", Guid.NewGuid().ToString("N")));
+        var skinHandler = new SkinFixtureHandler(); using var skinHttp = new HttpClient(skinHandler);
+        using var heads = new PlayerHeadService(skinPaths, skinHttp);
+        var editor = new AccountsEditor(original, "First_Player", heads);
         var dialog = new Window(); DialogChrome.Create(dialog, "Cuentas", editor, 520, 440);
         var root = (FrameworkElement)dialog.Content; dialog.Content = null;
         System.Windows.Documents.TextElement.SetForeground(root, (Brush)Application.Current.FindResource("Ink"));
@@ -535,7 +538,24 @@ internal static class Program
         Assert(!accepted, "Saving cannot accept an invalid pending account");
         input.Text = "Fourth_Player"; save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         Assert(accepted && editor.AccountNames.Contains("Fourth_Player"), "Save includes a valid name still typed in the input");
+        input.Text = "Example_Player";
         Layout();
+        var textView = Descendants<FrameworkElement>(input).Single(e => e.GetType().Name == "TextBoxView");
+        Assert(textView.ActualHeight >= 16, "Account input gives typed text a full line instead of clipping it to two pixels");
+        var inputBitmap = new RenderTargetBitmap((int)Math.Ceiling(input.ActualWidth), 40, 96, 96, PixelFormats.Pbgra32);
+        inputBitmap.Render(input);
+        var pixels = new byte[inputBitmap.PixelWidth * 40 * 4]; inputBitmap.CopyPixels(pixels, inputBitmap.PixelWidth * 4, 0);
+        Assert(Enumerable.Range(0, pixels.Length / 4).Count(i => pixels[i * 4] > 120 && pixels[i * 4 + 1] > 150 && pixels[i * 4 + 2] > 150) > 40,
+            "Typed account name produces visible light-colored glyphs in its actual 40px field");
+        var portraits = Descendants<AccountIdentity>(editor).ToArray();
+        Assert(portraits.Length == editor.AccountNames.Count && portraits.All(p => ReferenceEquals(p.GetValue(AccountIdentity.HeadServiceProperty), heads)),
+            "Each account list row inherits the shared cached-head service");
+        foreach (var portrait in portraits) await portrait.LoadHeadAsync();
+        Assert(portraits.All(p => Descendants<Image>(p).Single() is { Source: not null, Visibility: Visibility.Visible }),
+            "Account manager rows display verified heads to the left of their names");
+        var requests = skinHandler.Requests;
+        foreach (var portrait in portraits) await portrait.LoadHeadAsync();
+        Assert(skinHandler.Requests == requests, "Refreshing account rows reuses disk portraits without repeated network requests");
         var bitmap = new RenderTargetBitmap(520, 440, 96, 96, PixelFormats.Pbgra32); bitmap.Render(root);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using (var file = File.Create(Path.Combine(_output, "accounts.png"))) encoder.Save(file);
@@ -577,6 +597,15 @@ internal static class Program
         Assert(await secondService.GetCachedHeadAsync("skin_player", CancellationToken.None) is not null
             && await secondService.GetHeadAsync("SKIN_PLAYER", CancellationToken.None) is not null && handler.Requests == 3,
             "Disk cache survives new service instances and case changes without network requests");
+        var identity = new AccountIdentity { DataContext = "Skin_Player" };
+        identity.SetValue(AccountIdentity.HeadServiceProperty, service);
+        await identity.LoadHeadAsync();
+        var portrait = Descendants<Image>(identity).Single();
+        Assert(portrait.Source is not null && portrait.Visibility == Visibility.Visible && handler.Requests == 3,
+            "Dropdown account identity shows its cached portrait without fetching again");
+        identity.DataContext = "Another_Player";
+        Assert(portrait.Source is null && portrait.Visibility == Visibility.Collapsed,
+            "Changing a row's account clears the previous player's head before loading the next");
         var cacheFile = Directory.GetFiles(Path.Combine(paths.Cache, "player-heads"), "*.png").Single();
         File.SetLastWriteTimeUtc(cacheFile, DateTime.UtcNow.AddDays(-8)); handler.Unavailable = true;
         Assert(await service.GetHeadAsync("Skin_Player", CancellationToken.None) is not null && handler.Requests == 4,
