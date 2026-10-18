@@ -39,7 +39,8 @@ internal static class Program
         {
             try
             {
-                if (args.Contains("--lifecycle-only")) await AuditGameLifetime();
+                if (args.Contains("--headless")) await AuditHeadless();
+                else if (args.Contains("--lifecycle-only")) await AuditGameLifetime();
                 else await Audit();
                 File.WriteAllText(Path.Combine(_output, "ui-test-results.json"), JsonSerializer.Serialize(new { passed = Passed.Count, checks = Passed, skipped = Skipped, note = "State fixtures and WPF render targets; DPI images do not change the Windows display setting." }, new JsonSerializerOptions { WriteIndented = true }));
                 Console.WriteLine($"PASS: {Passed.Count} UI assertions; captures at {_output}");
@@ -237,7 +238,8 @@ internal static class Program
             var button = Get<Button>(preview, "PrimaryButton"); button.BringIntoView(); await Idle();
             HorizontalBounds(preview, button, $"Primary action at {width}x{height}");
             var primaryBounds = button.TransformToAncestor(preview).TransformBounds(new Rect(button.RenderSize));
-            var noticeTop = Get<TextBlock>(preview, "StatusText").TransformToAncestor(preview).Transform(new Point(0, 0)).Y;
+            var noticeTop = Get<Border>(preview, "StatusFooter").Visibility == Visibility.Visible
+                ? Get<TextBlock>(preview, "StatusText").TransformToAncestor(preview).Transform(new Point(0, 0)).Y : preview.ActualHeight;
             Assert(primaryBounds.Top >= 40 && primaryBounds.Bottom < noticeTop, $"Primary action is fully visible at {width}x{height}");
             HorizontalBounds(preview, Get<Button>(preview, "ProfileButton"), $"Long profile at {width}x{height}");
             HorizontalBounds(preview, news, $"News carousel fits at {width}x{height}");
@@ -257,7 +259,8 @@ internal static class Program
         var installAction = Get<Button>(preview, "InstallPrimaryButton");
         HorizontalBounds(preview, installAction, "Installation action fits the minimum width");
         var installBounds = installAction.TransformToAncestor(preview).TransformBounds(new Rect(installAction.RenderSize));
-        Assert(installBounds.Bottom < Get<TextBlock>(preview, "StatusText").TransformToAncestor(preview).Transform(new Point()).Y, "Installation action stays above the shared status footer");
+        Assert(installBounds.Bottom <= preview.ActualHeight && Get<Border>(preview, "StatusFooter").Visibility == Visibility.Collapsed,
+            "Installation action fits without a redundant idle footer");
         Capture(preview, "installation-compact");
         Get<Button>(preview, "HomeNav").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         preview.Width = 1000; preview.Height = 620; await Idle();
@@ -331,6 +334,126 @@ internal static class Program
         Assert(profileSave.IsDefault && Descendants<Button>(profile).Any(b => b.IsCancel), "Profile supports Enter and Escape");
         profile.Close();
         await AuditGameLifetime();
+    }
+
+    private static async Task AuditHeadless()
+    {
+        // No Show, Activate, native handle creation, input injection, or game-session watcher.
+        // The WPF content is detached and laid out only in memory while the user is playing.
+        var window = new MainWindow(previewMode: true, dataRoot: Path.Combine(_output, "isolated-data", Guid.NewGuid().ToString("N")));
+        var root = (FrameworkElement)window.Content;
+        window.Content = null;
+        System.Windows.Documents.TextElement.SetForeground(root, (Brush)Application.Current.FindResource("Ink"));
+        void Layout(double width = 1000, double height = 620)
+        {
+            window.MinWidth = 640; window.MinHeight = 440;
+            window.Width = width; window.Height = height;
+            root.Measure(new Size(width, height)); root.Arrange(new Rect(0, 0, width, height)); root.UpdateLayout();
+        }
+        void CaptureContent(string name)
+        {
+            var bitmap = new RenderTargetBitmap((int)root.ActualWidth, (int)root.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(root);
+            var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using var file = File.Create(Path.Combine(_output, name + ".png")); encoder.Save(file);
+        }
+        Layout();
+        Assert(!window.IsVisible && PresentationSource.FromVisual(root) is null, "Headless checks create no visible window or presentation source");
+        Assert(window.FindName("ActionHint") is null, "Primary button has no redundant hint");
+        Assert(Get<TextBlock>(window, "LauncherVersionText").Opacity == .55, "Sidebar version has subdued opacity");
+        foreach (var name in new[] { "HomeNav", "InstallationNav", "SettingsNav" })
+        {
+            var path = Descendants<System.Windows.Shapes.Path>(Get<Button>(window, name)).Single();
+            Assert(path.Fill is not null && path.Stroke is null && !path.Data.Bounds.IsEmpty, $"{name} uses a filled vector icon in the launcher palette");
+        }
+        var footer = Get<Border>(window, "StatusFooter");
+        foreach (var installed in new[] { "", "1.4.7" })
+        {
+            window.SetAuditState(installed, Check("1.4.7", false)); Layout();
+            Assert(footer.Visibility == Visibility.Collapsed, $"Idle state '{installed}' has no bottom microcopy");
+        }
+        CaptureContent("home");
+        window.SetAuditState("1.4.7", checking: true); Layout();
+        Assert(footer.Visibility == Visibility.Visible, "Manifest checks retain useful status");
+        window.SetAuditState("1.4.7", error: "Sin conexión"); Layout();
+        Assert(footer.Visibility == Visibility.Visible && Get<TextBlock>(window, "StatusDetail").Visibility == Visibility.Visible, "Connection errors retain their explanation");
+        CaptureContent("connection-error");
+        window.SetAuditState("1.4.7", Check("1.4.7", false));
+        window.SetAuditProgress("Descargando modpack · 1024/2048 bytes", .3); Layout();
+        Assert(footer.Visibility == Visibility.Visible && Get<ProgressBar>(window, "Progress").Value == .5, "Downloads retain real progress without filler text");
+        Assert(Get<TextBlock>(window, "StatusDetail").Visibility == Visibility.Collapsed, "Progress does not repeat keep-open instructions");
+        window.EndAuditProgress();
+        window.SetAuditState("1.4.7", Check("1.4.7", false));
+        Get<Button>(window, "InstallationNav").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Layout();
+        Assert(!Descendants<TextBlock>(root).Any(t => t.Text.Contains("Seleccionar una variante no descarga") || t.Text.Contains("La variante que usarás")), "Installation omits redundant explanations");
+        var openedFolders = new List<string>(); window.OpenDirectory = openedFolders.Add;
+        var folderButton = Get<Button>(window, "OpenInstallationFolderButton");
+        Assert(folderButton.IsEnabled, "Existing installation exposes Open folder");
+        folderButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(openedFolders.Single() == window.DataPaths.Instance("destiny"), "Open folder targets the selected installation without launching Explorer in the test");
+        window.SetAuditState("", edition: PackEdition.DestinyLite); Layout();
+        Assert(!folderButton.IsEnabled, "Uncreated Lite folder cannot be opened or created by the button");
+        folderButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(openedFolders.Count == 1 && !Directory.Exists(window.DataPaths.Instance("destiny-lite")), "Opening an absent folder never creates a new installation");
+        window.SetAuditState("1.4.7", Check("1.4.7", false)); Layout();
+        CaptureContent("installation");
+        Layout(680, 480);
+        var folderBounds = folderButton.TransformToAncestor(root).TransformBounds(new Rect(folderButton.RenderSize));
+        Assert(folderBounds.Left >= 0 && folderBounds.Right <= root.ActualWidth, "Open folder fits the compact installation page");
+        CaptureContent("installation-compact");
+        Layout();
+        Get<Button>(window, "SettingsNav").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Layout();
+        var settings = (SettingsPage)Get<ContentControl>(window, "SettingsPageHost").Content;
+        Assert(!Descendants<TextBlock>(settings).Any(t => t.Text.Contains("carpeta hermana") || t.Text.Contains("Prepara el launcher") || t.Text.Contains("Deja memoria libre")), "Settings keep labels and validation without filler paragraphs");
+        var slider = Descendants<Slider>(settings).Single();
+        var ram = Descendants<TextBox>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "RamInput");
+        Assert(slider.Minimum == 2 && slider.Maximum == 16 && slider.SmallChange == 1 && slider.LargeChange == 2, "RAM slider retains one-GB precision and two-GB major steps");
+        Assert(Descendants<RamTickBar>(slider).Count() == 1, "RAM scale displays major dot markers and numeric labels");
+        var track = (Track)slider.Template.FindName("PART_Track", slider);
+        var ticks = Descendants<RamTickBar>(slider).Single();
+        Assert(Math.Abs(ticks.ActualWidth - (track.ActualWidth - track.Thumb.ActualWidth)) < .1, "RAM dots align exactly with the thumb center range");
+        slider.Value = 10;
+        Assert(ram.Text == "10", "RAM slider updates the numeric badge");
+        Slider.IncreaseSmall.Execute(null, slider);
+        Assert(slider.Value == 11 && ram.Text == "11", "Standard slider commands move RAM by one GB without physical keyboard input");
+        ram.Text = "7";
+        Assert(slider.Value == 7, "Odd RAM values remain supported");
+        ram.Text = "32";
+        Assert(ram.Text == "32" && slider.Value == 16, "Manual RAM values above the quick scale are preserved");
+        LauncherConfig? saved = null;
+        settings.SaveRequested = c => { saved = c; settings.MarkSaved(); return Task.CompletedTask; };
+        var save = Descendants<Button>(settings).Single(b => Equals(b.Content, "Guardar ajustes"));
+        ram.Text = "0";
+        save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(saved is null && Descendants<TextBlock>(settings).Any(t => t.Text.Contains("entre 1 y 1024")), "RAM validation remains available after removing help paragraphs");
+        ram.Text = "12";
+        save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(saved?.RamGb == 12, "Polished RAM control submits the unchanged settings contract");
+        Layout(); CaptureContent("settings");
+        foreach (var (width, height) in new[] { (820d, 560d), (760d, 500d), (680d, 480d) })
+        {
+            Layout(width, height);
+            foreach (var control in Descendants<Button>(settings))
+            {
+                var bounds = control.TransformToAncestor(root).TransformBounds(new Rect(control.RenderSize));
+                Assert(bounds.Left >= 0 && bounds.Right <= width, $"Settings button fits headless layout {width}x{height}");
+            }
+            CaptureContent($"settings-{width}x{height}");
+        }
+        Assert(!window.IsVisible && PresentationSource.FromVisual(root) is null, "Headless checks finish without opening or activating any window");
+        window.Close();
+        var profile = new ProfileDialog("Player_123");
+        var profileRoot = (FrameworkElement)profile.Content;
+        profile.Content = null;
+        profileRoot.Measure(new Size(450, 280)); profileRoot.Arrange(new Rect(0, 0, 450, 280)); profileRoot.UpdateLayout();
+        var profileName = Descendants<TextBox>(profileRoot).Single();
+        var profileSave = Descendants<Button>(profileRoot).Single(b => Equals(b.Content, "Guardar nombre"));
+        Assert(profileSave.IsEnabled && !Descendants<TextBlock>(profileRoot).Any(t => t.Text.StartsWith("De 3 a 16")), "Valid offline profile has no permanent instruction paragraph");
+        profileName.Text = "ab";
+        Assert(!profileSave.IsEnabled && Descendants<TextBlock>(profileRoot).Any(t => t.Visibility == Visibility.Visible && t.Text.StartsWith("Usa de 3 a 16")), "Invalid profile retains its useful validation message");
+        profile.Close();
+        await Task.CompletedTask;
     }
 
     private static async Task AuditGameLifetime()

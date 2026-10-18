@@ -45,13 +45,13 @@
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <StackPanel Margin="0,18,0,0">
                             <Button x:Name="HomeNav" Tag="Selected" Style="{StaticResource NavItem}" Click="Home_Click" AutomationProperties.Name="Inicio" ToolTip="Inicio">
-                                <StackPanel><Path Data="{x:Static local:IconGlyphs.Home}" Width="20" Height="20" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" StrokeLineJoin="Round"/><TextBlock Text="Inicio" FontSize="10" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center" Margin="0,6,0,0"/></StackPanel>
+                                <StackPanel><Path Data="{x:Static local:IconGlyphs.Home}" Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/><TextBlock Text="Inicio" FontSize="10" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center" Margin="0,6,0,0"/></StackPanel>
                             </Button>
                             <Button x:Name="InstallationNav" Style="{StaticResource NavItem}" Click="Installation_Click" AutomationProperties.Name="Instalación" ToolTip="Administrar instalación">
-                                <StackPanel><Path Data="{x:Static local:IconGlyphs.Cube}" Width="20" Height="20" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" StrokeLineJoin="Round"/><TextBlock Text="Instalación" FontSize="9" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center" Margin="0,6,0,0"/></StackPanel>
+                                <StackPanel><Path Data="{x:Static local:IconGlyphs.Cube}" Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/><TextBlock Text="Instalación" FontSize="9" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center" Margin="0,6,0,0"/></StackPanel>
                             </Button>
                             <Button x:Name="SettingsNav" Style="{StaticResource NavItem}" Click="Settings_Click" AutomationProperties.Name="Ajustes" ToolTip="Ajustes">
-                                <StackPanel><Path Data="{x:Static local:IconGlyphs.Settings}" Width="20" Height="20" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"/><TextBlock Text="Ajustes" FontSize="10" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center" Margin="0,6,0,0"/></StackPanel>
+                                <StackPanel><Path Data="{x:Static local:IconGlyphs.Settings}" Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/><TextBlock Text="Ajustes" FontSize="10" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center" Margin="0,6,0,0"/></StackPanel>
                             </Button>
                         </StackPanel>
                         <StackPanel x:Name="SocialLinks" Grid.Row="2" Margin="0,4,0,12">
@@ -68,7 +68,7 @@
                         </StackPanel>
                         <StackPanel Grid.Row="3" VerticalAlignment="Bottom" Margin="0,0,0,12" IsHitTestVisible="False">
                             <Image x:Name="SidebarEmblem" Width="40" Height="40" Style="{StaticResource SmallBrandMark}" Opacity=".85"/>
-                            <TextBlock x:Name="LauncherVersionText" FontSize="9" Foreground="{StaticResource Subtle}" HorizontalAlignment="Center" Margin="0,7,0,0"/>
+                            <TextBlock x:Name="LauncherVersionText" FontSize="9" Foreground="{StaticResource Subtle}" Opacity=".55" HorizontalAlignment="Center" Margin="0,7,0,0"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -88,13 +88,12 @@
                                     <TextBlock x:Name="VersionText" Text="Minecraft 1.20.1 · Fabric" Foreground="#D6CDBB" FontSize="10"/>
                                 </Border>
                                 <StackPanel x:Name="ProfilePanel" Width="234" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,26">
-                                    <TextBlock Text="PERFIL OFFLINE" Style="{StaticResource Eyebrow}" Margin="0,0,0,9"/>
                                     <Button x:Name="ProfileButton" Click="Profile_Click" Padding="13,12" MinHeight="78" HorizontalContentAlignment="Stretch" Background="#ED181916" BorderBrush="#625239" ToolTip="Editar tu nombre de jugador" AutomationProperties.Name="Editar nombre de jugador">
                                         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/></Grid.ColumnDefinitions>
                                             <Border Width="44" Height="48" Background="#29271E" BorderBrush="#665232" BorderThickness="1" CornerRadius="5" VerticalAlignment="Center">
                                                 <Grid Margin="4"><TextBlock x:Name="PlayerInitial" Text="D" FontFamily="{StaticResource DisplayFont}" FontSize="23" Foreground="{StaticResource GoldBright}" VerticalAlignment="Center" HorizontalAlignment="Center"/><Image x:Name="PlayerHead" Visibility="Collapsed" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/></Grid>
                                             </Border>
-                                            <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center"><TextBlock x:Name="PlayerNameText" Text="Añadir nombre" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="Editar nombre" FontSize="10" Foreground="{StaticResource Muted}" Margin="0,6,0,0"/></StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center"><TextBlock x:Name="PlayerNameText" Text="Añadir nombre" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/></StackPanel>
                                             <Path Grid.Column="2" Data="{x:Static local:IconGlyphs.Edit}" Width="13" Height="13" Stretch="Uniform" Stroke="{StaticResource Gold}" StrokeThickness="1.3" VerticalAlignment="Center"/>
                                         </Grid>
                                     </Button>
@@ -117,14 +116,13 @@
                                     <Button x:Name="PrimaryButton" Style="{StaticResource GoldButton}" Height="54" Click="Primary_Click" AutomationProperties.Name="Acción principal">
                                         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="PrimaryLabel" Text="INSTALAR" FontSize="14" FontWeight="Bold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center"/><Path x:Name="ActionArrow" Grid.Column="1" Data="{x:Static local:IconGlyphs.Arrow}" Width="15" Height="15" Stretch="Uniform" Stroke="#4A3519" StrokeThickness="1.5" Margin="12,0,0,0"/></Grid>
                                     </Button>
-                                    <TextBlock x:Name="ActionHint" Foreground="{StaticResource Muted}" FontSize="10" TextAlignment="Center" TextWrapping="Wrap" Margin="0,7,0,0"/>
                                 </StackPanel>
                             </Grid>
                         </Border>
                     </Grid>
                     <Grid x:Name="InstallationView" Visibility="Collapsed" Margin="28,24,28,20">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <StackPanel Margin="0,0,0,20"><TextBlock Text="Instalación" FontFamily="{StaticResource DisplayFont}" FontSize="28"/><TextBlock Text="La variante que usarás en tu próxima partida." Foreground="{StaticResource Muted}" Margin="0,7,0,0" FontSize="12"/></StackPanel>
+                        <TextBlock Text="Instalación" FontFamily="{StaticResource DisplayFont}" FontSize="28" Margin="0,0,0,20"/>
                         <ScrollViewer x:Name="InstallationScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False" Padding="0,0,7,0">
                             <StackPanel>
                                 <StackPanel x:Name="EditionSelector">
@@ -137,18 +135,21 @@
                                             <StackPanel><TextBlock Text="Destiny Lite" FontFamily="{StaticResource DisplayFont}" FontSize="22"/><TextBlock Text="Una alternativa ligera" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="LiteState" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,12,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
                                         </RadioButton>
                                     </Grid>
-                                    <TextBlock Text="Seleccionar una variante no descarga ni cambia los archivos del juego." FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,12,0,0"/>
                                 </StackPanel>
                                 <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="7" Padding="18,16" Margin="0,20,0,0">
                                     <StackPanel>
-                                        <TextBlock Text="VARIANTE ACTIVA" Style="{StaticResource Eyebrow}"/>
-                                        <TextBlock Text="{Binding Text, ElementName=EditionText}" Style="{StaticResource SectionTitle}" Margin="0,8,0,0"/>
+                                        <TextBlock Text="{Binding Text, ElementName=EditionText}" Style="{StaticResource SectionTitle}"/>
                                         <WrapPanel Margin="0,12,0,0">
                                             <TextBlock Text="Instalada  " FontSize="12" Foreground="{StaticResource Muted}"/><TextBlock Text="{Binding Text, ElementName=PackInstalledVersionText}" MaxWidth="160" TextTrimming="CharacterEllipsis" FontSize="12" Margin="0,0,24,0"/>
                                             <TextBlock Text="Disponible  " FontSize="12" Foreground="{StaticResource Muted}"/><TextBlock Text="{Binding Text, ElementName=PackLatestVersionText}" MaxWidth="160" TextTrimming="CharacterEllipsis" FontSize="12"/>
                                         </WrapPanel>
                                         <TextBlock Text="CARPETA DEL JUEGO" Style="{StaticResource Eyebrow}" Margin="0,18,0,0"/>
-                                        <TextBlock x:Name="InstallationPathText" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,7,0,0"/>
+                                        <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="InstallationPathText" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,0,14,0"/>
+                                            <Button x:Name="OpenInstallationFolderButton" Grid.Column="1" Click="OpenInstallationFolder_Click" ToolTip="Abrir carpeta del juego" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="Abrir carpeta de la variante seleccionada">
+                                                <StackPanel Orientation="Horizontal"><Path Data="{x:Static local:IconGlyphs.Folder}" Width="17" Height="17" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Margin="0,0,8,0"/><TextBlock Text="Abrir carpeta" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" VerticalAlignment="Center"/></StackPanel>
+                                            </Button>
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

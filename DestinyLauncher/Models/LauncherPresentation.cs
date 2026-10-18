@@ -2,18 +2,18 @@ using System.Text.RegularExpressions;
 
 namespace DestinyLauncher.Models;
 
-internal sealed record LauncherPresentation(string Action, string State, string Hint, string Status, string Detail, string Tone)
+internal sealed record LauncherPresentation(string Action, string State, string Status, string Detail, string Tone)
 {
     internal static LauncherPresentation Describe(string installed, PackUpdateCheck? check, bool checking, string? error, bool failed, bool localFallbackAllowed = true)
     {
         var hasInstall = !string.IsNullOrWhiteSpace(installed);
-        if (checking) return new("COMPROBANDO…", "Comprobando", "Consultando el estado del modpack", "Comprobando modpack", "Consultando la versión disponible y los archivos locales.", "Gold");
-        if (failed) return new("REINTENTAR", "Requiere atención", "Vuelve a intentar la operación", "La operación no se completó", "Puedes volver a intentarlo o revisar la carpeta de instalación en Ajustes.", "Error");
-        if (error is not null) return new(hasInstall && localFallbackAllowed ? "JUGAR" : "REINTENTAR", hasInstall ? "Sin verificar" : "Sin instalar", hasInstall && localFallbackAllowed ? "Intentará usar la instalación local" : hasInstall ? "Volver a comprobar el modpack" : "Volver a comprobar e instalar", "No se pudo comprobar el modpack", error, "Warning");
-        if (check is null) return new(hasInstall ? "JUGAR" : "INSTALAR", hasInstall ? "Sin verificar" : "Sin instalar", hasInstall ? "Comprobará los archivos antes de jugar" : "Instala el modpack y abre Minecraft", hasInstall ? "Instalación local disponible" : "Prepara tu primera partida", "Elige una variante y un nombre de jugador para continuar.", "Gold");
-        if (!hasInstall) return new("INSTALAR", "Sin instalar", "Instala el modpack y abre Minecraft", "Listo para instalar", "Se descargarán el modpack, Minecraft y Fabric antes de abrir el juego.", "Gold");
-        if (check.HasChanges || installed != check.Manifest.Version) return new("ACTUALIZAR", "Actualización disponible", "Actualiza el modpack y abre Minecraft", "Hay archivos por actualizar", "El launcher actualizará los archivos del modpack antes de jugar.", "Warning");
-        return new("JUGAR", "Actualizado", "Todo preparado para entrar al reino", "Listo para jugar", "Los archivos del modpack están al día.", "Success");
+        if (checking) return new("COMPROBANDO…", "Comprobando", "Comprobando modpack", "", "Gold");
+        if (failed) return new("REINTENTAR", "Requiere atención", "La operación no se completó", "Puedes volver a intentarlo o revisar la carpeta de instalación en Ajustes.", "Error");
+        if (error is not null) return new(hasInstall && localFallbackAllowed ? "JUGAR" : "REINTENTAR", hasInstall ? "Sin verificar" : "Sin instalar", "No se pudo comprobar el modpack", error, "Warning");
+        if (check is null) return new(hasInstall ? "JUGAR" : "INSTALAR", hasInstall ? "Sin verificar" : "Sin instalar", "", "", "Gold");
+        if (!hasInstall) return new("INSTALAR", "Sin instalar", "", "", "Gold");
+        if (check.HasChanges || installed != check.Manifest.Version) return new("ACTUALIZAR", "Actualización disponible", "", "", "Gold");
+        return new("JUGAR", "Actualizado", "", "", "Success");
     }
 
     internal static double? Progress(string status, double value)

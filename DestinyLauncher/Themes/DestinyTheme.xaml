@@ -110,14 +110,17 @@
             </ControlTemplate.Triggers>
         </ControlTemplate></Setter.Value></Setter>
     </Style>
-    <Style TargetType="Slider">
-        <Setter Property="Height" Value="32"/><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}"/>
+    <Style x:Key="RamSlider" TargetType="Slider">
+        <Setter Property="Height" Value="68"/><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}"/>
         <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Slider">
-            <Track x:Name="PART_Track" VerticalAlignment="Center" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value}">
-                <Track.DecreaseRepeatButton><RepeatButton Command="Slider.DecreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate><Border Height="3" Background="{StaticResource Gold}" CornerRadius="1"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
-                <Track.IncreaseRepeatButton><RepeatButton Command="Slider.IncreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate><Border Height="3" Background="{StaticResource Line}" CornerRadius="1"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
-                <Track.Thumb><Thumb Width="16" Height="16"><Thumb.Template><ControlTemplate><Border Background="{StaticResource GoldBright}" BorderBrush="#F2DEB7" BorderThickness="1" CornerRadius="8"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
-            </Track>
+            <Grid><Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="28"/></Grid.RowDefinitions>
+                <Track x:Name="PART_Track" VerticalAlignment="Center" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value}">
+                    <Track.DecreaseRepeatButton><RepeatButton Command="Slider.DecreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate><Border Height="4" Background="{StaticResource Gold}" CornerRadius="2"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
+                    <Track.IncreaseRepeatButton><RepeatButton Command="Slider.IncreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate><Border Height="4" Background="#494435" CornerRadius="2"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
+                    <Track.Thumb><Thumb Width="18" Height="18" Cursor="Hand"><Thumb.Template><ControlTemplate TargetType="Thumb"><Border x:Name="Knob" Background="{StaticResource GoldBright}" BorderBrush="#F2DEB7" BorderThickness="1" CornerRadius="9"><Ellipse Width="4" Height="4" Fill="#685333"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Knob" Property="Background" Value="#F0D7A6"/></Trigger><Trigger Property="IsDragging" Value="True"><Setter TargetName="Knob" Property="BorderBrush" Value="{StaticResource Ink}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+                </Track>
+                <local:RamTickBar Grid.Row="1" Margin="9,0" Value="{TemplateBinding Value}" IsHitTestVisible="False"/>
+            </Grid>
         </ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style TargetType="ProgressBar">

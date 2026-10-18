@@ -30,10 +30,13 @@ En una raíz nueva, Destiny se instala dentro de `instances/Destiny` y Lite dent
 
 ```powershell
 dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/ui-refinement
+dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/ui-headless --headless
 dotnet run --project tools/PackUpdaterSmoke/PackUpdaterSmoke.csproj -c Release
 ```
 
 Ambos requieren el SDK de .NET 10. `UiSmoke` verifica estados, exclusividad de variantes, validación, persistencia, contraste y distribución, y guarda capturas WPF y un informe JSON. `--remote-skin` permite comprobar además el servicio externo de cabezas con un perfil de prueba. Los estados instalados y de descarga de estas capturas son fixtures explícitos; no descargan Minecraft. Los renderizados a 100/125/150/200 % comprueban la resolución de salida, no sustituyen una prueba manual cambiando la escala de Windows o moviendo la ventana entre monitores.
+
+`--headless` usa únicamente controles WPF desconectados, sin mostrar o activar ventanas, crear una fuente de presentación ni inyectar entrada. Comprueba el selector de RAM, la visibilidad condicional de mensajes y la acción de carpeta mediante un delegado de prueba; no abre el Explorador. Permite revisar estos cambios sin interrumpir una partida. Los PNG se renderizan en memoria y no sustituyen la revisión visual de la aplicación real.
 
 `PackUpdaterSmoke` utiliza respuestas HTTP en memoria y archivos temporales: comprueba instalación, actualización incremental, ediciones locales, rechazo de descargas corruptas, rutas protegidas y cancelación. No necesita manifiestos públicos ni toca partidas existentes.
 
@@ -46,6 +49,8 @@ Inicio presenta el pack activo, el perfil y la acción principal. La selección 
 Los emblemas pequeños comparten una imagen decodificada a 112 píxeles y remuestreo `HighQuality` de WPF; el título la presenta a 28 px y la barra lateral a 40 px. El arte original del banner se conserva. El marco usa un radio de 18 px, con recorte del contenido y región nativa de `WindowChrome`.
 
 La ventana tiene tamaño fijo: 1000 × 620 unidades de WPF, respetando el escalado de Windows. Si el área útil del escritorio es menor, se ajusta una sola vez al abrir y queda bloqueada en ese tamaño. Solo permite mover, minimizar y cerrar; no hay botón de maximizar ni bordes redimensionables. `WindowWorkArea.cs` bloquea también los comandos nativos de maximización y cambio de tamaño, incluido el doble clic en la barra de título. Las herramientas de vista previa conservan el cambio programático de tamaño para verificar distribución y escalado sin afectar a sesiones reales.
+
+En reposo se omiten el pie de estado y las frases bajo Jugar/Instalar. Las operaciones, avisos y errores mantienen sus mensajes. Instalación ofrece «Abrir carpeta» para la variante seleccionada cuando la ruta existe, sin crear directorios. Ajustes conserva etiquetas y validaciones; la escala rápida de RAM marca valores pares entre 2 y 16 GB, permite pasos de 1 GB y mantiene la entrada manual del rango admitido por el backend. Los iconos de Inicio, Instalación, Ajustes y carpeta usan los SVG de `Assets`, convertidos a geometrías WPF con el color heredado del control.
 
 ## Durante la partida
 

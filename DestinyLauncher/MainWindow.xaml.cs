@@ -83,6 +83,7 @@ public partial class MainWindow : Window
     internal Task PlayerHeadLoadTask => _playerHeadLoadTask ?? Task.CompletedTask;
     internal LauncherPaths DataPaths => _paths;
     internal Action<Uri> OpenExternalLink { get; set; } = uri => Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+    internal Action<string> OpenDirectory { get; set; } = path => Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
 
     private void ConfigureInitialWindowSize()
     {
@@ -159,6 +160,9 @@ public partial class MainWindow : Window
         LiteState.Foreground = Brush(_config.SelectedEdition == PackEdition.DestinyLite ? "GoldBright" : "Muted");
         var installed = Installed(Pack);
         InstallationPathText.Text = _paths.Instance(Pack.Slug);
+        InstallationPathText.ToolTip = InstallationPathText.Text;
+        OpenInstallationFolderButton.IsEnabled = !_busy && Directory.Exists(InstallationPathText.Text);
+        OpenInstallationFolderButton.ToolTip = OpenInstallationFolderButton.IsEnabled ? "Abrir carpeta del juego" : "Carpeta aún no creada";
         var presentation = LauncherPresentation.Describe(installed, _manifestCheck, _checkingManifest, _manifestError, _operationFailed, _localFallbackAllowed);
         PackInstalledVersionText.Text = string.IsNullOrEmpty(installed) ? "No instalado" : installed;
         PackInstalledVersionText.ToolTip = PackInstalledVersionText.Text;
@@ -169,8 +173,6 @@ public partial class MainWindow : Window
         if (!_busy)
         {
             PrimaryLabel.Text = presentation.Action;
-            ActionHint.Text = string.IsNullOrEmpty(installed) && InstallationView.Visibility != Visibility.Visible && !_checkingManifest
-                ? "Elige la variante antes de instalar" : presentation.Hint;
             PrimaryButton.IsEnabled = !_checkingManifest;
             InstallPrimaryButton.IsEnabled = !_checkingManifest;
             AutomationProperties.SetName(PrimaryButton, $"{presentation.Action} {Pack.Name}");
@@ -365,7 +367,6 @@ public partial class MainWindow : Window
             Progress.BeginAnimation(System.Windows.Controls.Primitives.RangeBase.ValueProperty, null);
             Progress.Visibility = Visibility.Collapsed;
             PrimaryLabel.Text = "EN PARTIDA";
-            ActionHint.Text = "El launcher volverá cuando cierres Minecraft";
             SetNotice("Minecraft en ejecución", "El launcher permanece en segundo plano durante la partida.", "Success");
             if (!process.HasExited) Hide();
             await process.WaitForExitAsync(_lifetime.Token);
@@ -416,19 +417,18 @@ public partial class MainWindow : Window
         RetryCheckButton.Visibility = Visibility.Collapsed;
         Progress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         Progress.IsIndeterminate = true;
+        OpenInstallationFolderButton.IsEnabled = !busy && Directory.Exists(_paths.Instance(Pack.Slug));
         if (busy)
         {
             PrimaryLabel.Text = "PREPARANDO…";
-            ActionHint.Text = "Se ocultará al iniciar Minecraft";
-            SetNotice(status, "Preparando los archivos de tu partida.", "Gold");
+            SetNotice(status, "", "Gold");
         }
     }
 
     private void SetProgress((string status, double value) update)
     {
         if (_closed || _gameRunning || (!_busy && !_checkingManifest)) return;
-        StatusText.Text = LauncherPresentation.ProgressStatus(update.status);
-        StatusDetail.Text = _busy ? "Mantén el launcher abierto hasta que termine la operación." : "Consultando la versión disponible y los archivos locales.";
+        SetNotice(LauncherPresentation.ProgressStatus(update.status), "", "Gold");
         // Backend values combine different phases. Only show determinate progress when a real
         // file count or Minecraft byte ratio is available; never present a fabricated overall %.
         var progress = LauncherPresentation.Progress(update.status, update.value);
@@ -442,6 +442,9 @@ public partial class MainWindow : Window
     {
         StatusText.Text = title;
         StatusDetail.Text = detail;
+        StatusDetail.Visibility = string.IsNullOrWhiteSpace(detail) ? Visibility.Collapsed : Visibility.Visible;
+        StatusFooter.Visibility = SettingsPageHost.Visibility != Visibility.Visible && (_busy || _checkingManifest || tone is "Error" or "Warning")
+            ? Visibility.Visible : Visibility.Collapsed;
         StatusDot.Fill = Brush(tone);
         if (animate) UiMotion.Enter(StatusText);
     }
@@ -498,6 +501,15 @@ public partial class MainWindow : Window
     private void Home_Click(object sender, RoutedEventArgs e) => ShowHomePage();
     private void Installation_Click(object sender, RoutedEventArgs e) => ShowInstallationPage();
     private void Settings_Click(object sender, RoutedEventArgs e) => ShowSettingsPage();
+    private void OpenInstallationFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy) return;
+        var folder = _paths.Instance(Pack.Slug);
+        if (!Directory.Exists(folder)) { Refresh(); return; }
+        try { OpenDirectory(folder); }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
+        { SetNotice("No se pudo abrir la carpeta", "Comprueba que la carpeta exista y tengas acceso a ella.", "Error"); }
+    }
     private void SocialLink_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string address } || !Uri.TryCreate(address, UriKind.Absolute, out var uri) || uri.Scheme != "https") return;
