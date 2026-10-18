@@ -20,6 +20,15 @@ public sealed class LauncherConfig
 {
     public const string DefaultJavaArguments = "-XX:+UseG1GC -XX:MaxGCPauseMillis=200";
     public string PlayerName { get; set; } = "";
+    public bool MultiAccountEnabled { get; set; }
+    public List<string> Accounts { get; set; } = [];
+    public static bool ValidPlayerName(string? name) => System.Text.RegularExpressions.Regex.IsMatch(name ?? "", "^[A-Za-z0-9_]{3,16}$");
+    public void NormalizeAccounts()
+    {
+        Accounts = (Accounts ?? []).Select(n => n?.Trim() ?? "").Where(ValidPlayerName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (ValidPlayerName(PlayerName) && !Accounts.Contains(PlayerName, StringComparer.OrdinalIgnoreCase)) Accounts.Add(PlayerName);
+        if (MultiAccountEnabled && !ValidPlayerName(PlayerName)) PlayerName = Accounts.FirstOrDefault() ?? "";
+    }
     public PackEdition SelectedEdition { get; set; } = PackEdition.Destiny;
     public int RamGb { get; set; } = 8;
     public string JavaArguments { get; set; } = DefaultJavaArguments;

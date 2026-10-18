@@ -7,12 +7,12 @@ internal sealed record LauncherPresentation(string Action, string State, string 
     internal static LauncherPresentation Describe(string installed, PackUpdateCheck? check, bool checking, string? error, bool failed, bool localFallbackAllowed = true)
     {
         var hasInstall = !string.IsNullOrWhiteSpace(installed);
-        if (checking) return new("COMPROBANDO…", "Comprobando", "Comprobando modpack", "", "Gold");
+        if (checking) return new("COMPROBANDO…", "Comprobando", "Consultando versión", "", "Gold");
         if (failed) return new("REINTENTAR", "Requiere atención", "La operación no se completó", "Puedes volver a intentarlo o revisar la carpeta de instalación en Ajustes.", "Error");
         if (error is not null) return new(hasInstall && localFallbackAllowed ? "JUGAR" : "REINTENTAR", hasInstall ? "Sin verificar" : "Sin instalar", "No se pudo comprobar el modpack", error, "Warning");
         if (check is null) return new(hasInstall ? "JUGAR" : "INSTALAR", hasInstall ? "Sin verificar" : "Sin instalar", "", "", "Gold");
         if (!hasInstall) return new("INSTALAR", "Sin instalar", "", "", "Gold");
-        if (check.HasChanges || installed != check.Manifest.Version) return new("ACTUALIZAR", "Actualización disponible", "", "", "Gold");
+        if (installed != check.Manifest.Version) return new("ACTUALIZAR", "Actualización disponible", "", "", "Gold");
         return new("JUGAR", "Actualizado", "", "", "Success");
     }
 

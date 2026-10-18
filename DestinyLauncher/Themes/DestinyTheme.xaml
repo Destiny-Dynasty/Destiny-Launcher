@@ -43,6 +43,22 @@
         </ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style x:Key="QuietButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"/>
+    <Style x:Key="AccountToggle" TargetType="CheckBox">
+        <Setter Property="Width" Value="38"/><Setter Property="Height" Value="24"/><Setter Property="Cursor" Value="Hand"/><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}"/>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox"><Border x:Name="Rail" Height="20" Background="#292A23" BorderBrush="#625B49" BorderThickness="1" CornerRadius="10"><Ellipse x:Name="Knob" Width="12" Height="12" Fill="{StaticResource Muted}" HorizontalAlignment="Left" Margin="3,0"/></Border><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Rail" Property="Background" Value="#57452B"/><Setter TargetName="Rail" Property="BorderBrush" Value="{StaticResource Gold}"/><Setter TargetName="Knob" Property="Fill" Value="{StaticResource GoldBright}"/><Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Rail" Property="BorderBrush" Value="{StaticResource GoldBright}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="AccountMenu" TargetType="ContextMenu">
+        <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="MinWidth" Value="234"/><Setter Property="MaxHeight" Value="340"/>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContextMenu"><Border Background="{StaticResource Panel}" BorderBrush="{StaticResource GoldDim}" BorderThickness="1" CornerRadius="6" Padding="5"><ScrollViewer VerticalScrollBarVisibility="Auto"><ItemsPresenter/></ScrollViewer></Border></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="AccountMenuItem" TargetType="MenuItem">
+        <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="MinHeight" Value="36"/><Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="MenuItem"><Border x:Name="Surface" Background="Transparent" Padding="10,7" CornerRadius="4"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Ellipse x:Name="Selected" Width="5" Height="5" Fill="{StaticResource GoldBright}" Visibility="Hidden"/><ContentPresenter Grid.Column="1" ContentSource="Header" VerticalAlignment="Center"/></Grid></Border><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Selected" Property="Visibility" Value="Visible"/></Trigger><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Surface" Property="Background" Value="#302B20"/><Setter Property="Foreground" Value="{StaticResource GoldBright}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="AccountListItem" TargetType="ListBoxItem">
+        <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="Padding" Value="12,10"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><Border x:Name="Surface" Background="Transparent" Padding="{TemplateBinding Padding}" CornerRadius="4"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter TargetName="Surface" Property="Background" Value="#352E20"/><Setter Property="Foreground" Value="{StaticResource GoldBright}"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#29271F"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style x:Key="SocialButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
         <Setter Property="Width" Value="38"/><Setter Property="Height" Value="36"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,1"/>
         <Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="Foreground" Value="{StaticResource Muted}"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/>

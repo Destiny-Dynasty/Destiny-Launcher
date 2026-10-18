@@ -149,6 +149,7 @@ public partial class MainWindow : Window
         PlayerNameText.Text = string.IsNullOrWhiteSpace(_config.PlayerName) ? "Añadir nombre" : _config.PlayerName;
         PlayerNameText.ToolTip = string.IsNullOrWhiteSpace(_config.PlayerName) ? "Elige tu nombre para jugar" : _config.PlayerName;
         PlayerInitial.Text = string.IsNullOrWhiteSpace(_config.PlayerName) ? "D" : _config.PlayerName[..1].ToUpperInvariant();
+        RefreshAccountMenu();
         RefreshPlayerHead();
         EditionText.Text = Pack.Name;
         VersionText.Text = $"Minecraft {_config.MinecraftVersion} · Fabric";
@@ -188,7 +189,7 @@ public partial class MainWindow : Window
         if (edition == _config.SelectedEdition && _checkingManifest) return "Comprobando…";
         if (string.IsNullOrEmpty(installed)) return "Sin instalar";
         if (_editionChecks.TryGetValue(edition, out var check))
-            return check.HasChanges || installed != check.Manifest.Version ? "Actualización disponible" : $"Instalada · {installed}";
+            return installed != check.Manifest.Version ? "Actualización disponible" : $"Instalada · {installed}";
         return $"Instalada · {installed}";
     }
 
@@ -233,8 +234,8 @@ public partial class MainWindow : Window
         Progress.IsIndeterminate = true;
         try
         {
-            var progress = new Progress<(string status, double value)>(p => { if (generation == _manifestRefreshGeneration && !_closed && !_busy && _checkingManifest) SetProgress(p); });
-            var check = await Task.Run(() => _manifestUpdater.CheckAsync(pack, progress, token), token);
+            var manifest = await _manifestUpdater.ReadManifestAsync(pack, token);
+            var check = new PackUpdateCheck(manifest, [], [], []);
             if (generation != _manifestRefreshGeneration || _closed) return;
             _manifestCheck = check;
             _editionChecks[edition] = check;
@@ -274,7 +275,7 @@ public partial class MainWindow : Window
         if (!Regex.IsMatch(_config.PlayerName ?? "", "^[A-Za-z0-9_]{3,16}$")) { Profile_Click(sender, e); return; }
         if (_previewMode) { SetNotice("Vista de prueba", "Las operaciones del juego están desactivadas en esta vista.", "Gold"); return; }
         ShowHomePage();
-        SetBusy(true, "Comprobando archivos");
+        SetBusy(true, "Consultando versión");
         string finalStatus = "Partida terminada";
         string finalDetail = "Minecraft se ha cerrado. Puedes volver a jugar cuando quieras.";
         try
@@ -282,25 +283,25 @@ public partial class MainWindow : Window
             var progress = new Progress<(string status, double value)>(SetProgress);
             var pack = Pack;
             var installedVersion = Installed(pack);
-            var manifestCheck = _manifestCheck;
-            if (manifestCheck is null)
+            PackUpdateCheck? manifestCheck = null;
+            using var versionRequest = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+            versionRequest.CancelAfter(TimeSpan.FromSeconds(15));
+            try { manifestCheck = new PackUpdateCheck(await _manifestUpdater.ReadManifestAsync(pack, versionRequest.Token), [], [], []); }
+            catch (HttpRequestException ex) when (!string.IsNullOrWhiteSpace(installedVersion) && (ex.StatusCode is null || (int)ex.StatusCode >= 500))
             {
-                try { manifestCheck = await Task.Run(() => _manifestUpdater.CheckAsync(pack, progress, _lifetime.Token)); }
-                catch (HttpRequestException ex) when (!string.IsNullOrWhiteSpace(installedVersion) && (ex.StatusCode is null || (int)ex.StatusCode >= 500))
-                {
-                    _log.Info($"GitHub unavailable; launching installed {pack.Slug} {installedVersion}.");
-                }
-                catch (TaskCanceledException) when (!string.IsNullOrWhiteSpace(installedVersion))
-                {
-                    _log.Info($"Manifest request timed out; launching installed {pack.Slug} {installedVersion}.");
-                }
+                _log.Info($"GitHub unavailable; launching installed {pack.Slug} {installedVersion}.");
+            }
+            catch (TaskCanceledException) when (!string.IsNullOrWhiteSpace(installedVersion) && !_lifetime.IsCancellationRequested)
+            {
+                _log.Info($"Manifest request timed out; launching installed {pack.Slug} {installedVersion}.");
             }
             if (manifestCheck is not null)
             {
                 _manifestCheck = manifestCheck;
                 _manifestError = null;
-                if (manifestCheck.HasChanges || installedVersion != manifestCheck.Manifest.Version)
+                if (installedVersion != manifestCheck.Manifest.Version)
                 {
+                    manifestCheck = await _manifestUpdater.PlanUpdateAsync(pack, manifestCheck.Manifest, progress, _lifetime.Token);
                     await _manifestUpdater.ApplyAsync(pack, manifestCheck, progress, _lifetime.Token);
                     _configService.SaveInstalled(pack.Slug, manifestCheck.Manifest.Version);
                     // A completed update must not keep the old 'changes pending' presentation.
@@ -459,13 +460,67 @@ public partial class MainWindow : Window
     private void Profile_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
+        if (_config.MultiAccountEnabled)
+        {
+            RefreshAccountMenu();
+            ProfileButton.ContextMenu.IsOpen = true;
+            return;
+        }
         var dialog = new ProfileDialog(_config.PlayerName) { Owner = this };
         if (dialog.ShowDialog() != true) return;
         var previousName = _config.PlayerName;
+        var previousAccounts = _config.Accounts.ToList();
+        _config.Accounts.RemoveAll(n => n.Equals(previousName, StringComparison.OrdinalIgnoreCase));
         _config.PlayerName = dialog.PlayerName;
-        if (!_previewMode && !TrySaveConfig()) { _config.PlayerName = previousName; return; }
+        _config.NormalizeAccounts();
+        if (!_previewMode && !TrySaveConfig()) { _config.PlayerName = previousName; _config.Accounts = previousAccounts; return; }
         Refresh();
-        SetNotice("Perfil guardado", $"Jugarás como {_config.PlayerName}.", "Success", animate: true);
+    }
+
+    private void RefreshAccountMenu()
+    {
+        ProfileActionGlyph.Data = _config.MultiAccountEnabled ? Geometry.Parse("M3 6l5 5 5-5") : IconGlyphs.Edit;
+        ProfileButton.ToolTip = _config.MultiAccountEnabled ? "Cambiar cuenta" : "Editar nombre de jugador";
+        System.Windows.Automation.AutomationProperties.SetName(ProfileButton, (string)ProfileButton.ToolTip);
+        if (!_config.MultiAccountEnabled) { ProfileButton.ContextMenu = null; return; }
+        var menu = new ContextMenu { Style = (Style)FindResource("AccountMenu"), PlacementTarget = ProfileButton,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        foreach (var name in _config.Accounts)
+        {
+            var item = new MenuItem { Header = name, Style = (Style)FindResource("AccountMenuItem"),
+                IsCheckable = true, IsChecked = name.Equals(_config.PlayerName, StringComparison.OrdinalIgnoreCase) };
+            item.Click += (_, _) => SetActiveAccount(name);
+            menu.Items.Add(item);
+        }
+        if (menu.Items.Count > 0) menu.Items.Add(new Separator { Background = Brush("Line"), Margin = new Thickness(8, 4, 8, 4) });
+        var manage = new MenuItem { Header = "Gestionar cuentas", Style = (Style)FindResource("AccountMenuItem") };
+        manage.Click += (_, _) =>
+        {
+            if (_busy) return;
+            var dialog = new AccountsDialog(_config.Accounts, _config.PlayerName, SaveAccounts) { Owner = this };
+            dialog.ShowDialog();
+        };
+        menu.Items.Add(manage);
+        ProfileButton.ContextMenu = menu;
+    }
+
+    internal bool SetActiveAccount(string name)
+    {
+        if (_busy || !_config.MultiAccountEnabled || !_config.Accounts.Contains(name, StringComparer.OrdinalIgnoreCase)) return false;
+        var previous = _config.PlayerName;
+        _config.PlayerName = _config.Accounts.First(n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (!_previewMode && !TrySaveConfig()) { _config.PlayerName = previous; return false; }
+        Refresh(); return true;
+    }
+
+    internal bool SaveAccounts(IEnumerable<string> names)
+    {
+        if (_busy || !_config.MultiAccountEnabled) return false;
+        var previousNames = _config.Accounts; var previousActive = _config.PlayerName;
+        _config.Accounts = names.Where(LauncherConfig.ValidPlayerName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (!_config.Accounts.Contains(_config.PlayerName, StringComparer.OrdinalIgnoreCase)) _config.PlayerName = _config.Accounts.FirstOrDefault() ?? "";
+        if (!_previewMode && !TrySaveConfig()) { _config.Accounts = previousNames; _config.PlayerName = previousActive; return false; }
+        Refresh(); return true;
     }
 
     private void RefreshPlayerHead()
@@ -489,6 +544,9 @@ public partial class MainWindow : Window
     {
         try
         {
+            var cached = await _playerHeadService.GetCachedHeadAsync(username, token);
+            if (cached is not null && !token.IsCancellationRequested && !_closed && string.Equals(username, _config.PlayerName, StringComparison.Ordinal))
+            { PlayerHead.Source = cached; PlayerHead.Visibility = Visibility.Visible; PlayerInitial.Visibility = Visibility.Collapsed; }
             var image = await _playerHeadService.GetHeadAsync(username, token);
             if (image is null || token.IsCancellationRequested || _closed || !string.Equals(username, _config.PlayerName, StringComparison.Ordinal)) return;
             PlayerHead.Source = image;
@@ -663,6 +721,12 @@ public partial class MainWindow : Window
         Refresh();
     }
     internal void SetAuditProgress(string status, double value) { SetBusy(true, status); SetProgress((status, value)); }
+    internal void SetAuditAccounts(bool enabled, IEnumerable<string> names, string active)
+    {
+        if (!_previewMode) throw new InvalidOperationException("Audit states require an isolated preview.");
+        _config.MultiAccountEnabled = enabled; _config.Accounts = names.ToList(); _config.PlayerName = active;
+        _config.NormalizeAccounts(); Refresh();
+    }
     internal void EndAuditProgress() => SetBusy(false, "");
     internal void SetAuditFailure()
     {

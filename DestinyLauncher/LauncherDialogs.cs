@@ -118,12 +118,13 @@ public sealed class SettingsPage : UserControl
     private readonly TextBox _ramValue;
     private readonly Slider _ramSlider;
     private readonly TextBox _javaArguments;
+    private readonly CheckBox _multiAccount;
     private readonly string _installationFolderName;
     private readonly string _originalBaseDirectory;
     private bool _syncingRam;
     private bool _saved;
     public bool HasChanges => !_saved && (_installDirectory.Text != _originalBaseDirectory || _ramValue.Text != _source.RamGb.ToString()
-        || _javaArguments.Text != _source.JavaArguments);
+        || _javaArguments.Text != _source.JavaArguments || (_multiAccount.IsChecked == true) != _source.MultiAccountEnabled);
     public Action? BackRequested { get; set; }
     public Func<LauncherConfig, Task>? SaveRequested { get; set; }
     internal void MarkSaved() => _saved = true;
@@ -138,8 +139,15 @@ public sealed class SettingsPage : UserControl
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 20) };
+        var heading = new Grid { Margin = new Thickness(0, 0, 0, 20) };
+        heading.ColumnDefinitions.Add(new ColumnDefinition());
+        heading.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         heading.Children.Add(new TextBlock { Text = "Ajustes", FontFamily = new FontFamily("Georgia"), FontSize = 28 });
+        var accountOption = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        accountOption.Children.Add(new TextBlock { Text = "Multicuentas", Foreground = ProfileDialog.ResourceBrush("Muted"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
+        _multiAccount = new CheckBox { IsChecked = source.MultiAccountEnabled, Style = (Style)Application.Current.FindResource("AccountToggle") };
+        AutomationProperties.SetName(_multiAccount, "Multicuentas"); AutomationProperties.SetAutomationId(_multiAccount, "MultiAccountToggle");
+        accountOption.Children.Add(_multiAccount); Grid.SetColumn(accountOption, 1); heading.Children.Add(accountOption);
         layout.Children.Add(heading);
         var content = new StackPanel();
         var installation = Card();
@@ -240,6 +248,7 @@ public sealed class SettingsPage : UserControl
             try { JavaArguments.Parse(_javaArguments.Text); }
             catch (FormatException ex) { Error(ex.Message, _javaArguments); return; }
             var updated = new LauncherConfig { PlayerName = source.PlayerName, SelectedEdition = source.SelectedEdition, InstallDirectory = path,
+                MultiAccountEnabled = _multiAccount.IsChecked == true, Accounts = source.Accounts.ToList(),
                 RamGb = ram, JavaArguments = _javaArguments.Text, MinecraftVersion = source.MinecraftVersion, FabricLoaderVersion = source.FabricLoaderVersion, Destiny = source.Destiny, DestinyLite = source.DestinyLite };
             save.IsEnabled = false;
             try { if (SaveRequested is not null) await SaveRequested(updated); }

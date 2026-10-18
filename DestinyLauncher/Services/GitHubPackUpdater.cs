@@ -41,11 +41,14 @@ public sealed class GitHubPackUpdater
     }
 
     public async Task<PackUpdateCheck> CheckAsync(PackDefinition pack, IProgress<(string status, double value)>? progress, CancellationToken token)
+        => await PlanUpdateAsync(pack, await ReadManifestAsync(pack, token), progress, token);
+
+    // Startup reads remote version metadata only. Never opens, hashes or enumerates the pack.
+    public async Task<PackManifest> ReadManifestAsync(PackDefinition pack, CancellationToken token)
     {
         if (!Uri.TryCreate(pack.ManifestUrl, UriKind.Absolute, out var manifestUri) || manifestUri.Scheme != Uri.UriSchemeHttps)
             throw new InvalidOperationException("Configura una URL HTTPS válida para el manifiesto del modpack.");
 
-        progress?.Report(("Consultando manifiesto de GitHub", .02));
         using var request = new HttpRequestMessage(HttpMethod.Get, manifestUri);
         request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
@@ -54,7 +57,13 @@ public sealed class GitHubPackUpdater
         var manifest = await JsonSerializer.DeserializeAsync<PackManifest>(responseStream, _json, token)
             ?? throw new InvalidDataException("El manifiesto del modpack está vacío o no es JSON válido.");
         ValidateManifest(pack, manifest);
+        return manifest;
+    }
 
+    public async Task<PackUpdateCheck> PlanUpdateAsync(PackDefinition pack, PackManifest manifest,
+        IProgress<(string status, double value)>? progress, CancellationToken token)
+    {
+        ValidateManifest(pack, manifest);
         var statePath = Path.Combine(_paths.Instance(pack.Slug), StateFileName);
         var local = ReadState(statePath, pack.Slug);
         var localFiles = local?.Files.ToDictionary(x => NormalizePath(x.Path), StringComparer.OrdinalIgnoreCase)
@@ -63,11 +72,28 @@ public sealed class GitHubPackUpdater
         var preservedOverrides = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var changed = new List<PackManifestFile>();
         var completed = 0;
+        var candidates = manifest.Files.Where(file => !localFiles.TryGetValue(NormalizePath(file.Path), out var baseline) ||
+            baseline.Size != file.Size || !baseline.Sha256.Equals(file.Sha256, StringComparison.OrdinalIgnoreCase)).ToArray();
         foreach (var file in manifest.Files)
         {
             token.ThrowIfCancellationRequested();
             var normalized = NormalizePath(file.Path);
+            // Only upstream changes need inspection. An unchanged upstream entry is not a
+            // reason to repair, hash or reinstall a player's edited/deleted local file.
+            if (localFiles.TryGetValue(normalized, out var baseline) && baseline.Size == file.Size &&
+                baseline.Sha256.Equals(file.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                if (overrides.Contains(normalized)) preservedOverrides.Add(normalized);
+                continue;
+            }
             var target = SafeTargetPath(_paths.Instance(pack.Slug), normalized);
+            if (localFiles.ContainsKey(normalized) && !File.Exists(target))
+            {
+                preservedOverrides.Add(normalized); // A player's intentional deletion.
+                completed++;
+                progress?.Report(($"Comprobando archivos · {completed}/{candidates.Length}", .02 + .38 * completed / Math.Max(1, candidates.Length)));
+                continue;
+            }
             var isCurrent = false;
             string? localHash = null;
             if (File.Exists(target))
@@ -76,7 +102,7 @@ public sealed class GitHubPackUpdater
                 localHash = await HashFileAsync(target, token);
                 isCurrent = info.Length == file.Size && localHash.Equals(file.Sha256, StringComparison.OrdinalIgnoreCase);
             }
-            if (overrides.Contains(normalized) && File.Exists(target) && !isCurrent)
+            if ((!localFiles.ContainsKey(normalized) || overrides.Contains(normalized)) && File.Exists(target) && !isCurrent)
             {
                 preservedOverrides.Add(normalized);
             }
@@ -92,7 +118,7 @@ public sealed class GitHubPackUpdater
                 if (!isCurrent) changed.Add(file);
             }
             completed++;
-            progress?.Report(($"Comprobando archivos · {completed}/{manifest.Files.Count}", .02 + .38 * completed / Math.Max(1, manifest.Files.Count)));
+            progress?.Report(($"Comprobando archivos · {completed}/{candidates.Length}", .02 + .38 * completed / Math.Max(1, candidates.Length)));
         }
 
         var desired = manifest.Files.Select(x => NormalizePath(x.Path)).ToHashSet(StringComparer.OrdinalIgnoreCase);

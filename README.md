@@ -22,6 +22,16 @@ Los argumentos de Java se guardan en `JavaArguments` y se aplican a ambas varian
 
 El launcher descarga Minecraft Java 1.20.1, instala Fabric y después sincroniza los archivos del modpack desde su manifiesto. En cada instalación consulta Fabric Meta para elegir el loader estable más reciente compatible con Minecraft 1.20.1; si el servicio no está disponible, utiliza la versión fijada en el manifiesto o la configuración.
 
+## Versiones, perfiles y skins
+
+Al abrir el launcher o cambiar de variante solo se lee `destiny-installed.json` y se consulta el manifiesto remoto. No se enumeran ni se calculan hashes de los mods. Jugar vuelve a consultar la versión; si coincide, inicia la instalación existente sin reparar el modpack. Los archivos básicos de Minecraft y las bibliotecas de Fabric siguen preparándose al lanzar el juego.
+
+Si cambia la versión del manifiesto, se prepara la actualización al pulsar Jugar/Actualizar. Solo se inspeccionan los archivos cuyo contenido cambió en el manifiesto y los candidatos a eliminación. Se conservan las modificaciones y eliminaciones locales, así como los archivos añadidos por el jugador y las colisiones con archivos que el launcher no gestiona. Las descargas nuevas mantienen la validación de tamaño y SHA-256, la preparación temporal y la recuperación ante errores. Para distribuir un cambio del modpack hay que incrementar su versión en el manifiesto; republicar archivos con el mismo número no obliga a reparar instalaciones existentes.
+
+Multicuentas está desactivado inicialmente. El perfil offline existente se conserva. Al activarlo en Ajustes, el perfil de Inicio ofrece un menú con las cuentas guardadas y «Gestionar cuentas». El gestor añade o elimina nombres de 3 a 16 letras, números o guiones bajos, sin duplicados por mayúsculas/minúsculas. Sus cambios se aplican solo con Guardar. Eliminar la cuenta activa selecciona la primera restante; eliminar todas exige introducir un nombre válido para jugar. Desactivar la opción conserva la lista y restaura la edición sencilla del nombre. Se guardan únicamente nombres locales; no se introduce autenticación Microsoft.
+
+Las cabezas se obtienen de la textura pública de Mojang correspondiente al nombre y se recortan con su capa de sombrero. La imagen verificada se guarda bajo `cache/player-heads` y se muestra desde disco antes de refrescar. La caché dura siete días; un fallo conserva la imagen anterior y retrasa seis horas el siguiente intento. Los nombres sin textura pública usan la inicial del perfil y nunca guardan un Steve de respaldo devuelto por un renderizador externo. Las skins de servicios privados del servidor no se consultan.
+
 ## Pruebas de interfaz y aislamiento
 
 Para abrir una sesión con configuración, caché, registros e instalaciones de prueba independientes:

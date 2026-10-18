@@ -17,6 +17,7 @@ public sealed class ConfigService
             if (string.IsNullOrWhiteSpace(config.InstallDirectory)) config.InstallDirectory = LauncherPaths.DefaultInstallDirectory;
             config.RamGb = Math.Clamp(config.RamGb, 1, 1024);
             config.JavaArguments ??= LauncherConfig.DefaultJavaArguments;
+            config.NormalizeAccounts();
             if (savedJson is not null && HasRemovedSettings(savedJson))
             {
                 try { Save(config); } catch { }
@@ -38,7 +39,13 @@ public sealed class ConfigService
         return false;
     }
 
-    public void Save(LauncherConfig config) => File.WriteAllText(_paths.ConfigFile, JsonSerializer.Serialize(config, _json));
+    public void Save(LauncherConfig config)
+    {
+        config.NormalizeAccounts();
+        var temporary = _paths.ConfigFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try { File.WriteAllText(temporary, JsonSerializer.Serialize(config, _json)); File.Move(temporary, _paths.ConfigFile, true); }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
     public string InstalledVersion(string slug) { var file = Path.Combine(_paths.Instance(slug), "destiny-installed.json"); try { return File.Exists(file) ? JsonSerializer.Deserialize<InstalledPack>(File.ReadAllText(file))?.Version ?? "" : ""; } catch { return ""; } }
     public void SaveInstalled(string slug, string version) { var dir = _paths.Instance(slug); Directory.CreateDirectory(dir); File.WriteAllText(Path.Combine(dir, "destiny-installed.json"), JsonSerializer.Serialize(new InstalledPack { Version = version }, _json)); }
 }

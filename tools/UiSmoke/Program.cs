@@ -186,7 +186,7 @@ internal static class Program
         Get<Button>(preview, "PrimaryButton").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         Assert(Get<Grid>(preview, "HomeView").IsVisible && !Get<Grid>(preview, "InstallationView").IsVisible, "Play with an installed pack does not reopen variant selection");
         preview.SetAuditState("1.4.7", Check("1.4.7", true));
-        Assert(Text(preview, "PrimaryLabel") == "ACTUALIZAR", "File changes require update even with the same version");
+        Assert(Text(preview, "PrimaryLabel") == "JUGAR", "File differences alone do not force a same-version update");
         preview.SetAuditState("1.4.7", error: "No se pudo conectar con el servidor. Revisa tu conexión y vuelve a intentarlo.");
         Assert(Text(preview, "PackStateText") == "Sin verificar", "Offline installation is never called current");
         Assert(Text(preview, "PrimaryLabel") == "JUGAR", "Local installation remains launchable during a connection failure");
@@ -373,6 +373,8 @@ internal static class Program
             Assert(footer.Visibility == Visibility.Collapsed, $"Idle state '{installed}' has no bottom microcopy");
         }
         CaptureContent("home");
+        window.SetAuditState("1.4.7", Check("1.4.7", true));
+        Assert(Text(window, "PrimaryLabel") == "JUGAR", "A same-version modpack stays playable despite local file differences");
         window.SetAuditState("1.4.7", checking: true); Layout();
         Assert(footer.Visibility == Visibility.Visible, "Manifest checks retain useful status");
         window.SetAuditState("1.4.7", error: "Sin conexión"); Layout();
@@ -405,6 +407,8 @@ internal static class Program
         Layout();
         Get<Button>(window, "SettingsNav").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Layout();
         var settings = (SettingsPage)Get<ContentControl>(window, "SettingsPageHost").Content;
+        var multi = Descendants<CheckBox>(settings).Single(c => System.Windows.Automation.AutomationProperties.GetAutomationId(c) == "MultiAccountToggle");
+        Assert(multi.IsChecked == false && Get<Button>(window, "ProfileButton").ContextMenu is null, "Multicuentas is opt-in and leaves the single-profile control unchanged");
         var baseInput = Descendants<TextBox>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "InstallDirectoryInput");
         var javaInput = Descendants<TextBox>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "JavaArgumentsInput");
         var fixedFolder = Descendants<TextBlock>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "FixedInstallationFolder");
@@ -451,7 +455,9 @@ internal static class Program
         Assert(saved?.InstallDirectory == Path.Combine(newBase, "Destiny") && !Directory.Exists(newBase),
             "Changing the base preserves the fixed name without moving or creating files");
         baseInput.Text = LauncherPaths.InstallationBaseDirectory(window.DataPaths.Instances);
+        multi.IsChecked = true;
         save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(saved?.MultiAccountEnabled == true && saved.PlayerName == "Player_Destiny16", "Settings save the multicuentas preference without changing the active offline name");
         Layout(); CaptureContent("settings");
         foreach (var (width, height) in new[] { (820d, 560d), (760d, 500d), (680d, 480d) })
         {
@@ -468,6 +474,25 @@ internal static class Program
         liteSettings.Measure(new Size(800, 540)); liteSettings.Arrange(new Rect(0, 0, 800, 540)); liteSettings.UpdateLayout();
         Assert(Descendants<TextBlock>(liteSettings).Any(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "FixedInstallationFolder" && t.Text == "\\Destiny-Lite"),
             "Lite displays its fixed sibling folder while sharing the same editable base");
+        window.SetAuditAccounts(true, ["First_Player", "Second_Player"], "First_Player");
+        var profileButton = Get<Button>(window, "ProfileButton");
+        Assert(profileButton.ContextMenu.Items.OfType<MenuItem>().Count() == 3 && profileButton.ContextMenu.Items.OfType<MenuItem>().Count(m => m.IsChecked) == 1,
+            "Account dropdown contains saved names, exactly one selection and Manage accounts");
+        var menu = profileButton.ContextMenu;
+        menu.Measure(new Size(250, 340)); menu.Arrange(new Rect(0, 0, 250, menu.DesiredSize.Height)); menu.UpdateLayout();
+        var menuBitmap = new RenderTargetBitmap(250, (int)Math.Ceiling(menu.ActualHeight), 96, 96, PixelFormats.Pbgra32); menuBitmap.Render(menu);
+        var menuEncoder = new PngBitmapEncoder(); menuEncoder.Frames.Add(BitmapFrame.Create(menuBitmap));
+        using (var file = File.Create(Path.Combine(_output, "account-menu.png"))) menuEncoder.Save(file);
+        Assert(!menu.IsOpen && PresentationSource.FromVisual(menu) is null, "Account menu is rendered without opening its native popup");
+        Assert(window.SetActiveAccount("Second_Player") && Text(window, "PlayerNameText") == "Second_Player", "Selecting a saved account changes the active offline name");
+        Assert(!window.SetActiveAccount("Not_Saved"), "Unknown account cannot become active through the selector");
+        window.SetAuditProgress("Preparando Minecraft", .2);
+        Assert(!window.SetActiveAccount("First_Player") && !window.SaveAccounts(["First_Player"]), "Game preparation locks account selection and editing");
+        window.EndAuditProgress();
+        Assert(window.SaveAccounts(["First_Player"]) && Text(window, "PlayerNameText") == "First_Player", "Removing the active account selects a remaining name");
+        Assert(window.SaveAccounts([]) && Text(window, "PlayerNameText") == "Añadir nombre", "Deleting all accounts requires a new valid name before play");
+        window.SetAuditAccounts(false, ["First_Player", "Second_Player"], "Second_Player");
+        Assert(profileButton.ContextMenu is null, "Disabling multicuentas restores the edit-name control");
         window.Close();
         var profile = new ProfileDialog("Player_123");
         var profileRoot = (FrameworkElement)profile.Content;
@@ -479,7 +504,103 @@ internal static class Program
         profileName.Text = "ab";
         Assert(!profileSave.IsEnabled && Descendants<TextBlock>(profileRoot).Any(t => t.Visibility == Visibility.Visible && t.Text.StartsWith("Usa de 3 a 16")), "Invalid profile retains its useful validation message");
         profile.Close();
-        await Task.CompletedTask;
+        AuditAccountsEditor();
+        AuditAccountPersistence();
+        await AuditSkinCache();
+    }
+
+    private static void AuditAccountsEditor()
+    {
+        var original = new[] { "First_Player", "Second_Player" };
+        var editor = new AccountsEditor(original, "First_Player");
+        var dialog = new Window(); DialogChrome.Create(dialog, "Cuentas", editor, 520, 440);
+        var root = (FrameworkElement)dialog.Content; dialog.Content = null;
+        System.Windows.Documents.TextElement.SetForeground(root, (Brush)Application.Current.FindResource("Ink"));
+        void Layout() { root.Measure(new Size(520, 440)); root.Arrange(new Rect(0, 0, 520, 440)); root.UpdateLayout(); }
+        Layout();
+        var input = Descendants<TextBox>(root).Single();
+        var add = Descendants<Button>(root).Single(b => Equals(b.Content, "Añadir"));
+        var remove = Descendants<Button>(root).Single(b => Equals(b.Content, "Eliminar"));
+        var save = Descendants<Button>(root).Single(b => Equals(b.Content, "Guardar"));
+        input.Text = "first_player"; add.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(editor.AccountNames.Count == 2 && Descendants<TextBlock>(root).Any(t => t.Text == "Esta cuenta ya está guardada."), "Duplicate offline names are rejected regardless of case");
+        input.Text = "ab"; add.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(editor.AccountNames.Count == 2 && Descendants<TextBlock>(root).Any(t => t.Text.StartsWith("Usa de 3 a 16")), "Account manager validates offline names");
+        input.Text = "Third_Player"; add.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(editor.AccountNames.Count == 3 && input.Text == "", "Adding a valid account selects it and clears the input");
+        remove.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(editor.AccountNames.SequenceEqual(original) && original.Length == 2, "Removing a draft account leaves the original list untouched");
+        var accepted = false; editor.SaveRequested += () => accepted = true;
+        input.Text = "bad name"; save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(!accepted, "Saving cannot accept an invalid pending account");
+        input.Text = "Fourth_Player"; save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(accepted && editor.AccountNames.Contains("Fourth_Player"), "Save includes a valid name still typed in the input");
+        Layout();
+        var bitmap = new RenderTargetBitmap(520, 440, 96, 96, PixelFormats.Pbgra32); bitmap.Render(root);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using (var file = File.Create(Path.Combine(_output, "accounts.png"))) encoder.Save(file);
+        Assert(!dialog.IsVisible && PresentationSource.FromVisual(root) is null, "Account manager is rendered without opening a window");
+        dialog.Close();
+    }
+
+    private static void AuditAccountPersistence()
+    {
+        var paths = new LauncherPaths(Path.Combine(_output, "accounts-data", Guid.NewGuid().ToString("N")));
+        var service = new ConfigService(paths);
+        File.WriteAllText(paths.ConfigFile, JsonSerializer.Serialize(new { PlayerName = "Legacy_User", InstallDirectory = paths.InstallDirectory, RamGb = 9, JavaArguments = "-Dtest=retained" }));
+        var config = service.Load();
+        Assert(!config.MultiAccountEnabled && config.Accounts.SequenceEqual(new[] { "Legacy_User" }), "Legacy profile migrates in memory without enabling multicuentas");
+        config.MultiAccountEnabled = true; config.Accounts.AddRange(["Second_User", "second_user", "bad name", "ab"]);
+        config.PlayerName = "Second_User"; service.Save(config);
+        var loaded = service.Load();
+        Assert(loaded.MultiAccountEnabled && loaded.PlayerName == "Second_User" && loaded.Accounts.Count == 2
+            && loaded.InstallDirectory == paths.InstallDirectory && loaded.RamGb == 9 && loaded.JavaArguments == "-Dtest=retained", "Account selection persists alongside existing paths, RAM and JVM flags");
+        loaded.MultiAccountEnabled = false; service.Save(loaded);
+        loaded = service.Load();
+        Assert(!loaded.MultiAccountEnabled && loaded.Accounts.Count == 2, "Disabling multicuentas keeps the saved account list for later use");
+        loaded.Accounts.Clear(); loaded.PlayerName = ""; loaded.MultiAccountEnabled = true; service.Save(loaded);
+        Assert(service.Load().Accounts.Count == 0 && service.Load().PlayerName == "", "An empty account list persists without resurrecting a removed profile");
+    }
+
+    private static async Task AuditSkinCache()
+    {
+        var paths = new LauncherPaths(Path.Combine(_output, "skin-data", Guid.NewGuid().ToString("N")));
+        var handler = new SkinFixtureHandler(); using var http = new HttpClient(handler);
+        using var service = new PlayerHeadService(paths, http);
+        var image = await service.GetHeadAsync("Skin_Player", CancellationToken.None);
+        Assert(image is { PixelWidth: 8, PixelHeight: 8, IsFrozen: true } && handler.Requests == 3, "Verified public skin is cropped to an undeformed frozen 8x8 head");
+        var pixel = new byte[4]; new FormatConvertedBitmap(image!, PixelFormats.Bgra32, null, 0).CopyPixels(new Int32Rect(1, 1, 1, 1), pixel, 4, 0);
+        Assert(pixel[2] == 200 && pixel[1] == 80 && pixel[0] == 30, "Cached head uses the face region rather than the whole skin");
+        new FormatConvertedBitmap(image!, PixelFormats.Bgra32, null, 0).CopyPixels(new Int32Rect(0, 0, 1, 1), pixel, 4, 0);
+        Assert(pixel[0] == 220 && pixel[2] == 10, "Skin hat layer is composited over the face");
+        using var secondService = new PlayerHeadService(paths, http);
+        Assert(await secondService.GetCachedHeadAsync("skin_player", CancellationToken.None) is not null
+            && await secondService.GetHeadAsync("SKIN_PLAYER", CancellationToken.None) is not null && handler.Requests == 3,
+            "Disk cache survives new service instances and case changes without network requests");
+        var cacheFile = Directory.GetFiles(Path.Combine(paths.Cache, "player-heads"), "*.png").Single();
+        File.SetLastWriteTimeUtc(cacheFile, DateTime.UtcNow.AddDays(-8)); handler.Unavailable = true;
+        Assert(await service.GetHeadAsync("Skin_Player", CancellationToken.None) is not null && handler.Requests == 4,
+            "Expired cache remains visible when the skin service fails");
+        Assert(await service.GetHeadAsync("Skin_Player", CancellationToken.None) is not null && handler.Requests == 4,
+            "Failed refreshes back off instead of repeatedly requesting a skin");
+        Assert(await service.GetHeadAsync("Unknown_User", CancellationToken.None) is null
+            && Directory.GetFiles(Path.Combine(paths.Cache, "player-heads"), "*.png").Length == 1,
+            "Unknown or unavailable profiles never cache a service's Steve fallback");
+        Assert(await service.GetHeadAsync("bad name", CancellationToken.None) is null && handler.Requests == 5,
+            "Invalid offline names never trigger a skin lookup");
+        handler.Unavailable = false;
+        await File.WriteAllTextAsync(cacheFile, "corrupt image"); File.Delete(cacheFile + ".retry");
+        Assert(await service.GetHeadAsync("Skin_Player", CancellationToken.None) is not null && handler.Requests == 8,
+            "Corrupt cache entries recover from the verified texture without breaking the profile");
+        using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+        try { await service.GetHeadAsync("Cancelled_User", cancelled.Token); throw new Exception("Cancellation ignored"); }
+        catch (OperationCanceledException) { Assert(true, "Skin requests honor cancellation when switching profiles or starting a game"); }
+        if (_remoteSkin)
+        {
+            using var live = new PlayerHeadService(new LauncherPaths(Path.Combine(_output, "public-skin-data", Guid.NewGuid().ToString("N"))));
+            var publicHead = await live.GetHeadAsync("Notch", CancellationToken.None);
+            Assert(publicHead is { PixelWidth: 8, PixelHeight: 8 }, "Live public Mojang texture resolves and renders a head in an isolated cache");
+        }
     }
 
     private static async Task AuditGameLifetime()
