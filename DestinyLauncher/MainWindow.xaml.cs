@@ -40,7 +40,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _playerHeadCancellation;
     private Task? _playerHeadLoadTask;
 
-    public MainWindow(bool previewMode = false, bool loadRemoteSkinInPreview = false, bool startOnSettingsPage = false, string? dataRoot = null)
+    public MainWindow(bool previewMode = false, bool loadRemoteSkinInPreview = false, bool startOnSettingsPage = false, string? dataRoot = null, PackEdition? initialEdition = null)
     {
         _previewMode = previewMode;
         _loadRemoteSkinInPreview = loadRemoteSkinInPreview;
@@ -55,6 +55,10 @@ public partial class MainWindow : Window
         var exists = File.Exists(_paths.ConfigFile);
         _config = previewMode ? new LauncherConfig { PlayerName = loadRemoteSkinInPreview ? "Shady935" : "", InstallDirectory = _paths.InstallDirectory } : _configService.Load();
         if (dataRoot is not null && !exists) _config.InstallDirectory = _paths.InstallDirectory;
+        if (initialEdition is not null) _config.SelectedEdition = initialEdition.Value;
+        CreateDesktopShortcut = edition => GameShortcutService.Create(
+            previewMode ? Path.Combine(_paths.Root, "desktop-preview") : Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+            Environment.ProcessPath ?? throw new InvalidOperationException("No se encontró el ejecutable del launcher."), edition, dataRoot);
         _paths.SetInstallDirectory(_config.InstallDirectory);
         InitializeComponent();
         ConfigureInitialWindowSize();
@@ -84,6 +88,7 @@ public partial class MainWindow : Window
     internal LauncherPaths DataPaths => _paths;
     internal Action<Uri> OpenExternalLink { get; set; } = uri => Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
     internal Action<string> OpenDirectory { get; set; } = path => Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+    internal Func<PackEdition, string> CreateDesktopShortcut { get; set; }
 
     private void ConfigureInitialWindowSize()
     {
@@ -119,7 +124,7 @@ public partial class MainWindow : Window
         ProfilePanel.Width = narrow ? 214 : 234;
         ProfilePanel.Margin = new Thickness(0, 0, narrow ? 20 : 28, 22);
         InstallationView.Margin = new Thickness(narrow ? 20 : 28, 24, narrow ? 20 : 28, 20);
-        LaunchLayout.ColumnDefinitions[1].Width = new GridLength(stacked ? 0 : narrow ? 202 : 228);
+        LaunchLayout.ColumnDefinitions[1].Width = new GridLength(stacked ? 0 : narrow ? 264 : 290);
         Grid.SetRow(ActionPanel, stacked ? 1 : 0);
         Grid.SetColumn(ActionPanel, stacked ? 0 : 1);
         ActionPanel.Margin = stacked ? new Thickness(0, 18, 0, 0) : new Thickness(0);
@@ -150,6 +155,7 @@ public partial class MainWindow : Window
         PlayerNameText.ToolTip = string.IsNullOrWhiteSpace(_config.PlayerName) ? "Elige tu nombre para jugar" : _config.PlayerName;
         PlayerInitial.Text = string.IsNullOrWhiteSpace(_config.PlayerName) ? "D" : _config.PlayerName[..1].ToUpperInvariant();
         RefreshAccountMenu();
+        RefreshGameMenu();
         RefreshPlayerHead();
         EditionText.Text = Pack.Name;
         VersionText.Text = $"Minecraft {_config.MinecraftVersion} · Fabric";
@@ -215,7 +221,7 @@ public partial class MainWindow : Window
     }
 
     private async void RetryCheck_Click(object sender, RoutedEventArgs e) => await RefreshManifestAsync();
-    private async Task RefreshManifestAsync()
+    private async Task RefreshManifestAsync(bool manual = false)
     {
         if (_previewMode || _busy || _closed) return;
         _manifestCancellation?.Cancel();
@@ -260,6 +266,83 @@ public partial class MainWindow : Window
                 _checkingManifest = false;
                 Progress.Visibility = Visibility.Collapsed;
                 Refresh();
+                if (manual && _manifestCheck is not null && _manifestError is null)
+                    SetNotice(string.IsNullOrEmpty(Installed(pack)) ? $"Versión disponible · {_manifestCheck.Manifest.Version}"
+                        : Installed(pack) == _manifestCheck.Manifest.Version ? "No hay actualizaciones" : "Actualización disponible", "", "Gold");
+            }
+        }
+    }
+
+    private void GameOptions_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || _checkingManifest) return;
+        RefreshGameMenu(); GameOptionsButton.ContextMenu.IsOpen = true;
+    }
+
+    private void RefreshGameMenu()
+    {
+        GameOptionsButton.IsEnabled = !_busy && !_checkingManifest;
+        var menu = new ContextMenu { Style = (Style)FindResource("AccountMenu"), Width = 300, HorizontalOffset = GameOptionsButton.ActualWidth - 300,
+            PlacementTarget = GameOptionsButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Top };
+        void Add(string label, RoutedEventHandler action, bool enabled = true)
+        {
+            var item = new MenuItem { Header = label, Style = (Style)FindResource("GameMenuItem"), IsEnabled = enabled && !_busy };
+            item.Click += action; menu.Items.Add(item);
+        }
+        Add("Ajustes del juego", (_, _) => ShowSettingsPage());
+        Add("Crear acceso directo en el escritorio", (_, _) =>
+        {
+            try { CreateDesktopShortcut(_config.SelectedEdition); SetNotice("Acceso directo creado", "", "Success"); }
+            catch (Exception ex) { _log.Error("Could not create desktop shortcut", ex); SetNotice("No se pudo crear el acceso directo", GetFriendlyError(ex), "Error"); }
+        });
+        Add("Ver capturas", (_, _) => OpenScreenshots(), Directory.Exists(_paths.Instance(Pack.Slug)));
+        Add("Buscar actualizaciones", async (_, _) => await RefreshManifestAsync(manual: true), !_checkingManifest);
+        menu.Items.Add(new Separator { Background = Brush("Line"), Margin = new Thickness(8, 4, 8, 4) });
+        Add("Reparar modpack", Repair_Click, !_checkingManifest && Directory.Exists(_paths.Instance(Pack.Slug)));
+        GameOptionsButton.ContextMenu = menu;
+    }
+
+    private void OpenScreenshots()
+    {
+        if (_busy || !Directory.Exists(_paths.Instance(Pack.Slug))) return;
+        try
+        {
+            var screenshots = Path.Combine(_paths.Instance(Pack.Slug), "screenshots");
+            Directory.CreateDirectory(screenshots); OpenDirectory(screenshots);
+        }
+        catch (Exception ex) { SetNotice("No se pudieron abrir las capturas", GetFriendlyError(ex), "Error"); }
+    }
+
+    private async void Repair_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || _checkingManifest || !Directory.Exists(_paths.Instance(Pack.Slug))) return;
+        var dialog = new RepairDialog(Pack.Name) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        if (_previewMode) { SetNotice("Vista de prueba", "Las operaciones del juego están desactivadas en esta vista.", "Gold"); return; }
+        SetBusy(true, "Comprobando archivos");
+        var success = false;
+        string? error = null;
+        try
+        {
+            var pack = Pack;
+            var initialInstall = string.IsNullOrEmpty(Installed(pack));
+            var manifest = await _manifestUpdater.ReadManifestAsync(pack, _lifetime.Token);
+            await _manifestUpdater.RepairAsync(pack, manifest, dialog.Prompt.RemoveThirdPartyMods.IsChecked == true,
+                new Progress<(string status, double value)>(SetProgress), _lifetime.Token);
+            if (initialInstall) await MinecraftService.InitializeNewInstanceAsync(_paths.Instance(pack.Slug), _lifetime.Token);
+            _configService.SaveInstalled(pack.Slug, manifest.Version);
+            _config.MinecraftVersion = manifest.MinecraftVersion; _config.FabricLoaderVersion = manifest.FabricLoaderVersion;
+            _manifestCheck = new PackUpdateCheck(manifest, [], [], []);
+            _editionChecks[_config.SelectedEdition] = _manifestCheck; _manifestError = null;
+            _configService.Save(_config); success = true;
+        }
+        catch (Exception ex) { error = ex is InvalidDataException ? ex.Message : GetFriendlyError(ex); _log.Error("Pack repair failed", ex); }
+        finally
+        {
+            if (!_closed)
+            {
+                SetBusy(false, ""); _operationFailed = !success; Refresh();
+                SetNotice(success ? "Modpack reparado" : "No se pudo reparar el modpack", error ?? "", success ? "Success" : "Error", animate: true);
             }
         }
     }
@@ -402,6 +485,7 @@ public partial class MainWindow : Window
         InvalidDataException => "Los archivos recibidos no son válidos. Vuelve a intentarlo; si persiste, contacta con el equipo de Destiny.",
         Win32Exception => "Windows no pudo iniciar Minecraft. Comprueba que Java y los archivos de la instancia estén disponibles e inténtalo de nuevo.",
         FormatException => "Revisa los argumentos de Java en Ajustes.",
+        PackRecoveryException => ex.Message,
         IOException => "No se pudieron guardar los archivos. Comprueba el espacio disponible y que la carpeta no esté en uso.",
         _ => "Revisa la conexión y la carpeta de instalación en Ajustes antes de volver a intentarlo."
     };
@@ -422,6 +506,7 @@ public partial class MainWindow : Window
         Progress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         Progress.IsIndeterminate = true;
         OpenInstallationFolderButton.IsEnabled = !busy && Directory.Exists(_paths.Instance(Pack.Slug));
+        GameOptionsButton.IsEnabled = !busy && !_checkingManifest;
         if (busy)
         {
             PrimaryLabel.Text = "PREPARANDO…";

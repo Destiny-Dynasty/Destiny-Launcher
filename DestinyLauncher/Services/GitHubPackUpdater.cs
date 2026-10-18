@@ -139,10 +139,71 @@ public sealed class GitHubPackUpdater
         return new PackUpdateCheck(manifest, changed, removed, preservedOverrides.ToArray());
     }
 
-    public async Task ApplyAsync(PackDefinition pack, PackUpdateCheck update, IProgress<(string status, double value)>? progress, CancellationToken token)
+    // Explicit repair restores official content even when it was edited/deleted locally.
+    // Normal launches and incremental updates never select this policy.
+    public async Task<PackUpdateCheck> RepairAsync(PackDefinition pack, PackManifest manifest, bool removeThirdPartyMods,
+        IProgress<(string status, double value)>? progress, CancellationToken token)
+    {
+        ValidateManifest(pack, manifest);
+        if (manifest.Files.Count == 0 || (removeThirdPartyMods && !manifest.Files.Any(f => NormalizePath(f.Path).StartsWith("mods/", StringComparison.OrdinalIgnoreCase))))
+            throw new InvalidDataException("El manifiesto no contiene archivos oficiales suficientes para reparar el modpack.");
+        var instance = _paths.Instance(pack.Slug);
+        var changed = new List<PackManifestFile>();
+        var desired = manifest.Files.Select(f => NormalizePath(f.Path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var removed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var preserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var completed = 0;
+        foreach (var file in manifest.Files)
+        {
+            token.ThrowIfCancellationRequested();
+            var target = RepairTargetPath(instance, file.Path);
+            if (!File.Exists(target) || new FileInfo(target).Length != file.Size ||
+                !(await HashFileAsync(target, token)).Equals(file.Sha256, StringComparison.OrdinalIgnoreCase)) changed.Add(file);
+            progress?.Report(($"Comprobando archivos · {++completed}/{manifest.Files.Count}", .02 + .38 * completed / manifest.Files.Count));
+        }
+        var oldState = ReadState(RepairTargetPath(instance, StateFileName, metadata: true), pack.Slug);
+        foreach (var file in oldState?.Files ?? [])
+        {
+            token.ThrowIfCancellationRequested();
+            var relative = NormalizePath(file.Path);
+            if (desired.Contains(relative)) continue;
+            var target = RepairTargetPath(instance, relative);
+            if (!File.Exists(target)) continue;
+            if ((await HashFileAsync(target, token)).Equals(file.Sha256, StringComparison.OrdinalIgnoreCase)) removed.Add(relative);
+            else preserved.Add(relative);
+        }
+        if (removeThirdPartyMods)
+        {
+            var mods = RepairTargetPath(instance, "mods/.repair-scan");
+            mods = Path.GetDirectoryName(mods)!;
+            if (Directory.Exists(mods))
+                foreach (var file in Directory.EnumerateFiles(mods, "*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = false, AttributesToSkip = FileAttributes.ReparsePoint }))
+                {
+                    token.ThrowIfCancellationRequested();
+                    var relative = NormalizePath(Path.GetRelativePath(instance, file));
+                    _ = RepairTargetPath(instance, relative);
+                    if (!desired.Contains(relative)) { removed.Add(relative); preserved.Remove(relative); }
+                }
+        }
+        var repair = new PackUpdateCheck(manifest, changed, removed.ToArray(), preserved.ToArray());
+        await ApplyCoreAsync(pack, repair, progress, token, repair: true);
+        return repair;
+    }
+
+    public Task ApplyAsync(PackDefinition pack, PackUpdateCheck update, IProgress<(string status, double value)>? progress, CancellationToken token)
+        => ApplyCoreAsync(pack, update, progress, token, repair: false);
+
+    private async Task ApplyCoreAsync(PackDefinition pack, PackUpdateCheck update, IProgress<(string status, double value)>? progress, CancellationToken token, bool repair)
     {
         ValidateManifest(pack, update.Manifest);
         var instance = _paths.Instance(pack.Slug);
+        string Target(string relative) => repair ? RepairTargetPath(instance, relative) : SafeTargetPath(instance, relative);
+        if (repair)
+        {
+            _ = RepairTargetPath(instance, StateFileName, metadata: true);
+            _ = RepairTargetPath(instance, StateFileName + ".next", metadata: true);
+            _ = RepairTargetPath(instance, "destiny-installed.json", metadata: true);
+        }
         Directory.CreateDirectory(instance);
         var workspace = Path.Combine(_paths.Temp, $"manifest-{pack.Slug}-{Guid.NewGuid():N}");
         var downloads = Path.Combine(workspace, "downloads");
@@ -152,6 +213,7 @@ public sealed class GitHubPackUpdater
         var oldStatePath = Path.Combine(instance, StateFileName);
         var oldState = ReadState(oldStatePath, pack.Slug);
         var oldManaged = (oldState?.Files ?? []).Select(x => NormalizePath(x.Path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var keepBackups = false;
 
         try
         {
@@ -163,8 +225,8 @@ public sealed class GitHubPackUpdater
                 token.ThrowIfCancellationRequested();
                 ValidateFile(file);
                 progress?.Report(($"Descargando modpack · {downloadedBytes}/{totalDownloadBytes} bytes", .4 + .48 * downloadNumber / Math.Max(1, update.ChangedFiles.Count)));
-                var target = SafeTargetPath(instance, NormalizePath(file.Path));
-                if (File.Exists(target) && !oldManaged.Contains(NormalizePath(file.Path)))
+                var target = Target(NormalizePath(file.Path));
+                if (!repair && File.Exists(target) && !oldManaged.Contains(NormalizePath(file.Path)))
                     throw new IOException($"El archivo «{file.Path}» ya existe y no pertenece al launcher. Se conservó sin cambios.");
 
                 var staged = SafeTargetPath(downloads, NormalizePath(file.Path));
@@ -214,7 +276,7 @@ public sealed class GitHubPackUpdater
                 foreach (var relative in affected)
                 {
                     token.ThrowIfCancellationRequested();
-                    var target = SafeTargetPath(instance, relative);
+                    var target = Target(relative);
                     var backup = SafeTargetPath(backups, relative);
                     var existed = File.Exists(target);
                     if (existed)
@@ -228,7 +290,7 @@ public sealed class GitHubPackUpdater
                 foreach (var file in update.ChangedFiles)
                 {
                     var relative = NormalizePath(file.Path);
-                    var target = SafeTargetPath(instance, relative);
+                    var target = Target(relative);
                     var staged = SafeTargetPath(downloads, relative);
                     Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                     File.Copy(staged, target, true);
@@ -236,7 +298,7 @@ public sealed class GitHubPackUpdater
 
                 foreach (var relative in update.RemovedFiles)
                 {
-                    var target = SafeTargetPath(instance, relative);
+                    var target = Target(relative);
                     if (File.Exists(target)) File.Delete(target);
                 }
 
@@ -254,23 +316,34 @@ public sealed class GitHubPackUpdater
                 await File.WriteAllTextAsync(newStatePath, JsonSerializer.Serialize(nextState, _json), token);
                 File.Copy(newStatePath, oldStatePath + ".next", true);
                 File.Move(oldStatePath + ".next", oldStatePath, true);
-                progress?.Report(($"Modpack actualizado · {update.Manifest.Version}", 1));
-                _log.Info($"Manifest applied: {pack.Slug} {update.Manifest.Version}; downloaded={update.ChangedFiles.Count}, removed={update.RemovedFiles.Count}");
             }
-            catch
+            catch (Exception original)
             {
+                var failures = new List<Exception>();
                 foreach (var item in backedUp.AsEnumerable().Reverse())
                 {
-                    var target = SafeTargetPath(instance, item.relative);
-                    if (item.existed)
+                    try
                     {
-                        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                        if (File.Exists(item.backup)) File.Copy(item.backup, target, true);
+                        var target = Target(item.relative);
+                        if (item.existed)
+                        {
+                            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                            if (File.Exists(item.backup)) File.Copy(item.backup, target, true);
+                        }
+                        else if (File.Exists(target)) File.Delete(target);
                     }
-                    else if (File.Exists(target)) File.Delete(target);
+                    catch (Exception restoreError) { failures.Add(restoreError); }
+                }
+                if (failures.Count > 0)
+                {
+                    keepBackups = true;
+                    throw new PackRecoveryException(backups, new AggregateException([original, .. failures]));
                 }
                 throw;
             }
+            // The file transaction is committed; notification/log failures cannot roll it back.
+            progress?.Report(($"Modpack actualizado · {update.Manifest.Version}", 1));
+            _log.Info($"Manifest applied: {pack.Slug} {update.Manifest.Version}; downloaded={update.ChangedFiles.Count}, removed={update.RemovedFiles.Count}");
         }
         catch (Exception ex)
         {
@@ -279,7 +352,7 @@ public sealed class GitHubPackUpdater
         }
         finally
         {
-            try { if (Directory.Exists(workspace)) Directory.Delete(workspace, true); } catch (Exception ex) { _log.Error("Could not clean manifest staging files", ex); }
+            try { if (!keepBackups && Directory.Exists(workspace)) Directory.Delete(workspace, true); } catch (Exception ex) { _log.Error("Could not clean manifest staging files", ex); }
         }
     }
 
@@ -300,13 +373,37 @@ public sealed class GitHubPackUpdater
 
     private static void ValidateFile(PackManifestFile file)
     {
-        var path = NormalizePath(file.Path);
-        var parts = path.Split('/');
-        if (parts.Length < 2 || !ManagedRoots.Contains(parts[0]) || parts.Any(x => x is "" or "." or "..") || path.Contains(':') || path.Contains('\0'))
-            throw new InvalidDataException($"Ruta no permitida en el manifiesto: «{file.Path}».");
-        if (ProtectedRoots.Contains(parts[0]) || ProtectedFiles.Contains(path)) throw new InvalidDataException($"El manifiesto intenta reemplazar datos personales: «{file.Path}».");
+        ValidateManagedPath(file.Path);
         if (file.Size < 0 || !Regex.IsMatch(file.Sha256 ?? "", "^[a-fA-F0-9]{64}$")) throw new InvalidDataException($"Tamaño o SHA-256 incorrecto para «{file.Path}».");
         if (!Uri.TryCreate(file.Url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps) throw new InvalidDataException($"URL HTTPS inválida para «{file.Path}».");
+    }
+
+    private static void ValidateManagedPath(string relative)
+    {
+        var path = NormalizePath(relative);
+        var parts = path.Split('/');
+        if (parts.Length < 2 || !ManagedRoots.Contains(parts[0]) || parts.Any(x => x is "" or "." or "..") || path.Contains(':') || path.Contains('\0'))
+            throw new InvalidDataException($"Ruta no permitida en el manifiesto: «{relative}».");
+        if (ProtectedRoots.Contains(parts[0]) || ProtectedFiles.Contains(path)) throw new InvalidDataException($"El manifiesto intenta reemplazar datos personales: «{relative}».");
+    }
+
+    private static string RepairTargetPath(string root, string relative, bool metadata = false)
+    {
+        if (!metadata) ValidateManagedPath(relative);
+        var target = SafeTargetPath(root, relative);
+        var normalizedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+        for (var current = target; ; current = Path.GetDirectoryName(current)!)
+        {
+            try
+            {
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidDataException("La reparación no puede atravesar enlaces de archivos o carpetas. Revisa la ruta de instalación.");
+            }
+            catch (FileNotFoundException) { }
+            catch (DirectoryNotFoundException) { }
+            if (current.Equals(normalizedRoot, StringComparison.OrdinalIgnoreCase)) break;
+        }
+        return target;
     }
 
     private static string NormalizePath(string path) => path.Replace('\\', '/');
@@ -337,3 +434,6 @@ public sealed class GitHubPackUpdater
         return Convert.ToHexString(hash);
     }
 }
+
+public sealed class PackRecoveryException(string directory, Exception inner)
+    : IOException($"No se pudo restaurar algún archivo. La copia de recuperación se conserva en: {directory}", inner);

@@ -56,7 +56,7 @@ internal static class JavaArguments
         }
     }
 
-    private static string Quote(string value)
+    internal static string Quote(string value)
     {
         if (value.Length > 0 && !value.Any(c => char.IsWhiteSpace(c) || c == '"')) return value;
         var result = new StringBuilder("\"");

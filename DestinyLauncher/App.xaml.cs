@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.IO;
 using DestinyLauncher.Models;
+using DestinyLauncher.Services;
 
 namespace DestinyLauncher;
 
@@ -49,13 +50,8 @@ public partial class App : Application
             return;
         }
 
-        string? dataRoot = null;
-        if (e.Args.Length == 2 && e.Args[0].Equals("--data-root", StringComparison.OrdinalIgnoreCase))
-        {
-            if (!Path.IsPathFullyQualified(e.Args[1])) { Shutdown(2); return; }
-            dataRoot = Path.GetFullPath(e.Args[1]);
-        }
-        MainWindow = new MainWindow(dataRoot: dataRoot);
+        if (!LauncherStartupOptions.TryParse(e.Args, out var startup)) { Shutdown(2); return; }
+        MainWindow = new MainWindow(dataRoot: startup.DataRoot, initialEdition: startup.Edition);
         MainWindow.Show();
     }
 

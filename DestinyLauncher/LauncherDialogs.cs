@@ -25,7 +25,7 @@ internal static class DialogChrome
         owner.ShowInTaskbar = false;
         owner.UseLayoutRounding = true;
         WindowChrome.SetWindowChrome(owner, new WindowChrome { CaptionHeight = 48, ResizeBorderThickness = new Thickness(0), GlassFrameThickness = new Thickness(0), UseAeroCaptionButtons = false });
-        var frame = new Border { BorderBrush = (Brush)Application.Current.FindResource("GoldDim"), BorderThickness = new Thickness(1) };
+        var frame = new Border { Background = owner.Background, BorderBrush = (Brush)Application.Current.FindResource("GoldDim"), BorderThickness = new Thickness(1) };
         var layout = new Grid();
         layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(48) });
         layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });

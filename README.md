@@ -70,6 +70,16 @@ La ventana tiene tamaño fijo: 1000 × 620 unidades de WPF, respetando el escala
 
 En reposo se omiten el pie de estado y las frases bajo Jugar/Instalar. Las operaciones, avisos y errores mantienen sus mensajes. Instalación ofrece «Abrir carpeta» para la variante seleccionada cuando la ruta existe, sin crear directorios. Ajustes conserva etiquetas y validaciones; la barra rápida de RAM incluye divisiones discretas cada 2 GB, sin números ni puntos adicionales, permite pasos de 1 GB y mantiene la entrada manual del rango admitido por el backend. Los iconos de Inicio, Instalación, Ajustes y carpeta usan los SVG de `Assets`, convertidos a geometrías WPF con el color heredado del control.
 
+## Opciones del juego y reparación
+
+El botón de menú junto a Jugar ofrece ajustes, acceso directo en el escritorio, capturas, consulta manual de actualizaciones y reparación. Las capturas corresponden a `screenshots` de la variante seleccionada; se crea esa carpeta si aún no existe. El acceso directo abre el launcher con la variante elegida (`--edition Destiny` o `--edition DestinyLite`); si la sesión usa `--data-root`, se conserva también esa raíz para mantener su aislamiento. No inicia Minecraft automáticamente.
+
+La instalación se reconoce por su `destiny-installed.json`. Si desaparece la instancia o ese marcador, figura como no instalada. Borrar mods conservando el marcador no cambia su versión ni dispara una reparación automática. La revisión al abrir continúa siendo únicamente de versiones.
+
+«Reparar modpack» requiere confirmación y consulta el manifiesto actual de la variante. Verifica todos sus archivos oficiales y restaura los que falten o estén modificados, incluidas las configuraciones distribuidas con el modpack. Por defecto conserva archivos externos. La casilla «Borrar mods de terceros» empieza desmarcada; al activarla, elimina únicamente archivos dentro de `mods` que no figuren en el manifiesto, incluidos los de subcarpetas. Mundos, capturas, `options.txt`, servidores y otros datos personales no se incluyen en la reparación. Los archivos oficiales obsoletos se retiran si permanecen sin modificar.
+
+La reparación prepara todas las descargas y comprueba tamaño y SHA-256 antes de reemplazar o borrar archivos. Si falla su aplicación, intenta restaurar los archivos anteriores; si alguna restauración también falla, conserva las copias y muestra su ruta. No recorre enlaces a carpetas externas ni permite reparar archivos oficiales a través de enlaces. Una lista oficial vacía no autoriza la limpieza de mods. La operación no inicia Minecraft.
+
 ## Durante la partida
 
 La ventana permanece visible mientras comprueba, descarga y prepara los archivos. Solo se oculta después de iniciar correctamente el proceso de Minecraft. El launcher conserva el identificador de ese proceso y espera su cierre con `Process.WaitForExitAsync`, mediante una notificación del sistema operativo, sin sondeos ni un hilo bloqueado. Al terminar el juego, vuelve a mostrar y activar la ventana en su tamaño normal; un código de salida distinto de cero se muestra como error y permite reintentar. Un fallo anterior al arranque mantiene la ventana visible.

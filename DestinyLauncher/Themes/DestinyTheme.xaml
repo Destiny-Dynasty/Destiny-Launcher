@@ -59,6 +59,20 @@
         <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="Padding" Value="12,10"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><Border x:Name="Surface" Background="Transparent" Padding="{TemplateBinding Padding}" CornerRadius="4"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter TargetName="Surface" Property="Background" Value="#352E20"/><Setter Property="Foreground" Value="{StaticResource GoldBright}"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#29271F"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
     </Style>
+    <Style x:Key="GameMenuItem" TargetType="MenuItem">
+        <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="MinHeight" Value="38"/><Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="MenuItem"><Border x:Name="Surface" Background="Transparent" Padding="14,10" CornerRadius="4"><ContentPresenter ContentSource="Header" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Surface" Property="Background" Value="#302B20"/><Setter Property="Foreground" Value="{StaticResource GoldBright}"/></Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value=".4"/><Setter Property="Cursor" Value="Arrow"/></Trigger>
+        </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="RepairCheckBox" TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="Cursor" Value="Hand"/><Setter Property="MinHeight" Value="30"/><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}"/>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox"><Grid Background="Transparent"><Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Border x:Name="Box" Width="18" Height="18" Background="{StaticResource Canvas}" BorderBrush="{StaticResource GoldDim}" BorderThickness="1" CornerRadius="3"><Path x:Name="Check" Data="M2 6l3 3 7-7" Margin="2" Stroke="{StaticResource GoldBright}" StrokeThickness="1.6" Visibility="Collapsed"/></Border>
+            <ContentPresenter Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center"/>
+        </Grid><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Check" Property="Visibility" Value="Visible"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource GoldBright}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style x:Key="SocialButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
         <Setter Property="Width" Value="38"/><Setter Property="Height" Value="36"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,1"/>
         <Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="Foreground" Value="{StaticResource Muted}"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/>

@@ -319,6 +319,21 @@ internal static class Program
         var settingsBounds = Get<Button>(preview, "SettingsNav").TransformToAncestor(preview).TransformBounds(new Rect(Get<Button>(preview, "SettingsNav").RenderSize));
         var socialBounds = Get<StackPanel>(preview, "SocialLinks").TransformToAncestor(preview).TransformBounds(new Rect(Get<StackPanel>(preview, "SocialLinks").RenderSize));
         Assert(socialBounds.Top >= settingsBounds.Bottom && socialBounds.Bottom <= preview.ActualHeight, "Social links fit below navigation at the smallest audited height");
+        preview.SetAuditState("1.4.7", Check("1.4.7", false));
+        var repairMenu = Get<Button>(preview, "GameOptionsButton").ContextMenu.Items.OfType<MenuItem>().Single(i => Equals(i.Header, "Reparar modpack"));
+        var installedBeforeDialog = Directory.GetFiles(preview.DataPaths.Instances, "*", SearchOption.AllDirectories).ToDictionary(f => f, File.ReadAllBytes);
+        var closeRepair = preview.Dispatcher.BeginInvoke(new Action(async () =>
+        {
+            var dialog = Application.Current.Windows.OfType<RepairDialog>().Single(w => w.IsVisible);
+            Assert(dialog.Owner == preview && dialog.Prompt.RemoveThirdPartyMods.IsChecked == false, "Real repair modal belongs to the launcher and cleanup starts unchecked");
+            await Task.Delay(300);
+            Capture(dialog, "repair-dialog");
+            Descendants<Button>(dialog).Single(b => Equals(b.Content, "Cancelar")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        }));
+        repairMenu.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        await closeRepair;
+        Assert(!Application.Current.Windows.OfType<RepairDialog>().Any(w => w.IsVisible) && installedBeforeDialog.All(f => File.ReadAllBytes(f.Key).SequenceEqual(f.Value)),
+            "Cancel closes the real modal without changing any installed files");
         preview.Close();
 
         var profile = new ProfileDialog("MMMMMMMMMMMMMMMM") { ShowActivated = false, Left = -32000, Top = -32000, WindowStartupLocation = WindowStartupLocation.Manual };
@@ -373,6 +388,31 @@ internal static class Program
             Assert(footer.Visibility == Visibility.Collapsed, $"Idle state '{installed}' has no bottom microcopy");
         }
         CaptureContent("home");
+        var gameOptions = Get<Button>(window, "GameOptionsButton");
+        var gameMenu = gameOptions.ContextMenu;
+        var gameItems = gameMenu.Items.OfType<MenuItem>().ToArray();
+        Assert(gameItems.Select(i => i.Header?.ToString()).SequenceEqual(new[] { "Ajustes del juego", "Crear acceso directo en el escritorio", "Ver capturas", "Buscar actualizaciones", "Reparar modpack" }),
+            "Game menu includes settings, shortcut, screenshots, manual update check and repair");
+        gameMenu.Measure(new Size(300, 340)); gameMenu.Arrange(new Rect(0, 0, 300, gameMenu.DesiredSize.Height)); gameMenu.UpdateLayout();
+        var gameBitmap = new RenderTargetBitmap(300, (int)Math.Ceiling(gameMenu.ActualHeight), 96, 96, PixelFormats.Pbgra32); gameBitmap.Render(gameMenu);
+        var gameEncoder = new PngBitmapEncoder(); gameEncoder.Frames.Add(BitmapFrame.Create(gameBitmap));
+        using (var file = File.Create(Path.Combine(_output, "game-menu.png"))) gameEncoder.Save(file);
+        gameItems[0].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Assert(Get<ContentControl>(window, "SettingsPageHost").Visibility == Visibility.Visible, "Game settings menu opens the existing configuration view");
+        Get<Button>(window, "HomeNav").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        PackEdition? shortcutEdition = null; window.CreateDesktopShortcut = edition => { shortcutEdition = edition; return "fixture.lnk"; };
+        gameItems[1].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Assert(shortcutEdition == PackEdition.Destiny, "Shortcut action selects the current pack without creating a desktop file during UI tests");
+        var screenshotFolders = new List<string>(); window.OpenDirectory = screenshotFolders.Add;
+        gameItems[2].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Assert(screenshotFolders.Single() == Path.Combine(window.DataPaths.Instance("destiny"), "screenshots") && Directory.Exists(screenshotFolders.Single()),
+            "Screenshots opens the selected instance's screenshots directory using the injected Explorer action");
+        window.SetAuditProgress("Comprobando archivos · 1/2", .2);
+        Assert(!gameOptions.IsEnabled, "Busy game operations disable the contextual menu"); window.EndAuditProgress();
+        window.SetAuditState("", edition: PackEdition.DestinyLite);
+        Assert(!Get<Button>(window, "GameOptionsButton").ContextMenu.Items.OfType<MenuItem>().Single(i => Equals(i.Header, "Reparar modpack")).IsEnabled,
+            "Repair stays disabled when the selected edition has no instance directory");
+        window.SetAuditState("1.4.7", Check("1.4.7", false)); Layout();
         window.SetAuditState("1.4.7", Check("1.4.7", true));
         Assert(Text(window, "PrimaryLabel") == "JUGAR", "A same-version modpack stays playable despite local file differences");
         window.SetAuditState("1.4.7", checking: true); Layout();
@@ -512,6 +552,56 @@ internal static class Program
         await AuditAccountsEditor();
         AuditAccountPersistence();
         await AuditSkinCache();
+        AuditRepairPrompt();
+        AuditShortcut();
+    }
+
+    private static void AuditRepairPrompt()
+    {
+        var prompt = new RepairPrompt("Destiny Lite");
+        var dialog = new Window(); DialogChrome.Create(dialog, "Reparar modpack", prompt, 470, 260);
+        var root = (FrameworkElement)dialog.Content; dialog.Content = null;
+        System.Windows.Documents.TextElement.SetForeground(root, (Brush)Application.Current.FindResource("Ink"));
+        root.Measure(new Size(470, 260)); root.Arrange(new Rect(0, 0, 470, 260)); root.UpdateLayout();
+        Assert(prompt.RemoveThirdPartyMods.IsChecked == false, "Repair confirmation never selects third-party deletion by default");
+        var confirmed = false; var cancelled = false;
+        prompt.Confirmed += () => confirmed = true; prompt.Cancelled += () => cancelled = true;
+        var buttons = Descendants<Button>(prompt).ToArray();
+        Assert(buttons.Single(b => Equals(b.Content, "Cancelar")).IsDefault && !buttons.Single(b => Equals(b.Content, "Reparar")).IsDefault,
+            "Enter defaults to cancel instead of implicitly authorizing a repair");
+        buttons.Single(b => Equals(b.Content, "Cancelar")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(cancelled && !confirmed, "Cancel does not authorize repair or cleanup");
+        prompt.RemoveThirdPartyMods.IsChecked = true;
+        buttons.Single(b => Equals(b.Content, "Reparar")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(confirmed && prompt.RemoveThirdPartyMods.IsChecked == true, "Explicit repair accepts the user's cleanup checkbox choice");
+        var bitmap = new RenderTargetBitmap(470, 260, 96, 96, PixelFormats.Pbgra32); bitmap.Render(root);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using (var file = File.Create(Path.Combine(_output, "repair-confirmation.png"))) encoder.Save(file);
+        dialog.Close();
+    }
+
+    private static void AuditShortcut()
+    {
+        var directory = Path.Combine(_output, "shortcut-fixture", Guid.NewGuid().ToString("N"));
+        var dataRoot = Path.Combine(directory, "isolated data") + Path.DirectorySeparatorChar;
+        var shortcut = GameShortcutService.Create(directory, Environment.ProcessPath!, PackEdition.DestinyLite, dataRoot);
+        object? shell = null; object? link = null;
+        try
+        {
+            shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;
+            link = ((dynamic)shell).CreateShortcut(shortcut);
+            var target = (string)((dynamic)link).TargetPath; var arguments = (string)((dynamic)link).Arguments;
+            Assert(File.Exists(shortcut) && target.Equals(Environment.ProcessPath, StringComparison.OrdinalIgnoreCase), "Real Windows shortcut is created only in the isolated fixture and targets the launcher executable");
+            Assert(LauncherStartupOptions.TryParse(JavaArguments.Parse(arguments), out var options) && options.Edition == PackEdition.DestinyLite && options.DataRoot == Path.GetFullPath(dataRoot),
+                "Shortcut arguments preserve the selected variant and isolated data directory, including spaces and trailing backslash");
+            Assert(!LauncherStartupOptions.TryParse(["--edition", "42"], out _) && !LauncherStartupOptions.TryParse(["--data-root", "relative"], out _),
+                "Invalid startup editions and relative data roots are rejected");
+        }
+        finally
+        {
+            if (link is not null) Marshal.FinalReleaseComObject(link);
+            if (shell is not null) Marshal.FinalReleaseComObject(shell);
+        }
     }
 
     private static async Task AuditAccountsEditor()
