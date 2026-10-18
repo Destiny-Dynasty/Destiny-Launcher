@@ -409,10 +409,10 @@ internal static class Program
         var slider = Descendants<Slider>(settings).Single();
         var ram = Descendants<TextBox>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "RamInput");
         Assert(slider.Minimum == 2 && slider.Maximum == 16 && slider.SmallChange == 1 && slider.LargeChange == 2, "RAM slider retains one-GB precision and two-GB major steps");
-        Assert(Descendants<RamTickBar>(slider).Count() == 1, "RAM scale displays major dot markers and numeric labels");
+        Assert(Descendants<RamTickBar>(slider).Count() == 1 && slider.Height == 40, "RAM rail has integrated divisions without an extra scale row");
         var track = (Track)slider.Template.FindName("PART_Track", slider);
         var ticks = Descendants<RamTickBar>(slider).Single();
-        Assert(Math.Abs(ticks.ActualWidth - (track.ActualWidth - track.Thumb.ActualWidth)) < .1, "RAM dots align exactly with the thumb center range");
+        Assert(Math.Abs(ticks.ActualWidth - (track.ActualWidth - track.Thumb.ActualWidth)) < .1, "RAM divisions align exactly with the thumb center range");
         slider.Value = 10;
         Assert(ram.Text == "10", "RAM slider updates the numeric badge");
         Slider.IncreaseSmall.Execute(null, slider);

@@ -1,10 +1,9 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 
 namespace DestinyLauncher;
 
-/// <summary>Major RAM markers share the slider thumb's exact horizontal range.</summary>
+/// <summary>Subtle divisions on the rail, aligned with the slider thumb's range.</summary>
 public sealed class RamTickBar : FrameworkElement
 {
     public static readonly DependencyProperty ValueProperty = DependencyProperty.Register(nameof(Value), typeof(double), typeof(RamTickBar),
@@ -13,17 +12,16 @@ public sealed class RamTickBar : FrameworkElement
     protected override void OnRender(DrawingContext drawing)
     {
         base.OnRender(drawing);
-        var muted = (Brush)FindResource("Muted");
-        var gold = (Brush)FindResource("Gold");
-        var inactive = (Brush)FindResource("GoldDim");
-        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-        for (var value = 2; value <= 16; value += 2)
+        var pen = new Pen((Brush)FindResource("Ink"), 1);
+        var selectedX = ActualWidth * (Value - 2) / 14;
+        drawing.PushOpacity(.45);
+        for (var value = 4; value < 16; value += 2)
         {
             var x = ActualWidth * (value - 2) / 14;
-            drawing.DrawEllipse(value <= Value ? gold : inactive, null, new Point(x, 4), 2, 2);
-            var label = new FormattedText(value.ToString(CultureInfo.InvariantCulture), CultureInfo.CurrentUICulture,
-                FlowDirection.LeftToRight, new Typeface("Segoe UI"), 10, muted, dpi);
-            drawing.DrawText(label, new Point(x - label.Width / 2, 11));
+            // Do not paint over the thumb when a division coincides with its position.
+            if (Math.Abs(x - selectedX) < 9) continue;
+            drawing.DrawLine(pen, new Point(x, ActualHeight / 2 - 3), new Point(x, ActualHeight / 2 + 3));
         }
+        drawing.Pop();
     }
 }
