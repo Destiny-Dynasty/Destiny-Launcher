@@ -22,6 +22,10 @@ Los argumentos de Java se guardan en `JavaArguments` y se aplican a ambas varian
 
 El launcher descarga Minecraft Java 1.20.1, instala Fabric y después sincroniza los archivos del modpack desde su manifiesto. En cada instalación consulta Fabric Meta para elegir el loader estable más reciente compatible con Minecraft 1.20.1; si el servicio no está disponible, utiliza la versión fijada en el manifiesto o la configuración.
 
+La opción «Entrar al servidor» de Ajustes controla la conexión automática a Destiny Dynasty al iniciar Minecraft. Está activada por defecto para conservar el comportamiento anterior. Desactivarla omite los argumentos de conexión y permite iniciar el juego en su menú; se guarda junto al resto de ajustes.
+
+En la primera instalación de cada variante se crea `options.txt` con `lang:es_es` (español de España), únicamente si todavía no existe ese archivo. Las instalaciones existentes, los reintentos con preferencias ya guardadas y las actualizaciones no sobrescriben el idioma ni otras opciones del jugador.
+
 ## Versiones, perfiles y skins
 
 Al abrir el launcher o cambiar de variante solo se lee `destiny-installed.json` y se consulta el manifiesto remoto. No se enumeran ni se calculan hashes de los mods. Jugar vuelve a consultar la versión; si coincide, inicia la instalación existente sin reparar el modpack. Los archivos básicos de Minecraft y las bibliotecas de Fabric siguen preparándose al lanzar el juego.

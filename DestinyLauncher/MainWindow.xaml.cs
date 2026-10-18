@@ -303,6 +303,8 @@ public partial class MainWindow : Window
                 {
                     manifestCheck = await _manifestUpdater.PlanUpdateAsync(pack, manifestCheck.Manifest, progress, _lifetime.Token);
                     await _manifestUpdater.ApplyAsync(pack, manifestCheck, progress, _lifetime.Token);
+                    if (string.IsNullOrWhiteSpace(installedVersion))
+                        await MinecraftService.InitializeNewInstanceAsync(_paths.Instance(pack.Slug), _lifetime.Token);
                     _configService.SaveInstalled(pack.Slug, manifestCheck.Manifest.Version);
                     // A completed update must not keep the old 'changes pending' presentation.
                     _manifestCheck = new PackUpdateCheck(manifestCheck.Manifest, [], [], manifestCheck.PreservedOverrides);

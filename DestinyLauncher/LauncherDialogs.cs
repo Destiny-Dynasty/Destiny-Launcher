@@ -119,12 +119,14 @@ public sealed class SettingsPage : UserControl
     private readonly Slider _ramSlider;
     private readonly TextBox _javaArguments;
     private readonly CheckBox _multiAccount;
+    private readonly CheckBox _autoJoin;
     private readonly string _installationFolderName;
     private readonly string _originalBaseDirectory;
     private bool _syncingRam;
     private bool _saved;
     public bool HasChanges => !_saved && (_installDirectory.Text != _originalBaseDirectory || _ramValue.Text != _source.RamGb.ToString()
-        || _javaArguments.Text != _source.JavaArguments || (_multiAccount.IsChecked == true) != _source.MultiAccountEnabled);
+        || _javaArguments.Text != _source.JavaArguments || (_multiAccount.IsChecked == true) != _source.MultiAccountEnabled
+        || (_autoJoin.IsChecked == true) != _source.AutoJoinServer);
     public Action? BackRequested { get; set; }
     public Func<LauncherConfig, Task>? SaveRequested { get; set; }
     internal void MarkSaved() => _saved = true;
@@ -143,11 +145,18 @@ public sealed class SettingsPage : UserControl
         heading.ColumnDefinitions.Add(new ColumnDefinition());
         heading.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         heading.Children.Add(new TextBlock { Text = "Ajustes", FontFamily = new FontFamily("Georgia"), FontSize = 28 });
+        var preferences = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var joinOption = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 24, 0) };
+        joinOption.Children.Add(new TextBlock { Text = "Entrar al servidor", Foreground = ProfileDialog.ResourceBrush("Muted"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
+        _autoJoin = new CheckBox { IsChecked = source.AutoJoinServer, Style = (Style)Application.Current.FindResource("AccountToggle") };
+        AutomationProperties.SetName(_autoJoin, "Entrar automáticamente al servidor"); AutomationProperties.SetAutomationId(_autoJoin, "AutoJoinServerToggle");
+        joinOption.Children.Add(_autoJoin); preferences.Children.Add(joinOption);
         var accountOption = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         accountOption.Children.Add(new TextBlock { Text = "Multicuentas", Foreground = ProfileDialog.ResourceBrush("Muted"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
         _multiAccount = new CheckBox { IsChecked = source.MultiAccountEnabled, Style = (Style)Application.Current.FindResource("AccountToggle") };
         AutomationProperties.SetName(_multiAccount, "Multicuentas"); AutomationProperties.SetAutomationId(_multiAccount, "MultiAccountToggle");
-        accountOption.Children.Add(_multiAccount); Grid.SetColumn(accountOption, 1); heading.Children.Add(accountOption);
+        accountOption.Children.Add(_multiAccount); preferences.Children.Add(accountOption);
+        Grid.SetColumn(preferences, 1); heading.Children.Add(preferences);
         layout.Children.Add(heading);
         var content = new StackPanel();
         var installation = Card();
@@ -248,7 +257,7 @@ public sealed class SettingsPage : UserControl
             try { JavaArguments.Parse(_javaArguments.Text); }
             catch (FormatException ex) { Error(ex.Message, _javaArguments); return; }
             var updated = new LauncherConfig { PlayerName = source.PlayerName, SelectedEdition = source.SelectedEdition, InstallDirectory = path,
-                MultiAccountEnabled = _multiAccount.IsChecked == true, Accounts = source.Accounts.ToList(),
+                MultiAccountEnabled = _multiAccount.IsChecked == true, Accounts = source.Accounts.ToList(), AutoJoinServer = _autoJoin.IsChecked == true,
                 RamGb = ram, JavaArguments = _javaArguments.Text, MinecraftVersion = source.MinecraftVersion, FabricLoaderVersion = source.FabricLoaderVersion, Destiny = source.Destiny, DestinyLite = source.DestinyLite };
             save.IsEnabled = false;
             try { if (SaveRequested is not null) await SaveRequested(updated); }

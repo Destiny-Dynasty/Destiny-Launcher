@@ -21,6 +21,7 @@ public sealed class LauncherConfig
     public const string DefaultJavaArguments = "-XX:+UseG1GC -XX:MaxGCPauseMillis=200";
     public string PlayerName { get; set; } = "";
     public bool MultiAccountEnabled { get; set; }
+    public bool AutoJoinServer { get; set; } = true;
     public List<string> Accounts { get; set; } = [];
     public static bool ValidPlayerName(string? name) => System.Text.RegularExpressions.Regex.IsMatch(name ?? "", "^[A-Za-z0-9_]{3,16}$");
     public void NormalizeAccounts()

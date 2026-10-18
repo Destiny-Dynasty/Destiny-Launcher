@@ -42,11 +42,29 @@ public sealed class MinecraftService
     {
         Session = MSession.CreateOfflineSession(config.PlayerName),
         MaximumRamMb = checked(config.RamGb * 1024),
-        ServerIp = "destinydynasty.tatnikhost.net",
+        ServerIp = config.AutoJoinServer ? "destinydynasty.tatnikhost.net" : null,
         // Explicitly replace CmlLib's extra tuning defaults. Mandatory profile/platform
         // arguments remain intact; empty user text deliberately means no extra JVM flags.
         ExtraJvmArguments = [new MArgument(JavaArguments.Parse(config.JavaArguments))]
     };
+
+    internal static async Task InitializeNewInstanceAsync(string instance, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var options = Path.Combine(instance, "options.txt");
+        // Never reset preferences in existing instances, including retries and updates.
+        if (File.Exists(options) || File.Exists(Path.Combine(instance, "destiny-installed.json"))) return;
+        Directory.CreateDirectory(instance);
+        var temporary = Path.Combine(instance, $".destiny-options-{Guid.NewGuid():N}.tmp");
+        try
+        {
+            await File.WriteAllTextAsync(temporary, "lang:es_es\n", new System.Text.UTF8Encoding(false), token);
+            token.ThrowIfCancellationRequested();
+            try { File.Move(temporary, options, overwrite: false); }
+            catch (IOException) when (File.Exists(options)) { } // Preserve an options file created meanwhile.
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
 
     internal static async Task<string> PrepareFabricAsync(MinecraftLauncher launcher, FabricInstaller installer, MinecraftPath instance,
         string minecraftVersion, string loaderVersion, IProgress<(string status, double value)> progress, CancellationToken token)

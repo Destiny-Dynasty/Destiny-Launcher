@@ -35,6 +35,33 @@ var launchOptions = MinecraftService.CreateLaunchOptions(defaults);
 Assert(launchOptions.ExtraJvmArguments.SelectMany(a => a.Values).SequenceEqual(new[] { "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200" }),
     "Launcher G1 defaults replace the library's experimental tuning flags");
 Assert(launchOptions.MaximumRamMb == 1024, "RAM setting still controls the normal maximum heap");
+Assert(launchOptions.ServerIp == "destinydynasty.tatnikhost.net", "Automatic server entry stays enabled by default for compatibility");
+var manualLaunch = MinecraftService.CreateLaunchOptions(new LauncherConfig { PlayerName = "Fixture", AutoJoinServer = false });
+Assert(string.IsNullOrEmpty(manualLaunch.ServerIp), "Disabling automatic entry omits the server from launch options");
+
+var freshInstance = Path.Combine(root, "spanish-first-install", Guid.NewGuid().ToString("N"));
+await MinecraftService.InitializeNewInstanceAsync(freshInstance, CancellationToken.None);
+var spanishOptions = Path.Combine(freshInstance, "options.txt");
+Assert(await File.ReadAllTextAsync(spanishOptions) == "lang:es_es\n", "First installation initializes vanilla language to Spanish (Spain)");
+Assert(!File.ReadAllBytes(spanishOptions).Take(3).SequenceEqual(new byte[] { 239, 187, 191 }), "Minecraft options use UTF-8 without a BOM");
+await File.WriteAllTextAsync(spanishOptions, "lang:fr_fr\ngamma:0.7\n");
+await MinecraftService.InitializeNewInstanceAsync(freshInstance, CancellationToken.None);
+Assert(await File.ReadAllTextAsync(spanishOptions) == "lang:fr_fr\ngamma:0.7\n", "Installation retries preserve a player's changed language and other settings");
+var installedInstance = Path.Combine(root, "spanish-existing-install", Guid.NewGuid().ToString("N")); Directory.CreateDirectory(installedInstance);
+await File.WriteAllTextAsync(Path.Combine(installedInstance, "destiny-installed.json"), "{}");
+await MinecraftService.InitializeNewInstanceAsync(installedInstance, CancellationToken.None);
+Assert(!File.Exists(Path.Combine(installedInstance, "options.txt")), "Existing installations never gain an options file from the new default");
+var liteInstance = freshInstance + "-Lite";
+await MinecraftService.InitializeNewInstanceAsync(liteInstance, CancellationToken.None);
+Assert(await File.ReadAllTextAsync(Path.Combine(liteInstance, "options.txt")) == "lang:es_es\n"
+    && (await File.ReadAllTextAsync(spanishOptions)).Contains("lang:fr_fr"), "Lite initializes its own language without changing Destiny preferences");
+using (var cancelledDefaults = new CancellationTokenSource())
+{
+    cancelledDefaults.Cancel();
+    var cancelledInstance = Path.Combine(root, "spanish-cancelled", Guid.NewGuid().ToString("N"));
+    try { await MinecraftService.InitializeNewInstanceAsync(cancelledInstance, cancelledDefaults.Token); throw new Exception("Cancellation ignored"); }
+    catch (OperationCanceledException) { Assert(!Directory.Exists(cancelledInstance), "Canceled installation defaults do not create instance data"); }
+}
 var quotedFlags = """-Ddestiny.path="C:\Game Folder\\" -Ddestiny.quote="a\"b" -Xmx128m""";
 var parsedFlags = JavaArguments.Parse(quotedFlags);
 Assert(parsedFlags.SequenceEqual(new[] { "-Ddestiny.path=C:\\Game Folder\\", "-Ddestiny.quote=a\"b", "-Xmx128m" }),
@@ -47,11 +74,12 @@ var configStore = new ConfigService(configPaths);
 var savedLocation = Path.Combine(root, "Existing Custom Instance");
 File.WriteAllText(configPaths.ConfigFile, JsonSerializer.Serialize(new { PlayerName = "Fixture", RamGb = 4, InstallDirectory = savedLocation }));
 var legacyConfig = configStore.Load();
-Assert(legacyConfig.InstallDirectory == savedLocation && legacyConfig.JavaArguments == LauncherConfig.DefaultJavaArguments,
+Assert(legacyConfig.InstallDirectory == savedLocation && legacyConfig.JavaArguments == LauncherConfig.DefaultJavaArguments && legacyConfig.AutoJoinServer,
     "Old configuration gains default JVM flags without moving or renaming its installation");
 legacyConfig.JavaArguments = quotedFlags;
+legacyConfig.AutoJoinServer = false;
 configStore.Save(legacyConfig);
-Assert(configStore.Load().JavaArguments == quotedFlags, "Custom flags round-trip through persisted settings");
+Assert(configStore.Load().JavaArguments == quotedFlags && !configStore.Load().AutoJoinServer, "Custom flags and disabled server entry round-trip through persisted settings");
 legacyConfig.JavaArguments = "";
 configStore.Save(legacyConfig);
 Assert(configStore.Load().JavaArguments == "", "Empty saved JVM flags remain intentionally empty");
@@ -122,6 +150,7 @@ if (File.Exists(java))
     javaOptions.JavaPath = java;
     using (var versionProcess = await LibraryTestLauncher(path, http).BuildProcessAsync(profile, javaOptions))
     {
+        Assert(versionProcess.StartInfo.Arguments.Contains("destinydynasty.tatnikhost.net"), "Enabled automatic entry reaches the actual game command line");
         JavaArguments.CorrectWindowsQuoting(versionProcess.StartInfo, javaOptions.ExtraJvmArguments.SelectMany(a => a.Values));
         Assert(!versionProcess.StartInfo.Arguments.Contains("-Xmx1024m"), "An explicit custom heap flag does not produce a conflicting duplicate");
         using var versionSession = MinecraftGameSession.Start(versionProcess);
@@ -132,6 +161,12 @@ if (File.Exists(java))
         Assert(output.Contains("destiny.path = C:\\Game Folder\\") && output.Contains("destiny.quote = a\"b"),
             "Real Java receives quoted custom properties exactly, without launching Minecraft");
     }
+
+    defaults.AutoJoinServer = false;
+    var menuOptions = MinecraftService.CreateLaunchOptions(defaults); menuOptions.JavaPath = java;
+    using (var menuProcess = await LibraryTestLauncher(path, http).BuildProcessAsync(profile, menuOptions))
+        Assert(!menuProcess.StartInfo.Arguments.Contains("destinydynasty.tatnikhost.net") && !menuProcess.StartInfo.Arguments.Contains("--server"),
+            "Disabled automatic entry removes server connection arguments from the actual game command line");
     var missingLoader = new Process { StartInfo = new ProcessStartInfo(java) { WorkingDirectory = root } };
     missingLoader.StartInfo.ArgumentList.Add("-cp");
     missingLoader.StartInfo.ArgumentList.Add(Path.Combine(root, "missing-fabric-loader.jar"));

@@ -408,6 +408,10 @@ internal static class Program
         Get<Button>(window, "SettingsNav").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Layout();
         var settings = (SettingsPage)Get<ContentControl>(window, "SettingsPageHost").Content;
         var multi = Descendants<CheckBox>(settings).Single(c => System.Windows.Automation.AutomationProperties.GetAutomationId(c) == "MultiAccountToggle");
+        var autoJoin = Descendants<CheckBox>(settings).Single(c => System.Windows.Automation.AutomationProperties.GetAutomationId(c) == "AutoJoinServerToggle");
+        Assert(autoJoin.IsChecked == true, "Settings expose enabled automatic server entry by default");
+        autoJoin.IsChecked = false;
+        Assert(settings.HasChanges, "Changing automatic server entry participates in unsaved settings tracking");
         Assert(multi.IsChecked == false && Get<Button>(window, "ProfileButton").ContextMenu is null, "Multicuentas is opt-in and leaves the single-profile control unchanged");
         var baseInput = Descendants<TextBox>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "InstallDirectoryInput");
         var javaInput = Descendants<TextBox>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "JavaArgumentsInput");
@@ -457,7 +461,8 @@ internal static class Program
         baseInput.Text = LauncherPaths.InstallationBaseDirectory(window.DataPaths.Instances);
         multi.IsChecked = true;
         save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        Assert(saved?.MultiAccountEnabled == true && saved.PlayerName == "Player_Destiny16", "Settings save the multicuentas preference without changing the active offline name");
+        Assert(saved?.MultiAccountEnabled == true && saved.PlayerName == "Player_Destiny16" && !saved.AutoJoinServer,
+            "Settings save multicuentas and disabled server entry without changing the active offline name");
         Layout(); CaptureContent("settings");
         foreach (var (width, height) in new[] { (820d, 560d), (760d, 500d), (680d, 480d) })
         {
