@@ -44,7 +44,10 @@ internal static class Program
                 using var key = RSA.Create(2048);
                 var version = Version.Parse(FileVersionInfo.GetVersionInfo(newSetup).ProductVersion!).ToString(3);
                 var url = $"https://github.com/{LauncherUpdateService.Repository}/releases/download/v{version}/DestinyLauncherSetup.exe";
-                var release = new LauncherRelease(1, version, "win-x64", url, payload.Length, Convert.ToHexString(SHA256.HashData(payload)));
+                var release = new LauncherRelease(1, version, "win-x64", url, payload.Length, Convert.ToHexString(SHA256.HashData(payload)),
+                    ["Una base compartida para Destiny, Lite y la futura variante Staff.",
+                     "Mods con releases fijas o actualizaciones independientes al jugar.",
+                     "Nueva ventana de actualización con novedades y descarga independiente."]);
                 var manifest = JsonSerializer.SerializeToUtf8Bytes(release);
                 var signature = key.SignData(manifest, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
                 var feed = JsonSerializer.SerializeToUtf8Bytes(new { draft = false, prerelease = false, tag_name = "v" + version, assets = new[] {
@@ -59,7 +62,7 @@ internal static class Program
                 var owner = new MainWindow(previewMode: true, dataRoot: installation.DataRoot) { Title = "Destiny Launcher · Prueba de actualización" };
                 ((TextBlock)owner.FindName("LauncherVersionText")).Text = "v1.1.0";
                 owner.Show();
-                var dialog = new UpdateDialog(service, checkedRelease, target) { Owner = owner };
+                var dialog = new UpdateDialog(service, checkedRelease, target);
                 dialog.Loaded += async (_, _) =>
                 {
                     await Task.Delay(500);
@@ -74,7 +77,7 @@ internal static class Program
                     }
                 };
                 File.WriteAllText(Path.Combine(root, "preview-ready.txt"), DateTime.UtcNow.ToString("O"));
-                dialog.ShowDialog();
+                dialog.ShowStandalone(owner);
                 owner.Close();
                 File.WriteAllText(Path.Combine(root, "preview-result.json"), JsonSerializer.Serialize(new { installerStarted = dialog.InstallerStarted, version, target }));
                 application.Shutdown();

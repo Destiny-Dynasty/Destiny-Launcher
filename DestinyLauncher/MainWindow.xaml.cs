@@ -128,8 +128,10 @@ public partial class MainWindow : Window
         var release = _pendingLauncherUpdate; _pendingLauncherUpdate = null; _updateDialogOpen = true;
         try
         {
-            var dialog = new UpdateDialog(_launcherUpdates!, release, AppContext.BaseDirectory) { Owner = this };
-            if (dialog.ShowDialog() == true && dialog.InstallerStarted) { _updateInstalling = true; Close(); }
+            var dialog = new UpdateDialog(_launcherUpdates!, release, AppContext.BaseDirectory);
+            dialog.ShowStandalone(this);
+            _updateInstalling = dialog.InstallerStarted;
+            Close(); // Cancel/X exits too; the update window is now the sole foreground UI.
         }
         finally { _updateDialogOpen = false; }
     }
@@ -433,9 +435,9 @@ public partial class MainWindow : Window
             {
                 _manifestCheck = manifestCheck;
                 _manifestError = null;
-                if (installedVersion != manifestCheck.Manifest.Version)
+                manifestCheck = await _manifestUpdater.PrepareForPlayAsync(pack, manifestCheck.Manifest, installedVersion, progress, _lifetime.Token);
+                if (installedVersion != manifestCheck.Manifest.Version || manifestCheck.HasChanges)
                 {
-                    manifestCheck = await _manifestUpdater.PlanUpdateAsync(pack, manifestCheck.Manifest, progress, _lifetime.Token);
                     await _manifestUpdater.ApplyAsync(pack, manifestCheck, progress, _lifetime.Token);
                     if (string.IsNullOrWhiteSpace(installedVersion))
                         await MinecraftService.InitializeNewInstanceAsync(_paths.Instance(pack.Slug), _lifetime.Token);

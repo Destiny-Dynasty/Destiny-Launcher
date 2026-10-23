@@ -17,6 +17,16 @@ public sealed class PackManifestFile
     public string Url { get; set; } = "";
     public long Size { get; set; }
     public string Sha256 { get; set; } = "";
+    [System.Text.Json.Serialization.JsonPropertyName("github")]
+    public GitHubModSource? GitHub { get; set; }
+}
+
+public sealed class GitHubModSource
+{
+    public string Repository { get; set; } = "";
+    public string Release { get; set; } = "latest";
+    public string Asset { get; set; } = "";
+    public string? Channel { get; set; }
 }
 
 public sealed class ManagedPackState
@@ -32,9 +42,11 @@ public sealed class ManagedPackFile
     public string Path { get; set; } = "";
     public long Size { get; set; }
     public string Sha256 { get; set; } = "";
+    public string Url { get; set; } = "";
+    public string SourceKey { get; set; } = "";
 }
 
-public sealed record PackUpdateCheck(PackManifest Manifest, IReadOnlyList<PackManifestFile> ChangedFiles, IReadOnlyList<string> RemovedFiles, IReadOnlyList<string> PreservedOverrides)
+public sealed record PackUpdateCheck(PackManifest Manifest, IReadOnlyList<PackManifestFile> ChangedFiles, IReadOnlyList<string> RemovedFiles, IReadOnlyList<string> PreservedOverrides, bool FloatingOnly = false)
 {
     public int TotalFiles => Manifest.Files.Count;
     public bool HasChanges => ChangedFiles.Count > 0 || RemovedFiles.Count > 0;

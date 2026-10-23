@@ -123,3 +123,7 @@ La primera prueba usa respuestas HTTP en memoria y datos temporales. `--live` co
 ## Distribución
 
 El instalador online y su proceso de publicación se mantienen en `installer/` y `tools/`. Este repositorio es público y sirve también para alojar los paquetes en GitHub Releases. El setup descarga `DestinyLauncher-win-x64.zip` desde la última release pública; el archivo debe existir allí antes de distribuir el instalador.
+
+## Modpack compartido y mods propios
+
+Consulta [la guía de variantes](docs/MODPACK_VARIANTS.md) para componer Destiny/Lite/Staff desde una base y publicar mods propios con releases fijas o latest. El código privado de los mods no se distribuye con los JAR.

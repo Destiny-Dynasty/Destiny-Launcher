@@ -62,6 +62,21 @@ public sealed class GitHubPackUpdater
 
     public async Task<PackUpdateCheck> PlanUpdateAsync(PackDefinition pack, PackManifest manifest,
         IProgress<(string status, double value)>? progress, CancellationToken token)
+        => await PlanUpdateCoreAsync(pack, manifest, progress, token, floatingOnly: false);
+
+    public async Task<PackUpdateCheck> PrepareForPlayAsync(PackDefinition pack, PackManifest manifest, string installedVersion,
+        IProgress<(string status, double value)>? progress, CancellationToken token)
+    {
+        ValidateManifest(pack, manifest);
+        var sameVersion = installedVersion == manifest.Version;
+        if (sameVersion && !manifest.Files.Any(GitHubModResolver.IsLatest)) return new PackUpdateCheck(manifest, [], [], []);
+        var state = ReadState(Path.Combine(_paths.Instance(pack.Slug), StateFileName), pack.Slug);
+        var resolved = await new GitHubModResolver(_paths, _log, _http).ResolveAsync(manifest, state?.Files ?? [], progress, token);
+        return await PlanUpdateCoreAsync(pack, resolved, progress, token, floatingOnly: sameVersion);
+    }
+
+    private async Task<PackUpdateCheck> PlanUpdateCoreAsync(PackDefinition pack, PackManifest manifest,
+        IProgress<(string status, double value)>? progress, CancellationToken token, bool floatingOnly)
     {
         ValidateManifest(pack, manifest);
         var statePath = Path.Combine(_paths.Instance(pack.Slug), StateFileName);
@@ -69,7 +84,7 @@ public sealed class GitHubPackUpdater
         var localFiles = local?.Files.ToDictionary(x => NormalizePath(x.Path), StringComparer.OrdinalIgnoreCase)
                          ?? new Dictionary<string, ManagedPackFile>(StringComparer.OrdinalIgnoreCase);
         var overrides = (local?.Overrides ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var preservedOverrides = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var preservedOverrides = new HashSet<string>(floatingOnly ? overrides : [], StringComparer.OrdinalIgnoreCase);
         var changed = new List<PackManifestFile>();
         var completed = 0;
         var candidates = manifest.Files.Where(file => !localFiles.TryGetValue(NormalizePath(file.Path), out var baseline) ||
@@ -78,6 +93,11 @@ public sealed class GitHubPackUpdater
         {
             token.ThrowIfCancellationRequested();
             var normalized = NormalizePath(file.Path);
+            if (floatingOnly && !GitHubModResolver.IsLatest(file))
+            {
+                if (overrides.Contains(normalized)) preservedOverrides.Add(normalized);
+                continue;
+            }
             // Only upstream changes need inspection. An unchanged upstream entry is not a
             // reason to repair, hash or reinstall a player's edited/deleted local file.
             if (localFiles.TryGetValue(normalized, out var baseline) && baseline.Size == file.Size &&
@@ -125,6 +145,7 @@ public sealed class GitHubPackUpdater
         var removed = new List<string>();
         foreach (var (path, tracked) in localFiles.Where(x => !desired.Contains(x.Key)))
         {
+            if (floatingOnly) continue;
             var target = SafeTargetPath(_paths.Instance(pack.Slug), path);
             if (!File.Exists(target)) continue;
             var localHash = await HashFileAsync(target, token);
@@ -136,7 +157,7 @@ public sealed class GitHubPackUpdater
             else removed.Add(path);
         }
         _log.Info($"Manifest checked: {pack.Slug} {manifest.Version}; changed={changed.Count}, removed={removed.Count}, preserved={preservedOverrides.Count}");
-        return new PackUpdateCheck(manifest, changed, removed, preservedOverrides.ToArray());
+        return new PackUpdateCheck(manifest, changed, removed, preservedOverrides.ToArray(), floatingOnly);
     }
 
     // Explicit repair restores official content even when it was edited/deleted locally.
@@ -145,6 +166,8 @@ public sealed class GitHubPackUpdater
         IProgress<(string status, double value)>? progress, CancellationToken token)
     {
         ValidateManifest(pack, manifest);
+        var installed = ReadState(Path.Combine(_paths.Instance(pack.Slug), StateFileName), pack.Slug);
+        manifest = await new GitHubModResolver(_paths, _log, _http).ResolveAsync(manifest, installed?.Files ?? [], progress, token);
         if (manifest.Files.Count == 0 || (removeThirdPartyMods && !manifest.Files.Any(f => NormalizePath(f.Path).StartsWith("mods/", StringComparison.OrdinalIgnoreCase))))
             throw new InvalidDataException("El manifiesto no contiene archivos oficiales suficientes para reparar el modpack.");
         var instance = _paths.Instance(pack.Slug);
@@ -197,7 +220,12 @@ public sealed class GitHubPackUpdater
     {
         ValidateManifest(pack, update.Manifest);
         var instance = _paths.Instance(pack.Slug);
-        string Target(string relative) => repair ? RepairTargetPath(instance, relative) : SafeTargetPath(instance, relative);
+        string Target(string relative)
+        {
+            var target = repair ? RepairTargetPath(instance, relative) : SafeTargetPath(instance, relative);
+            InstallationDataService.RejectLinks(target);
+            return target;
+        }
         if (repair)
         {
             _ = RepairTargetPath(instance, StateFileName, metadata: true);
@@ -211,6 +239,8 @@ public sealed class GitHubPackUpdater
         Directory.CreateDirectory(downloads);
         Directory.CreateDirectory(backups);
         var oldStatePath = Path.Combine(instance, StateFileName);
+        InstallationDataService.RejectLinks(oldStatePath);
+        InstallationDataService.RejectLinks(oldStatePath + ".next");
         var oldState = ReadState(oldStatePath, pack.Slug);
         var oldManaged = (oldState?.Files ?? []).Select(x => NormalizePath(x.Path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var keepBackups = false;
@@ -220,11 +250,12 @@ public sealed class GitHubPackUpdater
             var downloadNumber = 0;
             long downloadedBytes = 0;
             var totalDownloadBytes = update.ChangedFiles.Sum(file => file.Size);
+            var downloadLabel = update.FloatingOnly ? "Descargando mods" : "Descargando modpack";
             foreach (var file in update.ChangedFiles)
             {
                 token.ThrowIfCancellationRequested();
                 ValidateFile(file);
-                progress?.Report(($"Descargando modpack · {downloadedBytes}/{totalDownloadBytes} bytes", .4 + .48 * downloadNumber / Math.Max(1, update.ChangedFiles.Count)));
+                progress?.Report(($"{downloadLabel} · {downloadedBytes}/{totalDownloadBytes} bytes", .4 + .48 * downloadNumber / Math.Max(1, update.ChangedFiles.Count)));
                 var target = Target(NormalizePath(file.Path));
                 if (!repair && File.Exists(target) && !oldManaged.Contains(NormalizePath(file.Path)))
                     throw new IOException($"El archivo «{file.Path}» ya existe y no pertenece al launcher. Se conservó sin cambios.");
@@ -253,7 +284,7 @@ public sealed class GitHubPackUpdater
                         await output.WriteAsync(buffer.AsMemory(0, count), token);
                         if (Environment.TickCount64 - lastProgress >= 120)
                         {
-                            progress?.Report(($"Descargando modpack · {downloadedBytes + received}/{totalDownloadBytes} bytes", .4 + .48 * (downloadNumber + (file.Size > 0 ? (double)received / file.Size : 0)) / Math.Max(1, update.ChangedFiles.Count)));
+                            progress?.Report(($"{downloadLabel} · {downloadedBytes + received}/{totalDownloadBytes} bytes", .4 + .48 * (downloadNumber + (file.Size > 0 ? (double)received / file.Size : 0)) / Math.Max(1, update.ChangedFiles.Count)));
                             lastProgress = Environment.TickCount64;
                         }
                     }
@@ -265,7 +296,7 @@ public sealed class GitHubPackUpdater
 
                 downloadNumber++;
                 downloadedBytes += file.Size;
-                progress?.Report(($"Descargando modpack · {downloadedBytes}/{totalDownloadBytes} bytes", .4 + .48 * downloadNumber / Math.Max(1, update.ChangedFiles.Count)));
+                progress?.Report(($"{downloadLabel} · {downloadedBytes}/{totalDownloadBytes} bytes", .4 + .48 * downloadNumber / Math.Max(1, update.ChangedFiles.Count)));
             }
 
             var affected = update.Manifest.Files.Select(x => NormalizePath(x.Path)).Where(x => update.ChangedFiles.Any(f => NormalizePath(f.Path).Equals(x, StringComparison.OrdinalIgnoreCase)))
@@ -302,15 +333,21 @@ public sealed class GitHubPackUpdater
                     if (File.Exists(target)) File.Delete(target);
                 }
 
+                var nextFiles = update.Manifest.Files.Select(x => new ManagedPackFile
+                {
+                    Path = NormalizePath(x.Path), Size = x.Size, Sha256 = x.Sha256.ToLowerInvariant(), Url = x.Url, SourceKey = GitHubModResolver.SourceKey(x)
+                }).ToList();
+                if (update.FloatingOnly && oldState is not null)
+                {
+                    var floating = update.Manifest.Files.Where(GitHubModResolver.IsLatest).Select(f => NormalizePath(f.Path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    nextFiles = oldState.Files.Where(f => !floating.Contains(f.Path)).Concat(nextFiles.Where(f => floating.Contains(f.Path))).ToList();
+                }
                 var nextState = new ManagedPackState
                 {
                     PackId = pack.Slug,
                     Version = update.Manifest.Version,
                     Overrides = update.PreservedOverrides.ToList(),
-                    Files = update.Manifest.Files.Select(x => new ManagedPackFile
-                    {
-                        Path = NormalizePath(x.Path), Size = x.Size, Sha256 = x.Sha256.ToLowerInvariant()
-                    }).ToList()
+                    Files = nextFiles
                 };
                 var newStatePath = Path.Combine(workspace, StateFileName);
                 await File.WriteAllTextAsync(newStatePath, JsonSerializer.Serialize(nextState, _json), token);
@@ -358,7 +395,7 @@ public sealed class GitHubPackUpdater
 
     private void ValidateManifest(PackDefinition pack, PackManifest manifest)
     {
-        if (manifest.SchemaVersion != 1) throw new InvalidDataException($"Versión de manifiesto no compatible: {manifest.SchemaVersion}.");
+        if (manifest.SchemaVersion is not (1 or 2)) throw new InvalidDataException($"Versión de manifiesto no compatible: {manifest.SchemaVersion}.");
         if (!manifest.PackId.Equals(pack.Slug, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("El manifiesto pertenece a otra edición del modpack.");
         if (string.IsNullOrWhiteSpace(manifest.Version) || manifest.Version.Length > 64) throw new InvalidDataException("El manifiesto no contiene una versión válida.");
         if (string.IsNullOrWhiteSpace(manifest.MinecraftVersion) || string.IsNullOrWhiteSpace(manifest.FabricLoaderVersion)) throw new InvalidDataException("Faltan las versiones de Minecraft o Fabric en el manifiesto.");
@@ -368,6 +405,7 @@ public sealed class GitHubPackUpdater
         foreach (var file in manifest.Files)
         {
             ValidateFile(file);
+            if (file.GitHub is not null && manifest.SchemaVersion < 2) throw new InvalidDataException("Los mods latest requieren un manifiesto de versión 2.");
             if (!paths.Add(NormalizePath(file.Path))) throw new InvalidDataException($"El manifiesto repite la ruta «{file.Path}».");
         }
     }
@@ -375,6 +413,7 @@ public sealed class GitHubPackUpdater
     private static void ValidateFile(PackManifestFile file)
     {
         ValidateManagedPath(file.Path);
+        if (file.GitHub is not null) GitHubModResolver.Validate(file);
         if (file.Size < 0 || !Regex.IsMatch(file.Sha256 ?? "", "^[a-fA-F0-9]{64}$")) throw new InvalidDataException($"Tamaño o SHA-256 incorrecto para «{file.Path}».");
         if (!Uri.TryCreate(file.Url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps) throw new InvalidDataException($"URL HTTPS inválida para «{file.Path}».");
     }

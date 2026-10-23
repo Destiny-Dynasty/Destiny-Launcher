@@ -107,6 +107,13 @@ var release = new LauncherRelease(1, "9.0.0", "win-x64", "https://github.com/Des
 var bytes = JsonSerializer.SerializeToUtf8Bytes(release);
 var signature = key.SignData(bytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
 Check(LauncherUpdateService.VerifyManifest(bytes, signature, publicKey) == release, "Release metadata requires a valid project-key signature");
+var withNotes = release with { Changelog = ["Nueva ventana de actualización.", "Descarga independiente del launcher."] };
+var notesBytes = JsonSerializer.SerializeToUtf8Bytes(withNotes);
+var notesSignature = key.SignData(notesBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+Check(LauncherUpdateService.VerifyManifest(notesBytes, notesSignature, publicKey).Changelog!.SequenceEqual(withNotes.Changelog!), "Changelog travels inside the authenticated release metadata");
+Reject(() => LauncherUpdateService.VerifyManifest(JsonSerializer.SerializeToUtf8Bytes(withNotes with { Changelog = ["Alterado"] }), notesSignature, publicKey), "Editing signed changelog invalidates its signature");
+var tooLong = JsonSerializer.SerializeToUtf8Bytes(release with { Changelog = [new string('x', 241)] });
+Reject(() => LauncherUpdateService.VerifyManifest(tooLong, key.SignData(tooLong, HashAlgorithmName.SHA256, RSASignaturePadding.Pss), publicKey), "Oversized changelog entries are rejected");
 var modified = bytes.ToArray(); modified[5] ^= 1;
 Reject(() => LauncherUpdateService.VerifyManifest(modified, signature, publicKey), "Tampered release metadata is rejected");
 using var wrong = RSA.Create(2048);

@@ -1,0 +1,19 @@
+name: Validate shared modpack variants
+on:
+  push:
+    paths: ['base/**', 'variants/**', 'extras/**', 'overrides/**', 'channels/**', 'tools/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Test composition and release policies
+        shell: pwsh
+        run: ./tools/Test-PackVariants.ps1 -OutputDirectory "$env:RUNNER_TEMP/variant-tests"
+      - name: Validate enabled production variants
+        shell: pwsh
+        run: |
+          ./tools/New-PackVariants.ps1 -BaseManifestPath base/manifest.json -DefinitionsDirectory variants -ContentDirectory . -ReleaseBaseUrl https://github.com/Destiny-Dynasty/Modpack/releases/download/validation -OutputDirectory "$env:RUNNER_TEMP/compiled-variants"

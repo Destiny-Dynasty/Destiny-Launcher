@@ -6,6 +6,17 @@ using System.Text.Json;
 using DestinyLauncher.Models;
 using DestinyLauncher.Services;
 
+if (args.FirstOrDefault() == "--floating-only")
+{
+    await FloatingModsAudit.Run(Path.GetFullPath(args[1]));
+    return 0;
+}
+if (args.FirstOrDefault() == "--live-github-mod")
+{
+    await FloatingModsAudit.Live(Path.GetFullPath(args[1]));
+    return 0;
+}
+
 var tempRoot = Path.Combine(Path.GetTempPath(), $"destiny-pack-smoke-{Guid.NewGuid():N}");
 try
 {
@@ -86,7 +97,7 @@ try
     fixture.LiteUnavailable = true;
     await Reject<HttpRequestException>(() => updater.CheckAsync(lite, null, token));
     Require(!Directory.Exists(paths.Instance(lite.Slug)), "An unpublished Lite feed must not create an empty installation.");
-    Require(fixture.LastManifestUri?.AbsoluteUri == "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack-Lite/main/manifests/destiny-lite.json", "Lite must use its independent repository.");
+    Require(fixture.LastManifestUri?.AbsoluteUri == "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack/main/manifests/destiny-lite.json", "Lite must use the unified repository.");
     fixture.LiteUnavailable = false;
     var liteCheck = await updater.CheckAsync(lite, null, token);
     Require(liteCheck.Manifest.PackId == "destiny-lite" && liteCheck.ChangedFiles.Count == 2, "The future Lite feed must use the existing manifest contract.");

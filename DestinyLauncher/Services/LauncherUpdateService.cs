@@ -8,7 +8,7 @@ using System.Text.Json;
 
 namespace DestinyLauncher.Services;
 
-internal sealed record LauncherRelease(int Schema, string Version, string Platform, string InstallerUrl, long Size, string Sha256);
+internal sealed record LauncherRelease(int Schema, string Version, string Platform, string InstallerUrl, long Size, string Sha256, string[]? Changelog = null);
 
 internal sealed class LauncherUpdateService : IDisposable
 {
@@ -19,6 +19,7 @@ internal sealed class LauncherUpdateService : IDisposable
     private readonly string _cache;
     private readonly Version _current;
     private readonly string _currentExecutable;
+    internal Version CurrentVersion => _current;
     internal static string PublicKey()
     {
         using var stream = typeof(LauncherUpdateService).Assembly.GetManifestResourceStream("DestinyLauncher.Assets.Signing.launcher-update-public.pem")!;
@@ -66,6 +67,8 @@ internal sealed class LauncherUpdateService : IDisposable
         if (release.Schema != 1 || release.Platform != "win-x64" || !Version.TryParse(release.Version, out _)
             || release.Size is < 1 or > 536870912 || release.Sha256 is null || !System.Text.RegularExpressions.Regex.IsMatch(release.Sha256, "^[A-Fa-f0-9]{64}$"))
             throw new InvalidDataException("Manifiesto de actualización inválido.");
+        if (release.Changelog is { } notes && (notes.Length > 8 || notes.Any(note => string.IsNullOrWhiteSpace(note) || note.Length > 240 || note.Any(char.IsControl))))
+            throw new InvalidDataException("Las notas de actualización no son válidas.");
         return release;
     }
     internal async Task<string> DownloadAsync(LauncherRelease release, IProgress<double> progress, CancellationToken token)

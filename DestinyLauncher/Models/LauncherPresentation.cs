@@ -35,9 +35,9 @@ internal sealed record LauncherPresentation(string Action, string State, string 
 
     internal static string ProgressStatus(string status)
     {
-        var match = Regex.Match(status, @"^Descargando modpack · (\d+)/(\d+) bytes$");
-        if (!match.Success || !long.TryParse(match.Groups[1].Value, out var received) || !long.TryParse(match.Groups[2].Value, out var total)) return status;
+        var match = Regex.Match(status, @"^(Descargando (?:modpack|mods)) · (\d+)/(\d+) bytes$");
+        if (!match.Success || !long.TryParse(match.Groups[2].Value, out var received) || !long.TryParse(match.Groups[3].Value, out var total)) return status;
         static string Size(long bytes) => bytes >= 1_048_576 ? $"{bytes / 1_048_576d:0.#} MB" : $"{bytes / 1024d:0.#} KB";
-        return $"Descargando modpack · {Size(received)} de {Size(total)}";
+        return $"{match.Groups[1].Value} · {Size(received)} de {Size(total)}";
     }
 }

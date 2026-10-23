@@ -12,5 +12,7 @@
     <Compile Include="../../DestinyLauncher/Services/AppLogger.cs" Link="AppLogger.cs" />
     <Compile Include="../../DestinyLauncher/Services/GitHubPackUpdater.cs" Link="GitHubPackUpdater.cs" />
     <Compile Include="../../DestinyLauncher/Services/LauncherPaths.cs" Link="LauncherPaths.cs" />
+    <Compile Include="../../DestinyLauncher/Services/GitHubModResolver.cs" Link="GitHubModResolver.cs" />
+    <Compile Include="../../DestinyLauncher/Services/InstallationDataService.cs" Link="InstallationDataService.cs" />
   </ItemGroup>
 </Project>

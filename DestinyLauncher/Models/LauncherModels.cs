@@ -7,14 +7,18 @@ public enum GameWindowMode { Windowed, Maximized, Fullscreen }
 public sealed class PackDefinition
 {
     public const string DefaultDestinyManifestUrl = "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack/main/manifests/destiny.json";
-    public const string DefaultDestinyLiteManifestUrl = "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack-Lite/main/manifests/destiny-lite.json";
+    public const string DefaultDestinyLiteManifestUrl = "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack/main/manifests/destiny-lite.json";
 
     public string Name { get; init; } = "Destiny";
     public string Slug { get; init; } = "destiny";
     [JsonIgnore]
-    public string ManifestUrl => Slug.Equals("destiny-lite", StringComparison.OrdinalIgnoreCase)
-        ? DefaultDestinyLiteManifestUrl
-        : DefaultDestinyManifestUrl;
+    public string ManifestUrl => Slug.ToLowerInvariant() switch
+    {
+        "destiny" => DefaultDestinyManifestUrl,
+        "destiny-lite" => DefaultDestinyLiteManifestUrl,
+        "destiny-staff" => "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack/main/manifests/destiny-staff.json",
+        _ => throw new InvalidOperationException("Variante de modpack desconocida.")
+    };
     public string Version { get; set; } = "0.1.0";
     public int JavaVersion { get; set; } = 21;
 }

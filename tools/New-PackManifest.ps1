@@ -1,7 +1,7 @@
 [CmdletBinding(DefaultParameterSetName = 'Release')]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('destiny', 'destiny-lite')]
+    [ValidateSet('destiny', 'destiny-lite', 'destiny-staff')]
     [string]$PackId,
 
     [Parameter(Mandatory = $true)]
@@ -19,6 +19,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
 
+    [string]$PreviousManifestPath,
+    [string]$SourceOverridesPath,
+
     [string]$MinecraftVersion = '1.20.1',
     [string]$FabricLoaderVersion = '0.16.9',
     [ValidateRange(17,99)][int]$JavaVersion = 21
@@ -34,6 +37,29 @@ $manifestRoot = Join-Path $outRoot 'manifests'
 $manifestPath = Join-Path $manifestRoot "$PackId.json"
 $fileBaseUrl = if ($repositoryMode) { $RepositoryFilesBaseUrl.TrimEnd('/') } else { $ReleaseBaseUrl.TrimEnd('/') }
 
+$previousFiles = @{}
+if ($PreviousManifestPath) {
+    $previousManifest = Get-Content -LiteralPath $PreviousManifestPath -Raw | ConvertFrom-Json
+    foreach ($previousFile in $previousManifest.files) {
+        $previousFiles[$previousFile.path.Replace('\', '/')] = $previousFile
+    }
+}
+
+$sourceOverrides = @{}
+if ($SourceOverridesPath) {
+    $overrides = Get-Content -LiteralPath $SourceOverridesPath -Raw | ConvertFrom-Json
+    foreach ($property in $overrides.PSObject.Properties) {
+        $relative = $property.Name.Replace('\', '/')
+        $overrideUrl = if ($property.Value -is [string]) { $property.Value } else { $property.Value.url }
+        $overrideUri = $null
+        if (-not [System.Uri]::TryCreate($overrideUrl, [System.UriKind]::Absolute, [ref]$overrideUri) -or
+            $overrideUri.Scheme -ne [System.Uri]::UriSchemeHttps) {
+            throw "Source override for '$relative' must be an absolute HTTPS URL."
+        }
+        $sourceOverrides[$relative] = [ordered]@{ url = $overrideUrl; source = if ($property.Value -is [string]) { 'official' } else { $property.Value.source } }
+    }
+}
+
 function ConvertTo-GitHubReleaseAssetName([string]$Name) {
     # GitHub normalizes some release-asset filenames (diacritics, spaces,
     # parentheses, and apostrophes). Predict that normalization so manifest
@@ -42,6 +68,20 @@ function ConvertTo-GitHubReleaseAssetName([string]$Name) {
     $normalized = [regex]::Replace($normalized, '\p{Mn}', '')
     $normalized = [regex]::Replace($normalized, "[\s()']+", '.')
     return [regex]::Replace($normalized, '\.{2,}', '.')
+}
+
+function Add-FabricModId($Entry, $File) {
+    if ($Entry.path -notlike 'mods/*.jar') { return }
+    $zip = [IO.Compression.ZipFile]::OpenRead($File.FullName)
+    try {
+        $metadata = $zip.GetEntry('fabric.mod.json')
+        if ($metadata) {
+            if ($metadata.Length -gt 1048576) { throw 'Fabric metadata is unexpectedly large.' }
+            $reader = [IO.StreamReader]::new($metadata.Open())
+            try { $mod = $reader.ReadToEnd() | ConvertFrom-Json; if ($mod.id) { $Entry.modId = $mod.id } }
+            finally { $reader.Dispose() }
+        }
+    } finally { $zip.Dispose() }
 }
 
 if (Test-Path -LiteralPath $outRoot) {
@@ -72,6 +112,36 @@ foreach ($rootName in $managedRoots) {
     foreach ($sourceFile in Get-ChildItem -LiteralPath $sourceRoot -File -Recurse | Sort-Object FullName) {
         $relative = [System.IO.Path]::GetRelativePath($packRoot, $sourceFile.FullName).Replace('\', '/')
         $fileHash = (Get-FileHash -LiteralPath $sourceFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+
+        if ($sourceOverrides.ContainsKey($relative)) {
+            $entry = [ordered]@{
+                path = $relative
+                url = $sourceOverrides[$relative].url
+                size = [long]$sourceFile.Length
+                sha256 = $fileHash
+            }
+            if ($sourceOverrides[$relative].source) { $entry.source = $sourceOverrides[$relative].source }
+            Add-FabricModId $entry $sourceFile
+            $files.Add($entry)
+            continue
+        }
+
+        if ($previousFiles.ContainsKey($relative) -and
+            [long]$previousFiles[$relative].size -eq [long]$sourceFile.Length -and
+            $previousFiles[$relative].sha256 -eq $fileHash -and
+            $previousFiles[$relative].url) {
+            $entry = [ordered]@{
+                path = $relative
+                url = $previousFiles[$relative].url
+                size = [long]$sourceFile.Length
+                sha256 = $fileHash
+            }
+            if ($previousFiles[$relative].source) { $entry.source = $previousFiles[$relative].source }
+            Add-FabricModId $entry $sourceFile
+            $files.Add($entry)
+            continue
+        }
+
         if ($repositoryMode -and $sourceFile.Length -ge 100MB) {
             throw "GitHub blocks regular repository files at 100 MiB; use Release mode or another file host for '$relative'."
         }
@@ -95,12 +165,14 @@ foreach ($rootName in $managedRoots) {
             Copy-Item -LiteralPath $sourceFile.FullName -Destination $assetPath
         }
         $downloadUrl = "$fileBaseUrl/$([System.Uri]::EscapeDataString($assetName))"
-        $files.Add([ordered]@{
+        $entry = [ordered]@{
             path = $relative
             url = $downloadUrl
             size = [long]$sourceFile.Length
             sha256 = $fileHash
-        })
+        }
+        Add-FabricModId $entry $sourceFile
+        $files.Add($entry)
     }
 }
 
@@ -119,3 +191,5 @@ $json = $manifest | ConvertTo-Json -Depth 8
 Write-Host "Manifest: $manifestPath"
 Write-Host "Payload directory: $assetRoot"
 Write-Host "Managed files: $($files.Count)"
+Write-Host "New release assets: $((Get-ChildItem -LiteralPath $assetRoot -File).Count)"
+Write-Host "External-source files: $($sourceOverrides.Count)"

@@ -5,6 +5,10 @@ on:
       version:
         description: 'Version X.Y.Z (must be newer than the installed release)'
         required: true
+      changelog:
+        description: 'Short changelog, one item per line (up to 8 items, 240 characters each)'
+        required: false
+        type: string
       sign_with_signpath:
         description: 'Request recognized Windows signatures (requires Foundation approval and configured account)'
         type: boolean
@@ -48,6 +52,8 @@ jobs:
           dotnet run --project tools/InstallationSmoke/InstallationSmoke.csproj -c Release -- artifacts/release-tests
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/release-ui --headless
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/release-update-ui --update-only
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           ./tools/Publish-Launcher.ps1 -OutputPath "$pwd/artifacts/release/payload" -Version $env:RELEASE_VERSION
           if ($env:WANT_SIGNPATH -eq 'true') {
@@ -112,6 +118,7 @@ jobs:
           UPDATE_KEY: ${{ secrets.LAUNCHER_UPDATE_PRIVATE_KEY }}
           GH_TOKEN: ${{ github.token }}
           PREVIEW: ${{ inputs.prerelease }}
+          CHANGELOG: ${{ inputs.changelog }}
         run: |
           $ErrorActionPreference='Stop'
           $folder="$pwd/artifacts/release/installers"
@@ -121,7 +128,8 @@ jobs:
           $key=Join-Path $env:RUNNER_TEMP 'destiny-update-key.pem'
           try {
             [IO.File]::WriteAllText($key,$env:UPDATE_KEY)
-            ./tools/New-LauncherReleaseManifest.ps1 -Version $env:RELEASE_VERSION -SetupPath "$folder/DestinyLauncherSetup.exe" -SigningKeyPath $key -OutputPath $folder
+            $notes = @($env:CHANGELOG -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+            ./tools/New-LauncherReleaseManifest.ps1 -Version $env:RELEASE_VERSION -SetupPath "$folder/DestinyLauncherSetup.exe" -SigningKeyPath $key -OutputPath $folder -Changelog $notes
           } finally { if(Test-Path -LiteralPath $key){Remove-Item -LiteralPath $key -Force} }
           $files=@(Get-ChildItem "$folder/*.exe", "$folder/launcher-update.*") + @(Get-Item artifacts/release/payload/DestinyLauncher-win-x64.zip)
           $files | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content "$folder/SHA256SUMS.txt"

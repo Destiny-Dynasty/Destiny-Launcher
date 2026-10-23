@@ -32,13 +32,20 @@ principal para partidas sin acceso al manifiesto.
    añadir también `DestinyLauncher-win-x64.zip` y `DestinyLauncherWebSetup.exe`.
 5. El launcher instalado consulta `/releases/latest`, autentica el manifiesto,
    descarga y verifica el instalador y, con la aceptación del jugador, se cierra,
-   actualiza en su directorio y vuelve a abrirse. Si el jugador elige Más tarde,
-   continúa normalmente. Los portables y las instalaciones experimentales no reciben
+   actualiza en su directorio y vuelve a abrirse. La actualización se muestra en su
+   propia ventana con el launcher oculto; Cancelar o X cierran la aplicación y, si hay
+   una descarga activa, esperan su cancelación y limpieza. Los portables y las instalaciones experimentales no reciben
    actualizaciones automáticas. No se publican contraseñas ni claves en las releases.
 
 La firma RSA del canal de actualización no es una firma Authenticode de Windows.
 SmartScreen puede seguir mostrando un editor desconocido hasta disponer de una
 firma de editor reconocida y reputación suficiente.
+
+El changelog se incluye en los metadatos firmados mediante
+`New-LauncherReleaseManifest.ps1 -Changelog @('Primer cambio.', 'Segundo cambio.')`.
+Admite hasta ocho notas de 240 caracteres. Los manifiestos antiguos siguen siendo
+compatibles y ocultan la sección si no contienen notas. El workflow de release ofrece
+el campo `changelog`, con una nota por línea.
 
 ## Prueba repetible aislada
 
@@ -48,7 +55,7 @@ ejecuta un instalador experimental real y reinicia el launcher instalado. No int
 URLs de prueba ni excepciones de firma en la aplicación distribuida.
 
 Las carpetas `artifacts/release-validation/update-demo/old` y `new` deben contener los
-instaladores 1.1.0 y 1.2.0 compilados con `-Experimental -Offline` y el mismo `-DataRoot`
+instaladores de origen y destino compilados con `-Experimental -Offline` y el mismo `-DataRoot`
 aislado. El programa solo acepta destinos dentro de `artifacts`; se puede repetir
 para volver a observar el aviso y el proceso completo. No compartir esta herramienta
 con los jugadores: distribuir el instalador oficial.

@@ -41,6 +41,7 @@ internal sealed class InstallationDataService
     {
         Register(directory);
         Register(directory + "-Lite");
+        Register(directory + "-Staff");
     }
     internal IReadOnlyList<string> PlanGameRemoval()
     {

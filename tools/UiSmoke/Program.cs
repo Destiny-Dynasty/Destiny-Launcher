@@ -14,7 +14,7 @@ using DestinyLauncher;
 using DestinyLauncher.Models;
 using DestinyLauncher.Services;
 
-internal static class Program
+internal static partial class Program
 {
     private static readonly List<string> Passed = [];
     private static readonly List<string> Skipped = [];
@@ -43,7 +43,8 @@ internal static class Program
         {
             try
             {
-                if (args.Contains("--uninstall-only")) await AuditUninstall();
+                if (args.Contains("--update-only")) await AuditUpdateWindow();
+                else if (args.Contains("--uninstall-only")) await AuditUninstall();
                 else if (args.Contains("--intro-only")) await AuditIntro();
                 else if (args.Contains("--video-only")) await AuditVideo();
                 else if (args.Contains("--headless")) await AuditHeadless();

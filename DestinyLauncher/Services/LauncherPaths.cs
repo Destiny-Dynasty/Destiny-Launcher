@@ -15,7 +15,13 @@ public sealed class LauncherPaths
         if (root is not null) InstallDirectory = Path.Combine(Root, "instances", "Destiny");
     }
     public void SetInstallDirectory(string? path) => InstallDirectory = Path.GetFullPath(string.IsNullOrWhiteSpace(path) ? DefaultInstallDirectory : Environment.ExpandEnvironmentVariables(path.Trim()));
-    public string Instance(string slug) => string.Equals(slug, "destiny-lite", StringComparison.OrdinalIgnoreCase) ? InstallDirectory + "-Lite" : InstallDirectory;
+    public string Instance(string slug) => slug.ToLowerInvariant() switch
+    {
+        "destiny" => InstallDirectory,
+        "destiny-lite" => InstallDirectory + "-Lite",
+        "destiny-staff" => InstallDirectory + "-Staff",
+        _ => throw new InvalidOperationException("Variante de modpack desconocida.")
+    };
     // Keep the persisted full path compatible with existing installations. Only its parent
     // is editable in Settings; the existing instance name is preserved, including custom names.
     public static string InstallationFolderName(string instanceDirectory) => Path.GetFileName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(Environment.ExpandEnvironmentVariables(instanceDirectory))));

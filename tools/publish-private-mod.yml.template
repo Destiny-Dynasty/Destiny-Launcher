@@ -1,0 +1,52 @@
+name: Publish compiled mod to public distribution
+on:
+  workflow_dispatch:
+    inputs:
+      mod_id:
+        description: 'Distribution channel, e.g. destiny-patches'
+        required: true
+      version:
+        description: 'Compiled mod version, e.g. 0.1.1'
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: public-mod-distribution
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build and test private mod
+        shell: pwsh
+        working-directory: source
+        run: |
+          ./gradlew.bat build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: Destiny-Dynasty/Modpack
+          path: distribution
+          persist-credentials: false
+      - name: Publish only the compiled JAR
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.MOD_DISTRIBUTION_TOKEN }}
+          MOD_ID: ${{ inputs.mod_id }}
+          MOD_VERSION: ${{ inputs.version }}
+        run: |
+          $ErrorActionPreference='Stop'
+          if (-not $env:GH_TOKEN) { throw 'Configure MOD_DISTRIBUTION_TOKEN with Contents write access to Modpack.' }
+          gh auth setup-git
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $jars=@(Get-ChildItem source/build/libs/*.jar | Where-Object { $_.Name -notmatch '-(sources|javadoc|dev)\.jar$' })
+          if ($jars.Count -ne 1) { throw 'Select exactly one compiled Fabric JAR for this project.' }
+          ./distribution/tools/Publish-ModRelease.ps1 -RepositoryRoot ./distribution -ModId $env:MOD_ID -Version $env:MOD_VERSION -JarPath $jars[0].FullName

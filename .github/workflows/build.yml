@@ -25,6 +25,11 @@ jobs:
           }
           dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/ci/ui --headless
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/ci/update-ui --update-only
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          dotnet run --project tools/PackUpdaterSmoke/PackUpdaterSmoke.csproj -c Release -- --floating-only artifacts/ci/floating-mods
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./tools/Test-PackVariants.ps1 -OutputDirectory artifacts/ci/variants
       - name: Publish installer experiment
         shell: pwsh
         run: |
