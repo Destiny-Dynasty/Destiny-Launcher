@@ -6,6 +6,35 @@ using System.Text.Json;
 using DestinyLauncher.Models;
 using DestinyLauncher.Services;
 
+if (args.FirstOrDefault() == "--live-manifests")
+{
+    var root = Path.GetFullPath(args[1]);
+    var paths = new LauncherPaths(root);
+    var updater = new GitHubPackUpdater(paths, new AppLogger(paths));
+    var results = new List<object>();
+    using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+    foreach (var id in new[] { "destiny", "destiny-lite", "destiny-staff" })
+    {
+        var pack = new PackDefinition { Slug = id };
+        var manifest = await updater.ReadManifestAsync(pack, timeout.Token);
+        if (manifest.Version != args[2] || manifest.SchemaVersion != 2)
+            throw new Exception($"Unexpected public release metadata: {id}");
+        var plan = await updater.PrepareForPlayAsync(pack, manifest, "", null, timeout.Token);
+        var realms = plan.Manifest.Files.Single(f => f.Path == "mods/destiny-realms.jar");
+        if (plan.ChangedFiles.Count != manifest.Files.Count || realms.GitHub?.Channel != "destiny-realms"
+            || realms.GitHub.Repository != "Destiny-Dynasty/Mod-Releases"
+            || plan.Manifest.Files.Any(f => f.Url.Contains("/Modpack/releases/download/") && !f.Url.Contains($"/modpack-{args[2]}/")))
+            throw new Exception($"Public install plan is inconsistent: {id}");
+        if (Directory.Exists(Path.Combine(paths.Instance(id), "mods")))
+            throw new Exception("Metadata audit must not install any game files.");
+        results.Add(new { id, manifest.Version, manifest.FabricLoaderVersion, files = plan.ChangedFiles.Count, realms.Url, installed = false });
+    }
+    Directory.CreateDirectory(root);
+    File.WriteAllText(Path.Combine(root, "public-manifests.json"), JsonSerializer.Serialize(results, new JsonSerializerOptions { WriteIndented = true }));
+    Console.WriteLine("PASS: actual launcher validates all public manifests and resolves Realms latest for all variants. No game files installed.");
+    return 0;
+}
+
 if (args.FirstOrDefault() == "--floating-only")
 {
     await FloatingModsAudit.Run(Path.GetFullPath(args[1]));

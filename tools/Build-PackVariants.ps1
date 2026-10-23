@@ -12,7 +12,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $RepositoryRoot).Path)
 $output = [IO.Path]::GetFullPath($OutputDirectory)
-if ($Version -notmatch '^\d+\.\d+\.\d+([.-][A-Za-z0-9.-]+)?$') { throw 'Use a version such as 1.4.9.' }
+if ($Version -notmatch '^20\d{2}\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-(alpha|beta|rc)(\.[1-9]\d*)?)?$') { throw 'Use YEAR.MAJOR.MINOR, optionally followed by -alpha, -beta or -rc (for example 2026.0.1-alpha).' }
 if ($Repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid repository.' }
 if ((Test-Path -LiteralPath $output) -and @(Get-ChildItem -LiteralPath $output -Force).Count) { throw 'OutputDirectory must be empty.' }
 New-Item -ItemType Directory -Force -Path $output | Out-Null

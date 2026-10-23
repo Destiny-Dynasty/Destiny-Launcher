@@ -16,7 +16,7 @@ $fixed=@{path='mods/pinned.jar';github=@{repository='Fixture/Custom';release='v1
 $latest=@{path='mods/live.jar';github=@{repository='Fixture/Custom';release='latest';asset='custom-*.jar'}}
 $normal=@{id='destiny';include=@($fixed,$latest)}
 $lite=@{id='destiny-lite';extends='destiny';exclude=@('mods/visual-*.jar');include=@('extras/lite/mods/performance.jar');overrides='overrides/lite'}
-$staff=@{id='destiny-staff';extends='destiny';include=@((Entry 'mods/staff.jar' 'staff' 'staff'))}
+$staff=@{id='destiny-staff';extends='destiny';fabricLoaderVersion='0.16.14';include=@((Entry 'mods/staff.jar' 'staff' 'staff'))}
 function Write-Definitions {Json "$root/definitions/destiny.json" $normal;Json "$root/definitions/destiny-lite.json" $lite;Json "$root/definitions/destiny-staff.json" $staff}
 Write-Definitions
 $zip=[IO.Compression.ZipFile]::Open("$root/content/extras/lite/mods/performance.jar",[IO.Compression.ZipArchiveMode]::Create)
@@ -34,10 +34,21 @@ Assert ($a.files.Count -eq 5 -and $b.files.Count -eq 5 -and $c.files.Count -eq 6
 Assert (-not ($b.files.path -contains 'mods/visual-1.0.jar') -and $b.files.path -contains 'mods/performance.jar') 'Lite combines wildcard exclusions and exclusive included mods'
 Assert (($b.files|Where-Object path -eq 'config/quality.txt').sha256 -ne ($a.files|Where-Object path -eq 'config/quality.txt').sha256) 'Variant-specific configuration overrides replace only that variant'
 Assert (($c.files|Where-Object path -eq 'mods/common.jar').url -eq ($a.files|Where-Object path -eq 'mods/common.jar').url) 'Shared base files reuse one URL across variants'
+Assert ($a.fabricLoaderVersion -eq '0.16.9' -and $b.fabricLoaderVersion -eq '0.16.9' -and $c.fabricLoaderVersion -eq '0.16.14') 'A variant can require a newer Fabric Loader without changing other variants'
+$staff.fabricLoaderVersion='bad';Write-Definitions;Reject 'invalid-loader-version';$staff.fabricLoaderVersion='0.16.14';Write-Definitions
 $pin=$a.files|Where-Object path -eq 'mods/pinned.jar';$live=$a.files|Where-Object path -eq 'mods/live.jar'
 Assert ($pin.url -like '*/v1/*' -and -not $pin.github -and $pin.sha256 -eq $hash) 'Pinned releases compile into fixed, checksummed asset URLs'
 Assert ($a.schemaVersion -eq 2 -and $live.github.release -eq 'latest' -and $live.url -like '*/v2/*') 'Latest keeps its runtime policy alongside a verifiable publishing snapshot'
 Assert ((Get-ChildItem "$root/valid/release-assets" -File).Count -eq 2) 'Only exclusive local files are uploaded; inherited and external assets are not duplicated'
+$calendarRepo="$root/calendar-repo"
+New-Item -ItemType Directory -Force -Path "$calendarRepo/base","$calendarRepo/variants"|Out-Null
+Copy-Item "$root/base.json" "$calendarRepo/base/manifest.json"
+Copy-Item "$root/definitions/*.json" "$calendarRepo/variants"
+foreach($calendarVersion in @('2026.0.1-alpha','2026.0.1-beta','2026.0.1')){
+    & (Join-Path $PSScriptRoot 'Build-PackVariants.ps1') -RepositoryRoot $calendarRepo -Version $calendarVersion -OutputDirectory "$root/calendar-$calendarVersion" -ContentDirectory "$root/content" -ReleaseMetadataPath "$root/releases.json"
+    $calendarManifests=@(Get-ChildItem "$root/calendar-$calendarVersion/manifests" -File|ForEach-Object {Get-Content $_.FullName -Raw|ConvertFrom-Json})
+    Assert ($calendarManifests.Count -eq 3 -and @($calendarManifests|Where-Object version -ne $calendarVersion).Count -eq 0) "All variants publish with calendar version $calendarVersion"
+}
 $staff.enabled=$false;Write-Definitions;Generate 'disabled'
 Assert (-not (Test-Path "$root/disabled/manifests/destiny-staff.json")) 'Disabled Staff is not published as a fake working pack'
 $staff.Remove('enabled');$normal.extends='destiny-staff';Write-Definitions;Reject 'cycle';$normal.Remove('extends')

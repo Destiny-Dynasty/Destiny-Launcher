@@ -2,20 +2,20 @@
 param(
     [Parameter(Mandatory)][string]$RepositoryRoot,
     [Parameter(Mandatory)][ValidatePattern('^[a-z0-9][a-z0-9-]{0,63}$')][string]$ModId,
-    [Parameter(Mandatory)][ValidatePattern('^[0-9A-Za-z][0-9A-Za-z.+_-]{0,99}$')][string]$Version,
+    [Parameter(Mandatory)][ValidatePattern('^\d+\.\d+\.\d+[0-9A-Za-z.+_-]*$')][string]$Version,
     [Parameter(Mandatory)][string]$JarPath
 )
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Resolve-Path -LiteralPath $RepositoryRoot).Path)
 $jar=Get-Item -LiteralPath $JarPath
-$repository='Destiny-Dynasty/Modpack'
+$repository='Destiny-Dynasty/Mod-Releases'
 if ($jar.Extension -ne '.jar' -or $jar.Name -match '-(sources|javadoc)\.jar$') { throw 'Only a compiled mod JAR may be published.' }
 $zip=[IO.Compression.ZipFile]::OpenRead($jar.FullName)
 try {
     if (-not $zip.GetEntry('fabric.mod.json') -or @($zip.Entries|Where-Object {$_.FullName.EndsWith('.class')}).Count -eq 0) { throw 'The JAR must contain Fabric metadata and compiled classes; never upload a source archive.' }
 } finally { $zip.Dispose() }
-if ((& git -C $repo remote get-url origin) -notmatch 'github\.com[:/]Destiny-Dynasty/Modpack(\.git)?$' -or
-    (& git -C $repo branch --show-current).Trim() -ne 'main' -or (& git -C $repo status --porcelain)) { throw 'Use a clean main checkout of Destiny-Dynasty/Modpack.' }
+if ((& git -C $repo remote get-url origin) -notmatch 'github\.com[:/]Destiny-Dynasty/Mod-Releases(\.git)?$' -or
+    (& git -C $repo branch --show-current).Trim() -ne 'main' -or (& git -C $repo status --porcelain)) { throw 'Use a clean main checkout of Destiny-Dynasty/Mod-Releases.' }
 & git -C $repo fetch origin main
 if ($LASTEXITCODE -or (& git -C $repo rev-parse HEAD) -ne (& git -C $repo rev-parse origin/main)) { throw 'Synchronize main before publishing a mod.' }
 $tag="mod-$ModId-$Version"
@@ -59,15 +59,8 @@ $release = & gh api $releaseInfo.apiUrl | ConvertFrom-Json
 if ($LASTEXITCODE -or $release.draft) { throw 'Could not verify the public mod release.' }
 $asset=@($release.assets | Where-Object {$_.name -eq $assetName -and $_.digest -eq "sha256:$hash" -and $_.size -eq $jar.Length})
 if ($asset.Count -ne 1 -or $asset[0].browser_download_url -notlike "https://github.com/$repository/releases/download/$tag/*") { throw 'Public release asset verification failed.' }
-$channel=@{draft=$false;prerelease=$false;tag_name=$tag;published_at=[DateTime]::UtcNow.ToString('O');assets=@(@{
-    name=$assetName;size=[long]$jar.Length;digest="sha256:$hash";browser_download_url=$asset[0].browser_download_url
-})}
-New-Item -ItemType Directory -Force -Path "$repo/channels" | Out-Null
-[IO.File]::WriteAllText("$repo/channels/$ModId.json",($channel|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false))
-$user = & gh api user | ConvertFrom-Json
-& git -C $repo add -- "channels/$ModId.json"
-& git -C $repo -c "user.name=$($user.login)" -c "user.email=$($user.id)+$($user.login)@users.noreply.github.com" commit -m "mod: $ModId $Version"
-if ($LASTEXITCODE) { throw 'JAR published but channel commit failed. The existing channel was not changed remotely.' }
-& git -C $repo push origin main
-if ($LASTEXITCODE) { throw 'JAR published and channel committed locally. Retry git push origin main.' }
+# Idempotent API updates coexist safely with the release-published workflow.
+& (Join-Path $PSScriptRoot 'Sync-ModChannel.ps1') -ReleaseTag $tag -Repository $repository
+& git -C $repo pull --ff-only origin main
+if ($LASTEXITCODE) { throw 'Channel published; refresh the local checkout before publishing another mod.' }
 Write-Host "Published only compiled JAR: https://github.com/$repository/releases/tag/$tag"

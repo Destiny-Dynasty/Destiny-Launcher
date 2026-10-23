@@ -32,7 +32,7 @@ if ($LASTEXITCODE -eq 0) {
     $existing = $existingText | ConvertFrom-Json
     if (-not $existing.isDraft) { throw 'This release is already published; never replace its assets.' }
 } else {
-    & gh release create $build.tag --repo $build.repository --target main --draft --title "Destiny Modpacks $($build.version)" --notes "Variantes: $($build.variants -join ', ')."
+    & gh release create $build.tag --repo $build.repository --target main --draft --title "Destiny Modpacks $($build.version)" --notes "Variantes: $($build.variants -join ', ')." "--prerelease=$($build.version.Contains('-').ToString().ToLowerInvariant())"
     if ($LASTEXITCODE) { throw 'Could not create release draft.' }
 }
 foreach ($asset in $build.assets) {
@@ -54,7 +54,7 @@ if ($LASTEXITCODE -or @($assets).Count -ne @($build.assets).Count) { throw 'Rele
 foreach ($asset in $build.assets) {
     if (@($assets | Where-Object {$_.name -eq $asset.name -and $_.size -eq $asset.size -and $_.digest -eq "sha256:$($asset.sha256)"}).Count -ne 1) { throw 'GitHub asset digest mismatch.' }
 }
-& gh release edit $build.tag --repo $build.repository --draft=false
+& gh release edit $build.tag --repo $build.repository --draft=false "--prerelease=$($build.version.Contains('-').ToString().ToLowerInvariant())"
 if ($LASTEXITCODE) { throw 'Could not publish release; manifests remain unchanged.' }
 # Commit all variant manifests and the shared base together, after assets are public.
 Copy-Item -LiteralPath "$prepared/base-manifest.json" -Destination "$repo/base/manifest.json"

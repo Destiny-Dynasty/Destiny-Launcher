@@ -12,20 +12,20 @@ internal static class FloatingModsAudit
     {
         Directory.CreateDirectory(root);
         using var http = new HttpClient(); http.DefaultRequestHeaders.UserAgent.ParseAdd("DestinyLauncher-Test");
-        using var response = await http.GetAsync($"https://raw.githubusercontent.com/Destiny-Dynasty/Modpack/main/channels/destiny-patches.json?check={Guid.NewGuid():N}");
+        using var response = await http.GetAsync($"https://raw.githubusercontent.com/Destiny-Dynasty/Mod-Releases/main/channels/destiny-realms.json?check={Guid.NewGuid():N}");
         response.EnsureSuccessStatusCode();
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var asset = json.RootElement.GetProperty("assets").EnumerateArray().Single(a => a.GetProperty("name").GetString() is string name && !name.EndsWith("-sources.jar") && name.EndsWith(".jar"));
-        var file = new PackManifestFile { Path = "mods/destiny-patches.jar", Url = asset.GetProperty("browser_download_url").GetString()!,
+        var file = new PackManifestFile { Path = "mods/destiny-realms.jar", Url = asset.GetProperty("browser_download_url").GetString()!,
             Size = asset.GetProperty("size").GetInt64(), Sha256 = asset.GetProperty("digest").GetString()![7..],
-            GitHub = new() { Repository = "Destiny-Dynasty/Modpack", Release = "latest", Channel = "destiny-patches", Asset = "destiny-patches-*.jar" } };
-        var manifest = new PackManifest { PackId = "destiny", Version = "live-fixture", SchemaVersion = 2, Files = [file] };
+            GitHub = new() { Repository = "Destiny-Dynasty/Mod-Releases", Release = "latest", Channel = "destiny-realms", Asset = "destiny-realms-*.jar" } };
+        var manifest = new PackManifest { PackId = "destiny", Version = "2026.0.1-alpha", SchemaVersion = 2, Files = [file] };
         var paths = new LauncherPaths(Path.Combine(root, Guid.NewGuid().ToString("N"))); paths.Ensure();
         var updater = new GitHubPackUpdater(paths, new AppLogger(paths), http);
         var pack = new PackDefinition();
         var initial = await updater.PrepareForPlayAsync(pack, manifest, "", null, CancellationToken.None);
         await updater.ApplyAsync(pack, initial, null, CancellationToken.None);
-        var downloaded = Path.Combine(paths.Instance("destiny"), "mods", "destiny-patches.jar");
+        var downloaded = Path.Combine(paths.Instance("destiny"), "mods", "destiny-realms.jar");
         using var jar = System.IO.Compression.ZipFile.OpenRead(downloaded);
         if (jar.GetEntry("fabric.mod.json") is null || (await updater.PrepareForPlayAsync(pack, manifest, manifest.Version, null, CancellationToken.None)).HasChanges) throw new Exception("Live GitHub mod verification failed");
         File.WriteAllText(Path.Combine(root, "live-github-result.json"), JsonSerializer.Serialize(new { verified = true, file.Url, file.Sha256, downloaded, executed = false }, new JsonSerializerOptions { WriteIndented = true }));
@@ -66,7 +66,7 @@ internal static class FloatingModsAudit
         var unchanged = await updater.PrepareForPlayAsync(pack, manifest, manifest.Version, null, CancellationToken.None);
         Check(!unchanged.HasChanges && handler.ConditionalCalls > 0 && handler.NotModified > 0, "Every Play checks releases, while ETag 304 avoids resolving unchanged metadata again");
         using (var state = JsonDocument.Parse(File.ReadAllText(Path.Combine(instance, ".destiny-managed-files.json"))))
-            Check(state.RootElement.GetProperty("Version").GetString() == "1.4.9", "Independent mod updates do not change the installed modpack version");
+            Check(state.RootElement.GetProperty("Version").GetString() == "2026.0.1-alpha", "Independent mod updates do not change the installed modpack version");
         handler.Offline = true;
         Check(!(await updater.PrepareForPlayAsync(pack, manifest, manifest.Version, null, CancellationToken.None)).HasChanges && File.ReadAllText(mod) == "custom-version-2", "Offline checks keep the committed latest version instead of downgrading to the publishing snapshot");
         handler.Offline = false; handler.RateLimited = true;
@@ -126,7 +126,7 @@ internal static class FloatingModsAudit
                 main.GitHub = new() { Repository = "Fixture/Custom", Release = "latest", Asset = "custom-*.jar", Channel = UseChannel ? "custom" : null };
                 var helper = File("mods/helper.jar", Data("helper"), "https://github.com/Fixture/Custom/releases/download/v1/helper-1.jar");
                 helper.GitHub = new() { Repository = "Fixture/Custom", Release = "latest", Asset = "helper-*.jar", Channel = UseChannel ? "custom" : null };
-                return Task.FromResult(Response(JsonSerializer.SerializeToUtf8Bytes(new PackManifest { PackId = "destiny", Version = "1.4.9", SchemaVersion = Legacy ? 1 : 2,
+                return Task.FromResult(Response(JsonSerializer.SerializeToUtf8Bytes(new PackManifest { PackId = "destiny", Version = "2026.0.1-alpha", SchemaVersion = Legacy ? 1 : 2,
                     Files = [main, helper, File("mods/pinned.jar", Data("pinned"), "https://fixture.invalid/pinned"), File("config/base.txt", Data("base"), "https://fixture.invalid/base")] })));
             }
             if (uri.Host == "api.github.com" || uri.AbsolutePath.Contains("/channels/"))

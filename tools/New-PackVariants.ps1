@@ -107,7 +107,8 @@ function Get-Variant([string]$Id) {
     if ($resolving.ContainsKey($Id)) { throw "Variant inheritance cycle: $Id" }
     if (-not $definitions.ContainsKey($Id)) { throw "Unknown parent variant: $Id" }
     $resolving[$Id] = $true; $definition = $definitions[$Id]; $files = @{}
-    $parent = if ($definition.extends) { (Get-Variant $definition.extends).files } else { $base.files }
+    $parentManifest = if ($definition.extends) { Get-Variant $definition.extends } else { $base }
+    $parent = $parentManifest.files
     foreach ($file in $parent) {
         Test-ManagedPath $file.path
         if ($files.ContainsKey($file.path)) { throw "Duplicate base target: $($file.path)" }
@@ -152,8 +153,10 @@ function Get-Variant([string]$Id) {
             if ($required -and -not $ids.ContainsKey($required)) { throw "Missing declared dependency in ${Id}: $required" }
         }
     }
-    $result = @{ schemaVersion=1;packId=$Id;version=$(if($Version){$Version}elseif($definition.version){$definition.version}else{$base.version});
-        minecraftVersion=$base.minecraftVersion;fabricLoaderVersion=$base.fabricLoaderVersion;javaVersion=$base.javaVersion;
+    $loaderVersion = if ($definition.fabricLoaderVersion) { $definition.fabricLoaderVersion } else { $parentManifest.fabricLoaderVersion }
+    if ($loaderVersion -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid Fabric Loader version in ${Id}: $loaderVersion" }
+    $result = [ordered]@{ schemaVersion=1;packId=$Id;version=$(if($Version){$Version}elseif($definition.version){$definition.version}else{$base.version});
+        minecraftVersion=$base.minecraftVersion;fabricLoaderVersion=$loaderVersion;javaVersion=$base.javaVersion;
         files=@($files.Values | Sort-Object path) }
     if (@($result.files | Where-Object { $_.github }).Count) { $result.schemaVersion = 2 }
     if ($result.files.Count -eq 0) { throw "Variant contains no files: $Id" }
@@ -163,6 +166,6 @@ function Get-Variant([string]$Id) {
 foreach ($id in @($definitions.Keys | Sort-Object)) {
     if ($definitions[$id].enabled -eq $false -and -not $IncludeDisabled) { continue }
     $manifest = Get-Variant $id
-    [IO.File]::WriteAllText("$output/manifests/$id.json", ($manifest | ConvertTo-Json -Depth 30) + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText("$output/manifests/$id.json", ($manifest | ConvertTo-Json -Depth 30).Replace("`r`n", "`n") + "`n", [Text.UTF8Encoding]::new($false))
     Write-Host "$id : $($manifest.files.Count) files; schema $($manifest.schemaVersion); version $($manifest.version)"
 }
