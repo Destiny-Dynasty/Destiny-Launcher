@@ -86,7 +86,7 @@ internal static class Program
         {
             using var remote = new NewsFeedService(new LauncherPaths(Path.Combine(root, "live")));
             var actual = await remote.RefreshAsync(default);
-            Assert(actual.Count == 2 && actual.All(s => s.Caption.StartsWith("Muestra")), "Published Pages feed and both real images load through the production client");
+            Assert(actual.Count == 3 && actual.All(s => !s.Caption.StartsWith("Muestra") && s.Link is not null), "Published feed contains three announcements with readable images and article links");
         }
     }
     private static HttpResponseMessage Json(string text) => new(HttpStatusCode.OK) { Content = new StringContent(text, Encoding.UTF8, "application/json") };

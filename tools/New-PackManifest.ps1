@@ -20,7 +20,8 @@ param(
     [string]$OutputDirectory,
 
     [string]$MinecraftVersion = '1.20.1',
-    [string]$FabricLoaderVersion = '0.16.9'
+    [string]$FabricLoaderVersion = '0.16.9',
+    [ValidateRange(17,99)][int]$JavaVersion = 21
 )
 
 $ErrorActionPreference = 'Stop'
@@ -109,6 +110,7 @@ $manifest = [ordered]@{
     version = $Version
     minecraftVersion = $MinecraftVersion
     fabricLoaderVersion = $FabricLoaderVersion
+    javaVersion = $JavaVersion
     files = @($files)
 }
 $json = $manifest | ConvertTo-Json -Depth 8

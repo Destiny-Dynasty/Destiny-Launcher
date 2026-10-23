@@ -7,6 +7,7 @@ public sealed class PackManifest
     public string Version { get; set; } = "";
     public string MinecraftVersion { get; set; } = "1.20.1";
     public string FabricLoaderVersion { get; set; } = "0.16.9";
+    public int JavaVersion { get; set; } = 21;
     public List<PackManifestFile> Files { get; set; } = [];
 }
 

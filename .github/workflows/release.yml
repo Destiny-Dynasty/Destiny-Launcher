@@ -1,0 +1,133 @@
+name: Prepare launcher release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version X.Y.Z (must be newer than the installed release)'
+        required: true
+      sign_with_signpath:
+        description: 'Request recognized Windows signatures (requires Foundation approval and configured account)'
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Preview; clients will not install this release automatically'
+        type: boolean
+        default: true
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: launcher-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    environment: launcher-release
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      WANT_SIGNPATH: ${{ inputs.sign_with_signpath }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate release and signing prerequisites
+        shell: pwsh
+        env:
+          UPDATE_KEY: ${{ secrets.LAUNCHER_UPDATE_PRIVATE_KEY }}
+          SIGNPATH_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORG: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+        run: |
+          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version' }
+          if (-not $env:UPDATE_KEY) { throw 'LAUNCHER_UPDATE_PRIVATE_KEY is required; never publish an unauthenticated update.' }
+          if ($env:WANT_SIGNPATH -eq 'true' -and (-not $env:SIGNPATH_TOKEN -or -not $env:SIGNPATH_ORG)) { throw 'SignPath is not configured.' }
+      - name: Build, test and prepare signing inputs
+        shell: pwsh
+        run: |
+          ./tools/Ensure-InnoSetup.ps1 | Out-Null
+          dotnet run --project tools/InstallationSmoke/InstallationSmoke.csproj -c Release -- artifacts/release-tests
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/release-ui --headless
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./tools/Publish-Launcher.ps1 -OutputPath "$pwd/artifacts/release/payload" -Version $env:RELEASE_VERSION
+          if ($env:WANT_SIGNPATH -eq 'true') {
+            ./tools/Build-Installer.ps1 -PublishPath "$pwd/artifacts/release/payload" -OutputPath "$pwd/artifacts/release/installers" -Offline -PrepareSigningTemplates -SignedUninstallerDir "$pwd/artifacts/release/uninstallers"
+            ./tools/Build-Installer.ps1 -PublishPath "$pwd/artifacts/release/payload" -OutputPath "$pwd/artifacts/release/installers" -PrepareSigningTemplates -SignedUninstallerDir "$pwd/artifacts/release/uninstallers"
+          }
+      - name: Upload launcher and uninstaller templates
+        if: inputs.sign_with_signpath
+        id: signing-input
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: launcher-signing-input
+          path: |
+            artifacts/release/payload/DestinyLauncher.exe
+            artifacts/release/uninstallers/*.e32
+      - name: Sign launcher and uninstallers
+        if: inputs.sign_with_signpath
+        uses: SignPath/github-action-submit-signing-request@4184a38a17e5b37d026a3ed443581c1f03ae1b3a
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_COMPONENTS_CONFIGURATION }}
+          github-artifact-id: ${{ steps.signing-input.outputs.artifact-id }}
+          output-artifact-directory: artifacts/release
+          wait-for-completion-timeout-in-seconds: 3600
+      - name: Build both installers using the signed payload
+        shell: pwsh
+        run: |
+          $signing = @{}
+          if ($env:WANT_SIGNPATH -eq 'true') {
+            foreach ($file in @(Get-Item artifacts/release/payload/DestinyLauncher.exe) + @(Get-ChildItem artifacts/release/uninstallers/*.e32)) {
+              if ((Get-AuthenticodeSignature $file.FullName).Status -ne 'Valid') { throw "Invalid signature: $($file.Name)" }
+            }
+            $signing = @{ SignedUninstaller=$true; SignedUninstallerDir="$pwd/artifacts/release/uninstallers" }
+          }
+          ./tools/Build-Installer.ps1 -PublishPath "$pwd/artifacts/release/payload" -OutputPath "$pwd/artifacts/release/installers" -Offline @signing
+          ./tools/Build-Installer.ps1 -PublishPath "$pwd/artifacts/release/payload" -OutputPath "$pwd/artifacts/release/installers" @signing
+      - name: Upload installer signing inputs
+        if: inputs.sign_with_signpath
+        id: installer-input
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: installer-signing-input
+          path: artifacts/release/installers/*.exe
+      - name: Sign both installers
+        if: inputs.sign_with_signpath
+        uses: SignPath/github-action-submit-signing-request@4184a38a17e5b37d026a3ed443581c1f03ae1b3a
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_INSTALLERS_CONFIGURATION }}
+          github-artifact-id: ${{ steps.installer-input.outputs.artifact-id }}
+          output-artifact-directory: artifacts/release/installers
+          wait-for-completion-timeout-in-seconds: 3600
+      - name: Authenticate release and create a draft
+        shell: pwsh
+        env:
+          UPDATE_KEY: ${{ secrets.LAUNCHER_UPDATE_PRIVATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW: ${{ inputs.prerelease }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $folder="$pwd/artifacts/release/installers"
+          if ($env:WANT_SIGNPATH -eq 'true') {
+            Get-ChildItem "$folder/*.exe" | ForEach-Object { if((Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid'){throw "Unsigned installer: $($_.Name)"} }
+          }
+          $key=Join-Path $env:RUNNER_TEMP 'destiny-update-key.pem'
+          try {
+            [IO.File]::WriteAllText($key,$env:UPDATE_KEY)
+            ./tools/New-LauncherReleaseManifest.ps1 -Version $env:RELEASE_VERSION -SetupPath "$folder/DestinyLauncherSetup.exe" -SigningKeyPath $key -OutputPath $folder
+          } finally { if(Test-Path -LiteralPath $key){Remove-Item -LiteralPath $key -Force} }
+          $files=@(Get-ChildItem "$folder/*.exe", "$folder/launcher-update.*") + @(Get-Item artifacts/release/payload/DestinyLauncher-win-x64.zip)
+          $files | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content "$folder/SHA256SUMS.txt"
+          $releaseArgs=@('release','create',"v$env:RELEASE_VERSION",'--repo','Destiny-Dynasty/Destiny-Launcher','--target',$env:GITHUB_SHA,'--draft','--title',"Destiny Launcher $env:RELEASE_VERSION",'--generate-notes')
+          if($env:PREVIEW -eq 'true'){$releaseArgs+='--prerelease'}
+          $releaseArgs += $files.FullName
+          $releaseArgs += "$folder/SHA256SUMS.txt"
+          gh @releaseArgs
+          if($LASTEXITCODE){exit $LASTEXITCODE}

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 namespace DestinyLauncher.Models;
 
 public enum PackEdition { Destiny, DestinyLite }
+public enum GameWindowMode { Windowed, Maximized, Fullscreen }
 public sealed class PackDefinition
 {
     public const string DefaultDestinyManifestUrl = "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack/main/manifests/destiny.json";
@@ -15,6 +16,7 @@ public sealed class PackDefinition
         ? DefaultDestinyLiteManifestUrl
         : DefaultDestinyManifestUrl;
     public string Version { get; set; } = "0.1.0";
+    public int JavaVersion { get; set; } = 21;
 }
 public sealed class LauncherConfig
 {
@@ -22,6 +24,9 @@ public sealed class LauncherConfig
     public string PlayerName { get; set; } = "";
     public bool MultiAccountEnabled { get; set; }
     public bool AutoJoinServer { get; set; } = true;
+    public GameWindowMode WindowMode { get; set; } = GameWindowMode.Windowed;
+    public int GameWidth { get; set; } = 1280;
+    public int GameHeight { get; set; } = 720;
     public List<string> Accounts { get; set; } = [];
     public static bool ValidPlayerName(string? name) => System.Text.RegularExpressions.Regex.IsMatch(name ?? "", "^[A-Za-z0-9_]{3,16}$");
     public void NormalizeAccounts()
@@ -46,5 +51,6 @@ public sealed class LauncherConfig
 public sealed class InstalledPack
 {
     public string Version { get; set; } = "";
+    public int JavaVersion { get; set; } = 21;
     public DateTime InstalledAt { get; set; } = DateTime.UtcNow;
 }

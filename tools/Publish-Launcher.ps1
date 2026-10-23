@@ -1,10 +1,11 @@
 [CmdletBinding()]
-param()
+param([switch]$Experiment, [string]$OutputPath, [string]$Version)
 
 $ErrorActionPreference = 'Stop'
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $workspaceRoot 'DestinyLauncher\DestinyLauncher.csproj'
-$outputPath = Join-Path $workspaceRoot 'publish'
+$outputFolder = if ($Experiment) { 'publish-experiment' } else { 'publish' }
+$outputPath = if ($OutputPath) { [IO.Path]::GetFullPath($OutputPath) } else { Join-Path $workspaceRoot $outputFolder }
 $localSdkPath = Join-Path $env:LOCALAPPDATA 'Programs\dotnet-sdk-10.0.401\dotnet.exe'
 
 if (-not (Test-Path -LiteralPath $projectPath)) {
@@ -13,11 +14,11 @@ if (-not (Test-Path -LiteralPath $projectPath)) {
 
 if ((Test-Path -LiteralPath $outputPath) -and
     ((Get-Item -LiteralPath $outputPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-    throw "La salida publish no puede ser un enlace o una unión de directorios: $outputPath"
+    throw "La salida no puede ser un enlace o una unión de directorios: $outputPath"
 }
 $runningOutput = Get-Process DestinyLauncher -ErrorAction SilentlyContinue |
     Where-Object { $_.Path -eq (Join-Path $outputPath 'DestinyLauncher.exe') }
-if ($runningOutput) { throw 'Cierra el launcher de publish antes de volver a publicarlo.' }
+if ($runningOutput) { throw "Cierra el launcher de $outputFolder antes de volver a publicarlo." }
 
 New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
 $dotnetCommand = if (Test-Path -LiteralPath $localSdkPath) {
@@ -44,6 +45,10 @@ $publishArgs = @(
     '-p:DebugSymbols=false'
 )
 
+if ($Version) {
+    if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Version debe tener formato X.Y.Z.' }
+    $publishArgs += @("-p:Version=$Version", "-p:AssemblyVersion=$Version.0", "-p:FileVersion=$Version.0")
+}
 & $dotnetCommand @publishArgs
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE

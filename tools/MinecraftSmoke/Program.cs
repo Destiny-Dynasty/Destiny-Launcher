@@ -14,6 +14,12 @@ using System.IO.Compression;
 using DestinyLauncher.Services;
 using DestinyLauncher.Models;
 
+if (args.FirstOrDefault() == "--java-only")
+{
+    await JavaRuntimeAudit.Run(Path.GetFullPath(args[1]));
+    return 0;
+}
+
 if (args.FirstOrDefault() == "--error-fixture")
 {
     Console.Error.Write(new string('A', 200_000));
@@ -35,6 +41,9 @@ var launchOptions = MinecraftService.CreateLaunchOptions(defaults);
 Assert(launchOptions.ExtraJvmArguments.SelectMany(a => a.Values).SequenceEqual(new[] { "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200" }),
     "Launcher G1 defaults replace the library's experimental tuning flags");
 Assert(launchOptions.MaximumRamMb == 1024, "RAM setting still controls the normal maximum heap");
+Assert(launchOptions.ScreenWidth == 1280 && launchOptions.ScreenHeight == 720 && !launchOptions.FullScreen, "Default windowed launch uses the configured 1280x720 resolution");
+var fullOptions = MinecraftService.CreateLaunchOptions(new LauncherConfig { PlayerName = "Fixture", WindowMode = GameWindowMode.Fullscreen, GameWidth = 1920, GameHeight = 1080 });
+Assert(fullOptions.FullScreen && fullOptions.ScreenWidth == 1920 && fullOptions.ScreenHeight == 1080, "Fullscreen mode reaches the supported CmlLib launch options");
 Assert(launchOptions.ServerIp == "destinydynasty.tatnikhost.net", "Automatic server entry stays enabled by default for compatibility");
 var manualLaunch = MinecraftService.CreateLaunchOptions(new LauncherConfig { PlayerName = "Fixture", AutoJoinServer = false });
 Assert(string.IsNullOrEmpty(manualLaunch.ServerIp), "Disabling automatic entry omits the server from launch options");
@@ -77,9 +86,23 @@ var legacyConfig = configStore.Load();
 Assert(legacyConfig.InstallDirectory == savedLocation && legacyConfig.JavaArguments == LauncherConfig.DefaultJavaArguments && legacyConfig.AutoJoinServer,
     "Old configuration gains default JVM flags without moving or renaming its installation");
 legacyConfig.JavaArguments = quotedFlags;
+legacyConfig.GameWidth = 1600; legacyConfig.GameHeight = 900; legacyConfig.WindowMode = GameWindowMode.Maximized;
 legacyConfig.AutoJoinServer = false;
 configStore.Save(legacyConfig);
 Assert(configStore.Load().JavaArguments == quotedFlags && !configStore.Load().AutoJoinServer, "Custom flags and disabled server entry round-trip through persisted settings");
+Assert(configStore.Load().GameWidth == 1600 && configStore.Load().GameHeight == 900 && configStore.Load().WindowMode == GameWindowMode.Maximized,
+    "Game resolution and exclusive window mode persist with existing settings");
+await File.WriteAllTextAsync(configPaths.ConfigFile, JsonSerializer.Serialize(new { PlayerName = "Fixture", GameWidth = -1, GameHeight = 99999, WindowMode = 99 }));
+var normalized = configStore.Load();
+Assert(normalized.PlayerName == "Fixture" && normalized.GameWidth == 1280 && normalized.GameHeight == 720 && normalized.WindowMode == GameWindowMode.Windowed,
+    "Invalid stored display options recover defaults without resetting the offline player");
+await GameOptionsFile.SetFullscreenAsync(freshInstance, true, CancellationToken.None);
+Assert((await File.ReadAllTextAsync(spanishOptions)).Contains("lang:fr_fr") && (await File.ReadAllTextAsync(spanishOptions)).Contains("fullscreen:true"),
+    "Fullscreen option is written without resetting the player's language");
+await GameOptionsFile.SetFullscreenAsync(freshInstance, false, CancellationToken.None);
+var afterWindowed = await File.ReadAllTextAsync(spanishOptions);
+Assert(afterWindowed.Contains("fullscreen:false") && afterWindowed.Contains("gamma:0.7") && afterWindowed.Split("fullscreen:").Length == 2,
+    "Windowed mode overrides a saved fullscreen preference without duplicating it or modifying other options");
 legacyConfig.JavaArguments = "";
 configStore.Save(legacyConfig);
 Assert(configStore.Load().JavaArguments == "", "Empty saved JVM flags remain intentionally empty");
@@ -117,6 +140,10 @@ MinecraftLauncher LibraryTestLauncher(MinecraftPath isolatedPath, HttpClient cli
     return new MinecraftLauncher(parameters);
 }
 await MinecraftService.PrepareFabricAsync(LibraryTestLauncher(path, http), installer, path, "1.20.1", "0.19.5", new Progress<(string, double)>(), CancellationToken.None);
+Assert(requests.Count(r => r.Contains("/profile/json")) == 1, "A valid installed Fabric profile is reused rather than downloaded on every start");
+Assert(MinecraftService.HasLocalProfile(path, profile, "1.20.1"), "Complete local Fabric metadata is recognized for the offline fast path");
+Assert(!MinecraftService.HasLocalProfile(path, profile, "1.21") && !MinecraftService.HasLocalProfile(path, "missing", null),
+    "Wrong inheritance or missing metadata cannot enter the local-profile fast path");
 var loaderJar = Path.Combine(path.Library, "net", "fabricmc", "fabric-loader", "0.19.5", "fabric-loader-0.19.5.jar");
 Assert(File.Exists(loaderJar) && await File.ReadAllTextAsync(loaderJar) == "fixture-library", "Production Fabric preparation downloads the missing loader jar after writing the profile");
 Assert(requests.Contains("/net/fabricmc/fabric-loader/0.19.5/fabric-loader-0.19.5.jar"), "Dependency download uses the selected loader's Maven coordinates");
@@ -151,6 +178,8 @@ if (File.Exists(java))
     using (var versionProcess = await LibraryTestLauncher(path, http).BuildProcessAsync(profile, javaOptions))
     {
         Assert(versionProcess.StartInfo.Arguments.Contains("destinydynasty.tatnikhost.net"), "Enabled automatic entry reaches the actual game command line");
+        Assert(versionProcess.StartInfo.Arguments.Contains("--width 1280") && versionProcess.StartInfo.Arguments.Contains("--height 720"),
+            "Configured resolution reaches the actual Minecraft command line");
         JavaArguments.CorrectWindowsQuoting(versionProcess.StartInfo, javaOptions.ExtraJvmArguments.SelectMany(a => a.Values));
         Assert(!versionProcess.StartInfo.Arguments.Contains("-Xmx1024m"), "An explicit custom heap flag does not produce a conflicting duplicate");
         using var versionSession = MinecraftGameSession.Start(versionProcess);

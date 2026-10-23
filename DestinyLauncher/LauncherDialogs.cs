@@ -120,13 +120,20 @@ public sealed class SettingsPage : UserControl
     private readonly TextBox _javaArguments;
     private readonly CheckBox _multiAccount;
     private readonly CheckBox _autoJoin;
+    private readonly RadioButton _windowed;
+    private readonly RadioButton _maximized;
+    private readonly RadioButton _fullscreen;
+    private readonly TextBox _gameWidth;
+    private readonly TextBox _gameHeight;
+    private GameWindowMode SelectedWindowMode => _fullscreen.IsChecked == true ? GameWindowMode.Fullscreen : _maximized.IsChecked == true ? GameWindowMode.Maximized : GameWindowMode.Windowed;
     private readonly string _installationFolderName;
     private readonly string _originalBaseDirectory;
     private bool _syncingRam;
     private bool _saved;
     public bool HasChanges => !_saved && (_installDirectory.Text != _originalBaseDirectory || _ramValue.Text != _source.RamGb.ToString()
         || _javaArguments.Text != _source.JavaArguments || (_multiAccount.IsChecked == true) != _source.MultiAccountEnabled
-        || (_autoJoin.IsChecked == true) != _source.AutoJoinServer);
+        || (_autoJoin.IsChecked == true) != _source.AutoJoinServer || SelectedWindowMode != _source.WindowMode
+        || _gameWidth.Text != _source.GameWidth.ToString() || _gameHeight.Text != _source.GameHeight.ToString());
     public Action? BackRequested { get; set; }
     public Func<LauncherConfig, Task>? SaveRequested { get; set; }
     internal void MarkSaved() => _saved = true;
@@ -145,18 +152,12 @@ public sealed class SettingsPage : UserControl
         heading.ColumnDefinitions.Add(new ColumnDefinition());
         heading.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         heading.Children.Add(new TextBlock { Text = "Ajustes", FontFamily = new FontFamily("Georgia"), FontSize = 28 });
-        var preferences = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        var joinOption = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 24, 0) };
-        joinOption.Children.Add(new TextBlock { Text = "Entrar al servidor", Foreground = ProfileDialog.ResourceBrush("Muted"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
-        _autoJoin = new CheckBox { IsChecked = source.AutoJoinServer, Style = (Style)Application.Current.FindResource("AccountToggle") };
-        AutomationProperties.SetName(_autoJoin, "Entrar automáticamente al servidor"); AutomationProperties.SetAutomationId(_autoJoin, "AutoJoinServerToggle");
-        joinOption.Children.Add(_autoJoin); preferences.Children.Add(joinOption);
         var accountOption = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         accountOption.Children.Add(new TextBlock { Text = "Multicuentas", Foreground = ProfileDialog.ResourceBrush("Muted"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
         _multiAccount = new CheckBox { IsChecked = source.MultiAccountEnabled, Style = (Style)Application.Current.FindResource("AccountToggle") };
         AutomationProperties.SetName(_multiAccount, "Multicuentas"); AutomationProperties.SetAutomationId(_multiAccount, "MultiAccountToggle");
-        accountOption.Children.Add(_multiAccount); preferences.Children.Add(accountOption);
-        Grid.SetColumn(preferences, 1); heading.Children.Add(preferences);
+        accountOption.Children.Add(_multiAccount);
+        Grid.SetColumn(accountOption, 1); heading.Children.Add(accountOption);
         layout.Children.Add(heading);
         var content = new StackPanel();
         var installation = Card();
@@ -190,6 +191,40 @@ public sealed class SettingsPage : UserControl
         };
         Grid.SetColumn(browse, 2); pathRow.Children.Add(browse); installBody.Children.Add(pathRow);
         installation.Child = installBody; content.Children.Add(installation);
+        var game = Card(); game.Margin = new Thickness(0, 14, 0, 0);
+        var gameBody = new StackPanel(); gameBody.Children.Add(Title("Juego"));
+        var modes = new WrapPanel { Margin = new Thickness(0, 14, 0, 0) };
+        RadioButton Mode(string label, string id, bool selected)
+        {
+            var radio = new RadioButton { Content = label, GroupName = "GameWindowMode", IsChecked = selected,
+                Style = (Style)Application.Current.FindResource("GameModeOption"), Margin = new Thickness(0, 0, 8, 6) };
+            AutomationProperties.SetAutomationId(radio, id); AutomationProperties.SetName(radio, label); modes.Children.Add(radio); return radio;
+        }
+        _windowed = Mode("Ventana", "WindowedMode", source.WindowMode == GameWindowMode.Windowed);
+        _maximized = Mode("Maximizada", "MaximizedMode", source.WindowMode == GameWindowMode.Maximized);
+        _fullscreen = Mode("Pantalla completa", "FullscreenMode", source.WindowMode == GameWindowMode.Fullscreen);
+        gameBody.Children.Add(modes);
+        var resolution = new WrapPanel { Margin = new Thickness(0, 8, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        resolution.Children.Add(new TextBlock { Text = "Resolución en ventana", Foreground = ProfileDialog.ResourceBrush("Muted"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) });
+        _gameWidth = new TextBox { Text = source.GameWidth.ToString(), Width = 86, MaxLength = 4, TextAlignment = TextAlignment.Center };
+        _gameHeight = new TextBox { Text = source.GameHeight.ToString(), Width = 86, MaxLength = 4, TextAlignment = TextAlignment.Center };
+        AutomationProperties.SetName(_gameWidth, "Ancho del juego en píxeles"); AutomationProperties.SetAutomationId(_gameWidth, "GameWidthInput");
+        AutomationProperties.SetName(_gameHeight, "Alto del juego en píxeles"); AutomationProperties.SetAutomationId(_gameHeight, "GameHeightInput");
+        foreach (var input in new[] { _gameWidth, _gameHeight })
+            input.TextChanged += (_, _) => { input.BorderBrush = ProfileDialog.ResourceBrush("Line"); if (validation is not null) validation.Visibility = Visibility.Collapsed; };
+        resolution.Children.Add(_gameWidth);
+        resolution.Children.Add(new TextBlock { Text = "×", Foreground = ProfileDialog.ResourceBrush("Muted"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 10, 0) });
+        resolution.Children.Add(_gameHeight); gameBody.Children.Add(resolution);
+        void UpdateResolution() { _gameWidth.IsEnabled = _gameHeight.IsEnabled = SelectedWindowMode == GameWindowMode.Windowed; }
+        _windowed.Checked += (_, _) => UpdateResolution(); _maximized.Checked += (_, _) => UpdateResolution(); _fullscreen.Checked += (_, _) => UpdateResolution();
+        UpdateResolution();
+        var joinRow = new Grid { Margin = new Thickness(0, 18, 0, 0) };
+        joinRow.ColumnDefinitions.Add(new ColumnDefinition()); joinRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        joinRow.Children.Add(new TextBlock { Text = "Entrar automáticamente al servidor", VerticalAlignment = VerticalAlignment.Center });
+        _autoJoin = new CheckBox { IsChecked = source.AutoJoinServer, Style = (Style)Application.Current.FindResource("AccountToggle") };
+        AutomationProperties.SetName(_autoJoin, "Entrar automáticamente al servidor"); AutomationProperties.SetAutomationId(_autoJoin, "AutoJoinServerToggle");
+        Grid.SetColumn(_autoJoin, 1); joinRow.Children.Add(_autoJoin); gameBody.Children.Add(joinRow);
+        game.Child = gameBody; content.Children.Add(game);
         var memory = Card(); memory.Margin = new Thickness(0, 14, 0, 0);
         var memoryBody = new StackPanel(); memoryBody.Children.Add(Title("Memoria del juego"));
         var ramRow = new Grid { Margin = new Thickness(0, 14, 0, 0) };
@@ -254,10 +289,13 @@ public sealed class SettingsPage : UserControl
             }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { Error("La ruta contiene caracteres no válidos. Elige otra carpeta.", _installDirectory); return; }
             if (!int.TryParse(_ramValue.Text, out var ram) || ram is < 1 or > 1024) { Error("Introduce un número entero entre 1 y 1024 GB.", _ramValue); return; }
+            if (!int.TryParse(_gameWidth.Text, out var width) || width is < 640 or > 7680) { Error("El ancho debe estar entre 640 y 7680 píxeles.", _gameWidth); return; }
+            if (!int.TryParse(_gameHeight.Text, out var height) || height is < 360 or > 4320) { Error("El alto debe estar entre 360 y 4320 píxeles.", _gameHeight); return; }
             try { JavaArguments.Parse(_javaArguments.Text); }
             catch (FormatException ex) { Error(ex.Message, _javaArguments); return; }
             var updated = new LauncherConfig { PlayerName = source.PlayerName, SelectedEdition = source.SelectedEdition, InstallDirectory = path,
                 MultiAccountEnabled = _multiAccount.IsChecked == true, Accounts = source.Accounts.ToList(), AutoJoinServer = _autoJoin.IsChecked == true,
+                GameWidth = width, GameHeight = height, WindowMode = SelectedWindowMode,
                 RamGb = ram, JavaArguments = _javaArguments.Text, MinecraftVersion = source.MinecraftVersion, FabricLoaderVersion = source.FabricLoaderVersion, Destiny = source.Destiny, DestinyLite = source.DestinyLite };
             save.IsEnabled = false;
             try { if (SaveRequested is not null) await SaveRequested(updated); }

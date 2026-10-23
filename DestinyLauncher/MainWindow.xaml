@@ -65,6 +65,9 @@
                             <Button x:Name="XLink" Style="{StaticResource SocialButton}" Tag="https://x.com/DestinyDynasty_" Click="SocialLink_Click" ToolTip="X · Novedades de Destiny Dynasty" AutomationProperties.Name="Abrir X de Destiny Dynasty">
                                 <Path Data="{x:Static local:IconGlyphs.X}" Width="17" Height="17" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
+                            <Button x:Name="TatnikHostLink" Style="{StaticResource SocialButton}" Tag="https://tatnikhost.net/l/crC7CrzY" Click="SocialLink_Click" ToolTip="Tatnik Host · Hosting del servidor" AutomationProperties.Name="Abrir Tatnik Host">
+                                <Path Data="{x:Static local:IconGlyphs.TatnikHost}" Width="21" Height="21" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
                         </StackPanel>
                         <StackPanel Grid.Row="3" VerticalAlignment="Bottom" Margin="0,0,0,12" IsHitTestVisible="False">
                             <Image x:Name="SidebarEmblem" Width="40" Height="40" Style="{StaticResource SmallBrandMark}" Opacity=".85"/>
@@ -79,10 +82,11 @@
                         <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <ScrollViewer x:Name="HomeScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" CanContentScroll="False" Focusable="False">
                             <Grid x:Name="Hero" Height="{Binding ViewportHeight, ElementName=HomeScroll}" MinHeight="280" ClipToBounds="True">
-                                <Image Source="/DestinyLauncher;component/Assets/destiny-hero-gold-v3.png" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                <Image Source="/DestinyLauncher;component/Assets/Video/reino-poster.jpg" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                <MediaElement x:Name="HeroVideo" LoadedBehavior="Manual" UnloadedBehavior="Close" Stretch="UniformToFill" IsMuted="True" Volume="0" Opacity="0" IsHitTestVisible="False" Focusable="False"/>
                                 <Rectangle><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="1,0"><GradientStop Color="#B510100F"/><GradientStop Color="#2010100F" Offset=".6"/><GradientStop Color="#3810100F" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
                                 <Rectangle><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#1810100F"/><GradientStop Color="#0010100F" Offset=".4"/><GradientStop Color="#C510100F" Offset=".9"/><GradientStop Color="#FF10100F" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
-                                <Image x:Name="HeroMark" Width="250" Height="148" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="28,22,0,0" Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/destiny-combination-mark.png" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                <Image x:Name="HeroMark" Width="250" Height="178" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="28,22,0,0" Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/Combination-Mark-Destiny.png" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                                 <local:NewsCarousel x:Name="News" Width="350" Height="156" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="28,0,0,22"/>
                                 <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,20,28,0" Background="#B5151612" BorderBrush="#4A4130" BorderThickness="1" CornerRadius="4" Padding="10,5">
                                     <TextBlock x:Name="VersionText" Text="Minecraft 1.20.1 · Fabric" Foreground="#D6CDBB" FontSize="10"/>

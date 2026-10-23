@@ -362,6 +362,7 @@ public sealed class GitHubPackUpdater
         if (!manifest.PackId.Equals(pack.Slug, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("El manifiesto pertenece a otra edición del modpack.");
         if (string.IsNullOrWhiteSpace(manifest.Version) || manifest.Version.Length > 64) throw new InvalidDataException("El manifiesto no contiene una versión válida.");
         if (string.IsNullOrWhiteSpace(manifest.MinecraftVersion) || string.IsNullOrWhiteSpace(manifest.FabricLoaderVersion)) throw new InvalidDataException("Faltan las versiones de Minecraft o Fabric en el manifiesto.");
+        if (manifest.JavaVersion is < 17 or > 99) throw new InvalidDataException("La versión de Java del manifiesto no es válida.");
         if (manifest.Files is null) throw new InvalidDataException("El manifiesto no contiene una lista de archivos.");
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in manifest.Files)

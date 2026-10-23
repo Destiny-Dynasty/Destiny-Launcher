@@ -25,10 +25,11 @@ public sealed class NewsFeedService : IDisposable
         _http = http ?? new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
     }
 
-    public static IReadOnlyList<NewsSlide> BundledSamples() =>
+    public static IReadOnlyList<NewsSlide> BundledNews() =>
     [
-        new("sample-valley", "Muestra · Bienvenido a Destiny Dynasty.", Bundled("destiny-hero-gold-v3.png")),
-        new("sample-citadel", "Muestra · Tu próxima aventura comienza aquí.", Bundled("destiny-hero-gold-v2.png"))
+        new("launcher-2026-10", "Nuevo launcher: una nueva puerta a Destiny Dynasty.", Bundled("News/nuevo-launcher-v1.jpg"), new Uri(FeedUri, "posts/nuevo-launcher.html")),
+        new("nuevo-comienzo-2026-10", "Próximo reinicio de mundo y nivel. Conservaremos estructuras y objetos compatibles.", Bundled("News/nuevo-comienzo-v1.jpg"), new Uri(FeedUri, "posts/nuevo-comienzo.html")),
+        new("rpg-desarrollo-2026-10", "Un nuevo RPG en desarrollo: misiones, habilidades y una aventura más profunda.", Bundled("News/rpg-en-desarrollo-v1.jpg"), new Uri(FeedUri, "posts/rpg-en-desarrollo.html"))
     ];
 
     private static BitmapImage Bundled(string name)

@@ -1,0 +1,93 @@
+<Window x:Class="DestinyLauncher.UninstallDialog" x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Desinstalar Destiny Launcher" Width="780" Height="566"
+        WindowStyle="None" ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
+        Background="{StaticResource Canvas}" Foreground="{StaticResource Ink}" FontFamily="{StaticResource UiFont}"
+        Icon="/DestinyLauncher;component/Assets/destiny-launcher.ico"
+        UseLayoutRounding="True" SnapsToDevicePixels="True">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="44" ResizeBorderThickness="0" GlassFrameThickness="0" UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+    <Window.Resources>
+        <Style x:Key="RemovalOption" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="Surface" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="7" Padding="16,15">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="34"/></Grid.ColumnDefinitions>
+                                <ContentPresenter VerticalAlignment="Center"/>
+                                <Border x:Name="Box" Grid.Column="1" Width="20" Height="20" HorizontalAlignment="Right" VerticalAlignment="Center" Background="{StaticResource Canvas}" BorderBrush="{StaticResource GoldDim}" BorderThickness="1" CornerRadius="4">
+                                    <Path x:Name="Tick" Data="M 3,8 L 7,12 L 14,4" Stroke="{StaticResource GoldBright}" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource GoldDim}"/></Trigger>
+                            <Trigger Property="IsChecked" Value="True"><Setter TargetName="Surface" Property="Background" Value="#2B251B"/><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource GoldDim}"/><Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Gold}"/><Setter TargetName="Tick" Property="Visibility" Value="Visible"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value=".5"/><Setter Property="Cursor" Value="Arrow"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+    <Border Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}" BorderThickness="1">
+        <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="218"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Grid ClipToBounds="True">
+                <Image Source="/DestinyLauncher;component/Assets/destiny-hero-gold-v3.png" Stretch="UniformToFill" HorizontalAlignment="Center" Opacity=".45" RenderOptions.BitmapScalingMode="HighQuality"/>
+                <Border>
+                    <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#5010100F"/><GradientStop Color="#E010100F" Offset=".6"/><GradientStop Color="#FF10100F" Offset="1"/></LinearGradientBrush></Border.Background>
+                </Border>
+                <Image Width="174" Height="128" Margin="20,68,20,0" VerticalAlignment="Top" Source="/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/Combination-Mark-Destiny.png" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                <StackPanel Margin="26,0,22,30" VerticalAlignment="Bottom">
+                    <Border Width="28" Height="1" Background="{StaticResource GoldDim}" HorizontalAlignment="Left" Margin="0,0,0,16"/>
+                    <TextBlock Text="DESTINY LAUNCHER" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Gold}"/>
+                    <TextBlock x:Name="VersionLabel" FontSize="11" Foreground="{StaticResource Subtle}" Margin="0,6,0,0"/>
+                </StackPanel>
+                <Border Width="1" Background="{StaticResource Line}" HorizontalAlignment="Right"/>
+            </Grid>
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <TextBlock Text="Desinstalación" FontSize="11" Foreground="{StaticResource Subtle}" Margin="28,0,50,0" VerticalAlignment="Center"/>
+                <Button x:Name="CloseButton" Content="×" FontSize="20" Style="{StaticResource CloseControl}" HorizontalAlignment="Right" VerticalAlignment="Top" ToolTip="Cerrar" AutomationProperties.Name="Cerrar desinstalador" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="Cancel_Click"/>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                    <StackPanel Margin="28,20,28,22">
+                        <TextBlock Text="Desinstalar launcher" FontFamily="{StaticResource DisplayFont}" FontSize="27" TextWrapping="Wrap"/>
+                        <TextBlock Text="Tus juegos y perfiles se conservarán." x:Name="Summary" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,10,0,26" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                        <TextBlock Text="ELIMINAR TAMBIÉN" Style="{StaticResource Eyebrow}" Margin="0,0,0,10"/>
+                        <CheckBox x:Name="ProfilesOption" Style="{StaticResource RemovalOption}" AutomationProperties.AutomationId="RemoveLauncherProfiles" AutomationProperties.Name="Eliminar perfiles y ajustes" Checked="Selection_Changed" Unchecked="Selection_Changed">
+                            <StackPanel><TextBlock Text="Perfiles y ajustes" FontWeight="SemiBold" FontSize="14"/><TextBlock Text="Cuentas locales, preferencias y caché" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,5,10,0" TextWrapping="Wrap"/></StackPanel>
+                        </CheckBox>
+                        <CheckBox x:Name="GamesOption" Style="{StaticResource RemovalOption}" Margin="0,10,0,0" AutomationProperties.AutomationId="RemoveGameInstallations" AutomationProperties.Name="Eliminar instalaciones de Destiny y Destiny Lite" Checked="Selection_Changed" Unchecked="Selection_Changed">
+                            <StackPanel><TextBlock Text="Instalaciones del juego" FontWeight="SemiBold" FontSize="14"/><TextBlock Text="Destiny y Destiny Lite" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,5,0,0"/></StackPanel>
+                        </CheckBox>
+                        <Border x:Name="GameDetails" Visibility="Collapsed" Background="{StaticResource Panel}" CornerRadius="5" Padding="14,12" Margin="0,10,0,0" BorderBrush="{StaticResource GoldDim}" BorderThickness="2,0,0,0">
+                            <StackPanel>
+                                <TextBlock x:Name="GameWarning" Text="También se borrarán mundos, capturas y mods." Foreground="{StaticResource Warning}" FontSize="12" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="GamePaths" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock x:Name="ErrorMessage" Visibility="Collapsed" Foreground="{StaticResource Error}" TextWrapping="Wrap" Margin="0,14,0,0" AutomationProperties.LiveSetting="Assertive"/>
+                    </StackPanel>
+                </ScrollViewer>
+                <Border Grid.Row="2" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="28,18" Background="{StaticResource Panel}">
+                    <StackPanel>
+                        <ProgressBar x:Name="RemovalProgress" Height="3" IsIndeterminate="True" Visibility="Collapsed" Margin="0,0,0,14"/>
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Button x:Name="CancelButton" Content="Cancelar" Style="{StaticResource QuietButton}" Height="42" MinWidth="104" HorizontalAlignment="Left" IsCancel="True" Click="Cancel_Click"/>
+                            <Button x:Name="RemoveButton" Grid.Column="1" Content="Desinstalar" Style="{StaticResource GoldButton}" Height="42" MinWidth="158" AutomationProperties.AutomationId="ConfirmUninstall" Click="Remove_Click"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

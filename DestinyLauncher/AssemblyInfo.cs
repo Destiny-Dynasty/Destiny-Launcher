@@ -3,6 +3,8 @@ using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("UiSmoke")]
 [assembly: InternalsVisibleTo("MinecraftSmoke")]
+[assembly: InternalsVisibleTo("InstallationSmoke")]
+[assembly: InternalsVisibleTo("UpdatePreview")]
 
 [assembly:ThemeInfo(
     ResourceDictionaryLocation.None,            //where theme specific resource dictionaries are located

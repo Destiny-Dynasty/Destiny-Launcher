@@ -18,6 +18,9 @@ public sealed class ConfigService
             config.RamGb = Math.Clamp(config.RamGb, 1, 1024);
             config.JavaArguments ??= LauncherConfig.DefaultJavaArguments;
             config.NormalizeAccounts();
+            if (!Enum.IsDefined(config.WindowMode)) config.WindowMode = GameWindowMode.Windowed;
+            if (config.GameWidth is < 640 or > 7680) config.GameWidth = 1280;
+            if (config.GameHeight is < 360 or > 4320) config.GameHeight = 720;
             if (savedJson is not null && HasRemovedSettings(savedJson))
             {
                 try { Save(config); } catch { }
@@ -47,5 +50,6 @@ public sealed class ConfigService
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
     public string InstalledVersion(string slug) { var file = Path.Combine(_paths.Instance(slug), "destiny-installed.json"); try { return File.Exists(file) ? JsonSerializer.Deserialize<InstalledPack>(File.ReadAllText(file))?.Version ?? "" : ""; } catch { return ""; } }
-    public void SaveInstalled(string slug, string version) { var dir = _paths.Instance(slug); Directory.CreateDirectory(dir); File.WriteAllText(Path.Combine(dir, "destiny-installed.json"), JsonSerializer.Serialize(new InstalledPack { Version = version }, _json)); }
+    public int InstalledJavaVersion(string slug) { try { return System.Text.Json.JsonSerializer.Deserialize<InstalledPack>(File.ReadAllText(Path.Combine(_paths.Instance(slug), "destiny-installed.json")))?.JavaVersion ?? 21; } catch { return 21; } }
+    public void SaveInstalled(string slug, string version, int javaVersion = 21) { var dir = _paths.Instance(slug); Directory.CreateDirectory(dir); File.WriteAllText(Path.Combine(dir, "destiny-installed.json"), JsonSerializer.Serialize(new InstalledPack { Version = version, JavaVersion = javaVersion }, _json)); }
 }

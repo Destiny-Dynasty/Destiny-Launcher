@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private readonly NewsFeedService _newsFeed;
     private readonly bool _previewMode;
     private readonly bool _loadRemoteSkinInPreview;
+    private readonly BackgroundVideoController _backgroundVideo;
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource _optionalActivity = new();
     private CancellationTokenSource? _manifestCancellation;
@@ -39,6 +40,11 @@ public partial class MainWindow : Window
     private string? _playerHeadUsername;
     private CancellationTokenSource? _playerHeadCancellation;
     private Task? _playerHeadLoadTask;
+    private readonly InstallationDataService _installationData;
+    private readonly LauncherUpdateService? _launcherUpdates;
+    private LauncherRelease? _pendingLauncherUpdate;
+    private bool _updateDialogOpen;
+    private bool _updateInstalling;
 
     public MainWindow(bool previewMode = false, bool loadRemoteSkinInPreview = false, bool startOnSettingsPage = false, string? dataRoot = null, PackEdition? initialEdition = null)
     {
@@ -60,13 +66,25 @@ public partial class MainWindow : Window
             previewMode ? Path.Combine(_paths.Root, "desktop-preview") : Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
             Environment.ProcessPath ?? throw new InvalidOperationException("No se encontró el ejecutable del launcher."), edition, dataRoot);
         _paths.SetInstallDirectory(_config.InstallDirectory);
+        _installationData = new InstallationDataService(_paths);
+        if (!previewMode)
+        {
+            try { _installationData.RegisterConfigured(_config.InstallDirectory); }
+            catch (Exception ex) { _log.Error("Instance registration was skipped", ex); }
+        }
+        var installation = LauncherInstallation.Read(AppContext.BaseDirectory);
+        if (!previewMode && installation is { Experimental: false } && dataRoot?.Equals(installation.DataRoot, StringComparison.OrdinalIgnoreCase) != false)
+            _launcherUpdates = new LauncherUpdateService(_paths);
         InitializeComponent();
+        _backgroundVideo = new BackgroundVideoController(HeroVideo, this, _paths,
+            () => !_busy && !_gameRunning && !_closed,
+            ex => _log.Error("Animated background unavailable; keeping the still image", ex), !previewMode);
         ConfigureInitialWindowSize();
         SizeChanged += (_, _) => ApplyResponsiveLayout();
         WindowFrame.SizeChanged += (_, _) => UpdateFrameClip();
         StateChanged += (_, _) => UpdateWindowFrame();
         Hero.SizeChanged += (_, _) => ApplyResponsiveLayout();
-        News.SetSlides(NewsFeedService.BundledSamples());
+        News.SetSlides(NewsFeedService.BundledNews());
         Loaded += async (_, _) =>
         {
             ApplyResponsiveLayout();
@@ -74,6 +92,7 @@ public partial class MainWindow : Window
             if (_initialLoadStarted) return;
             _initialLoadStarted = true;
             if (!_previewMode) _ = LoadNewsAsync();
+            if (_launcherUpdates is not null) _ = CheckLauncherUpdateAsync();
             await RefreshManifestAsync();
         };
         TestModeText.Visibility = dataRoot is not null ? Visibility.Visible : Visibility.Collapsed;
@@ -89,6 +108,36 @@ public partial class MainWindow : Window
     internal Action<Uri> OpenExternalLink { get; set; } = uri => Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
     internal Action<string> OpenDirectory { get; set; } = path => Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     internal Func<PackEdition, string> CreateDesktopShortcut { get; set; }
+    internal Func<Process, CancellationToken, Task<bool>>? GameWindowReady { get; set; }
+    internal BackgroundVideoController BackgroundVideo => _backgroundVideo;
+
+    private async Task CheckLauncherUpdateAsync()
+    {
+        try
+        {
+            _pendingLauncherUpdate = await _launcherUpdates!.CheckAsync(_optionalActivity.Token);
+            ShowPendingLauncherUpdate();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { if (!_closed) _log.Info("Launcher update check skipped: " + ex.Message); }
+    }
+    private void ShowPendingLauncherUpdate()
+    {
+        if (_pendingLauncherUpdate is null || _closed || _busy || _gameRunning || _updateDialogOpen
+            || SettingsPageHost.Content is SettingsPage { HasChanges: true }) return;
+        var release = _pendingLauncherUpdate; _pendingLauncherUpdate = null; _updateDialogOpen = true;
+        try
+        {
+            var dialog = new UpdateDialog(_launcherUpdates!, release, AppContext.BaseDirectory) { Owner = this };
+            if (dialog.ShowDialog() == true && dialog.InstallerStarted) { _updateInstalling = true; Close(); }
+        }
+        finally { _updateDialogOpen = false; }
+    }
+    private void RegisterCurrentInstances()
+    {
+        try { _installationData.RegisterConfigured(_config.InstallDirectory); }
+        catch (Exception ex) { _log.Error("Could not register instance ownership", ex); }
+    }
 
     private void ConfigureInitialWindowSize()
     {
@@ -113,9 +162,9 @@ public partial class MainWindow : Window
         var stacked = width < 740;
         SidebarColumn.Width = new GridLength(narrow ? 70 : 80);
         var height = ActualHeight > 0 ? ActualHeight : Height;
-        var compactHero = Hero.ActualHeight < 340;
+        var compactHero = Hero.ActualHeight < 380;
         HeroMark.Width = compactHero ? 190 : narrow ? 230 : 250;
-        HeroMark.Height = compactHero ? 106 : 148;
+        HeroMark.Height = compactHero ? 106 : 178;
         HeroMark.Margin = new Thickness(narrow ? 20 : 28, compactHero ? 8 : 22, 0, 0);
         News.Width = narrow || compactHero ? 300 : 350;
         News.Height = News.Width / 2.24;
@@ -247,6 +296,7 @@ public partial class MainWindow : Window
             _editionChecks[edition] = check;
             _config.MinecraftVersion = check.Manifest.MinecraftVersion;
             _config.FabricLoaderVersion = check.Manifest.FabricLoaderVersion;
+            pack.JavaVersion = check.Manifest.JavaVersion;
             _log.Info($"Manifest ready for {pack.Slug}: {check.Manifest.Version}");
         }
         catch (OperationCanceledException) when (_closed || generation != _manifestRefreshGeneration) { return; }
@@ -330,8 +380,9 @@ public partial class MainWindow : Window
             await _manifestUpdater.RepairAsync(pack, manifest, dialog.Prompt.RemoveThirdPartyMods.IsChecked == true,
                 new Progress<(string status, double value)>(SetProgress), _lifetime.Token);
             if (initialInstall) await MinecraftService.InitializeNewInstanceAsync(_paths.Instance(pack.Slug), _lifetime.Token);
-            _configService.SaveInstalled(pack.Slug, manifest.Version);
-            _config.MinecraftVersion = manifest.MinecraftVersion; _config.FabricLoaderVersion = manifest.FabricLoaderVersion;
+            _configService.SaveInstalled(pack.Slug, manifest.Version, manifest.JavaVersion);
+            RegisterCurrentInstances();
+            _config.MinecraftVersion = manifest.MinecraftVersion; _config.FabricLoaderVersion = manifest.FabricLoaderVersion; pack.JavaVersion = manifest.JavaVersion;
             _manifestCheck = new PackUpdateCheck(manifest, [], [], []);
             _editionChecks[_config.SelectedEdition] = _manifestCheck; _manifestError = null;
             _configService.Save(_config); success = true;
@@ -388,17 +439,21 @@ public partial class MainWindow : Window
                     await _manifestUpdater.ApplyAsync(pack, manifestCheck, progress, _lifetime.Token);
                     if (string.IsNullOrWhiteSpace(installedVersion))
                         await MinecraftService.InitializeNewInstanceAsync(_paths.Instance(pack.Slug), _lifetime.Token);
-                    _configService.SaveInstalled(pack.Slug, manifestCheck.Manifest.Version);
+                    _configService.SaveInstalled(pack.Slug, manifestCheck.Manifest.Version, manifestCheck.Manifest.JavaVersion);
+                    RegisterCurrentInstances();
                     // A completed update must not keep the old 'changes pending' presentation.
                     _manifestCheck = new PackUpdateCheck(manifestCheck.Manifest, [], [], manifestCheck.PreservedOverrides);
                 }
                 _editionChecks[_config.SelectedEdition] = _manifestCheck;
                 _config.MinecraftVersion = manifestCheck.Manifest.MinecraftVersion;
                 _config.FabricLoaderVersion = manifestCheck.Manifest.FabricLoaderVersion;
+                pack.JavaVersion = manifestCheck.Manifest.JavaVersion;
+                _configService.SaveInstalled(pack.Slug, manifestCheck.Manifest.Version, pack.JavaVersion);
                 _configService.Save(_config);
             }
             else if (string.IsNullOrWhiteSpace(installedVersion))
                 throw new InvalidOperationException("No hay una instalación local ni un manifiesto disponible.");
+            if (manifestCheck is null) pack.JavaVersion = _configService.InstalledJavaVersion(pack.Slug);
             using var session = await _minecraft.PrepareAndLaunchAsync(_config, pack, progress, _lifetime.Token);
             // A settings write failure after a successful start must never abandon the game
             // handle or leave the launcher visible for the rest of the session.
@@ -444,17 +499,26 @@ public partial class MainWindow : Window
         if (_gameRunning) throw new InvalidOperationException("Ya hay una partida en curso.");
         _ = process.Id; // Reject an unstarted process before hiding any UI.
         _gameRunning = true;
+        _backgroundVideo.Update();
         try
         {
             _optionalActivity.Cancel();
             _playerHeadCancellation?.Cancel();
             News.SuspendPlayback(true);
+            PrimaryLabel.Text = "INICIANDO…";
+            SetNotice("Iniciando Minecraft", "", "Gold");
+            Progress.IsIndeterminate = true;
+            Progress.Visibility = Visibility.Visible;
+            var clock = Stopwatch.StartNew();
+            var ready = GameWindowReady is not null ? await GameWindowReady(process, _lifetime.Token)
+                : _previewMode || await GameWindowService.WaitForWindowAsync(process, _config.WindowMode, _lifetime.Token);
+            _log.Info($"Minecraft window readiness: PID {process.Id}, ready={ready}, elapsed={clock.Elapsed.TotalSeconds:F2}s.");
             Progress.IsIndeterminate = false;
             Progress.BeginAnimation(System.Windows.Controls.Primitives.RangeBase.ValueProperty, null);
             Progress.Visibility = Visibility.Collapsed;
             PrimaryLabel.Text = "EN PARTIDA";
             SetNotice("Minecraft en ejecución", "El launcher permanece en segundo plano durante la partida.", "Success");
-            if (!process.HasExited) Hide();
+            if (!process.HasExited && ready) Hide();
             await process.WaitForExitAsync(_lifetime.Token);
             var exitCode = process.ExitCode;
             _log.Info($"Minecraft exited: PID {process.Id}, code {exitCode}.");
@@ -463,6 +527,7 @@ public partial class MainWindow : Window
         finally
         {
             _gameRunning = false;
+            _backgroundVideo.Update();
             if (!_closed)
             {
                 _optionalActivity.Dispose();
@@ -478,6 +543,7 @@ public partial class MainWindow : Window
 
     internal static string GetFriendlyError(Exception ex) => ex switch
     {
+        JavaRuntimeException => ex.Message,
         HttpRequestException { StatusCode: System.Net.HttpStatusCode.NotFound } => "El modpack no está disponible en el servidor. Vuelve a comprobarlo más tarde.",
         HttpRequestException => "No se pudo conectar con el servidor. Revisa tu conexión y vuelve a intentarlo.",
         OperationCanceledException => "La conexión tardó demasiado. Revisa tu conexión y vuelve a intentarlo.",
@@ -497,6 +563,7 @@ public partial class MainWindow : Window
     {
         _busy = busy;
         News.SuspendPlayback(busy);
+        _backgroundVideo.Update();
         if (busy) _operationFailed = false;
         PrimaryButton.IsEnabled = !busy;
         InstallPrimaryButton.IsEnabled = !busy;
@@ -512,6 +579,7 @@ public partial class MainWindow : Window
             PrimaryLabel.Text = "PREPARANDO…";
             SetNotice(status, "", "Gold");
         }
+        else if (_pendingLauncherUpdate is not null) Dispatcher.BeginInvoke(ShowPendingLauncherUpdate);
     }
 
     private void SetProgress((string status, double value) update)
@@ -718,6 +786,7 @@ public partial class MainWindow : Window
     private bool DiscardSettings() => LauncherDialog.Confirm(this, "Cambios sin guardar", "Tienes cambios en los ajustes. Puedes seguir editándolos o descartarlos.", "Descartar cambios", "Seguir editando");
     private async Task SaveSettingsAsync(LauncherConfig config)
     {
+        RegisterCurrentInstances();
         // Validate and persist before updating the active configuration.
         var installPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(config.InstallDirectory.Trim()));
         if (!_previewMode) _configService.Save(config);
@@ -770,6 +839,7 @@ public partial class MainWindow : Window
     }
     protected override void OnClosing(CancelEventArgs e)
     {
+        if (_updateInstalling) { base.OnClosing(e); return; }
         if (_busy)
         {
             e.Cancel = true;
@@ -781,6 +851,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _closed = true;
+        _backgroundVideo.Dispose();
         _lifetime.Cancel();
         _optionalActivity.Cancel();
         _optionalActivity.Dispose();
@@ -790,6 +861,7 @@ public partial class MainWindow : Window
         _playerHeadCancellation?.Dispose();
         _playerHeadService.Dispose();
         _newsFeed.Dispose();
+        _launcherUpdates?.Dispose();
         base.OnClosed(e);
     }
 

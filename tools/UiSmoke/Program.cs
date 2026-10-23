@@ -20,6 +20,8 @@ internal static class Program
     private static readonly List<string> Skipped = [];
     private static string _output = "";
     private static bool _remoteSkin;
+    private static bool _newsArtwork;
+    private static bool _recordVideo;
     [STAThread]
     private static int Main(string[] args)
     {
@@ -32,6 +34,8 @@ internal static class Program
         }
         _output = Path.GetFullPath(args.FirstOrDefault() ?? "artifacts/ui-refinement");
         _remoteSkin = args.Contains("--remote-skin");
+        _newsArtwork = args.Contains("--news-artwork");
+        _recordVideo = args.Contains("--record-video");
         Directory.CreateDirectory(_output);
         var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         application.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/DestinyLauncher;component/Themes/DestinyTheme.xaml", UriKind.Relative) });
@@ -39,7 +43,10 @@ internal static class Program
         {
             try
             {
-                if (args.Contains("--headless")) await AuditHeadless();
+                if (args.Contains("--uninstall-only")) await AuditUninstall();
+                else if (args.Contains("--intro-only")) await AuditIntro();
+                else if (args.Contains("--video-only")) await AuditVideo();
+                else if (args.Contains("--headless")) await AuditHeadless();
                 else if (args.Contains("--lifecycle-only")) await AuditGameLifetime();
                 else await Audit();
                 File.WriteAllText(Path.Combine(_output, "ui-test-results.json"), JsonSerializer.Serialize(new { passed = Passed.Count, checks = Passed, skipped = Skipped, note = "State fixtures and WPF render targets; DPI images do not change the Windows display setting." }, new JsonSerializerOptions { WriteIndented = true }));
@@ -49,6 +56,150 @@ internal static class Program
             catch (Exception ex) { Console.Error.WriteLine(ex); application.Shutdown(1); }
         };
         return application.Run();
+    }
+
+    private static async Task AuditVideo()
+    {
+        var window = new MainWindow(previewMode: true, dataRoot: Path.Combine(_output, "isolated-data"))
+            { Title = "Destiny Launcher - Video test", ShowInTaskbar = _recordVideo, ShowActivated = _recordVideo };
+        if (!_recordVideo) { window.WindowStartupLocation = WindowStartupLocation.Manual; window.Left = -32000; window.Top = -32000; }
+        window.Show(); if (_recordVideo) window.Activate(); await Idle();
+        var controller = window.BackgroundVideo;
+        var playbackFocus = true;
+        controller.HasPlaybackFocus = () => playbackFocus;
+        var video = Get<MediaElement>(window, "HeroVideo");
+        Assert(!controller.IsOpen && video.Source is null, "Ordinary preview does not open a video decoder");
+        Assert(video.IsMuted && video.Volume == 0, "Background video is silent");
+        async Task Until(Func<bool> ready, string name, int seconds = 12)
+        {
+            var clock = Stopwatch.StartNew();
+            var nextTrace = TimeSpan.Zero;
+            while (!ready() && clock.Elapsed.TotalSeconds < seconds)
+            {
+                if (controller.LastError is { } error) throw new Exception(name, error);
+                if (clock.Elapsed >= nextTrace)
+                {
+                    File.AppendAllText(Path.Combine(_output, "video-trace.txt"),
+                        $"{DateTime.UtcNow:O} {name}: active={window.IsActive}, open={controller.IsOpen}, playing={controller.IsPlaying}, position={video.Position.TotalSeconds:F3}, loops={controller.CompletedLoops}\n");
+                    nextTrace = clock.Elapsed + TimeSpan.FromMilliseconds(500);
+                }
+                await Task.Delay(50);
+            }
+            Assert(ready(), name);
+        }
+        if (!SystemParameters.ClientAreaAnimation)
+        {
+            controller.Enabled = true; await Task.Delay(300);
+            Assert(!controller.IsOpen, "Reduced-motion preference keeps the still image and decoder closed");
+            Skipped.Add("Live decoding and loop test: system has reduced motion enabled.");
+            window.Close(); return;
+        }
+        File.WriteAllText(Path.Combine(_output, "video-ready.txt"), "Waiting for optional window-only recorder.");
+        if (_recordVideo) await Until(() => File.Exists(Path.Combine(_output, "recording.ready")), "Window recorder is ready", 40);
+        controller.Enabled = true;
+        await Until(() => video.NaturalVideoWidth == 1920 && video.Position.TotalSeconds > .3 && video.Opacity == 1,
+            "Actual H.264 video decodes at 1920x1080 and advances");
+        Assert(video.NaturalVideoHeight == 1080 && video.NaturalDuration.HasTimeSpan
+            && Math.Abs(video.NaturalDuration.TimeSpan.TotalSeconds - 12) < .1, "Embedded clip has the expected dimensions and real duration");
+        var cache = Directory.GetFiles(Path.Combine(window.DataPaths.Cache, "background"), "*.mp4").Single();
+        var timestamp = File.GetLastWriteTimeUtc(cache);
+        using var process = Process.GetCurrentProcess();
+        var cpuBefore = process.TotalProcessorTime;
+        var activeClock = Stopwatch.StartNew();
+        await Until(() => controller.CompletedLoops >= 1 && video.Position.TotalSeconds > .3,
+            "Playback loops naturally past the full 12-second clip", 25);
+        var cpuOneCorePercent = (process.TotalProcessorTime - cpuBefore).TotalSeconds / activeClock.Elapsed.TotalSeconds * 100;
+        playbackFocus = false; controller.Update(); await Task.Delay(250);
+        Assert(!controller.IsPlaying && controller.IsOpen, "Losing playback focus pauses the existing decoder");
+        var pausedPosition = video.Position;
+        await Task.Delay(350);
+        Assert(Math.Abs((video.Position - pausedPosition).TotalSeconds) < .1, "Paused playback position remains still");
+        playbackFocus = true; controller.Update();
+        await Until(() => controller.IsPlaying, "Returning focus resumes playback");
+        var beforeMinimizeSource = video.Source;
+        window.WindowState = WindowState.Minimized; await Task.Delay(200);
+        Assert(controller.IsOpen && !controller.IsPlaying && ReferenceEquals(video.Source, beforeMinimizeSource)
+            && video.Opacity == 1, "Minimizing preserves the paused decoder, source and last visible frame");
+        var minimizedPosition = video.Position;
+        await Task.Delay(300);
+        Assert(Math.Abs((video.Position-minimizedPosition).TotalSeconds)<.1, "Minimized video does not continue decoding frames");
+        window.WindowState = WindowState.Normal; if (_recordVideo) window.Activate();
+        await Until(() => video.Opacity == 1 && controller.IsPlaying, "Restoring resumes the same video without reopening");
+        Assert(ReferenceEquals(video.Source, beforeMinimizeSource), "Restore retains the same media source instead of seeking back to zero");
+        for (var cycle = 0; cycle < 3; cycle++)
+        {
+            window.WindowState = WindowState.Minimized; await Task.Delay(180);
+            window.WindowState = WindowState.Normal; if (_recordVideo) window.Activate(); await Task.Delay(180);
+            Assert(controller.IsOpen && video.Opacity == 1 && ReferenceEquals(video.Source, beforeMinimizeSource),
+                $"Minimize/restore cycle {cycle+1} preserves the video surface");
+        }
+        Get<Button>(window, "SettingsNav").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); await Idle();
+        Assert(!controller.IsOpen, "Settings page closes the invisible background decoder");
+        Get<Button>(window, "HomeNav").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        await Until(() => controller.IsPlaying && video.Opacity == 1, "Home resumes the animated background");
+        window.SetAuditProgress("Preparando Minecraft", .1); await Idle();
+        Assert(!controller.IsOpen, "Game preparation releases background video resources");
+        window.EndAuditProgress();
+        await Until(() => controller.IsPlaying && video.Opacity == 1, "End of operation restores background playback");
+        window.Hide(); await Task.Delay(150);
+        Assert(!controller.IsOpen, "Hidden background launcher keeps no open decoder");
+        window.Show(); if (_recordVideo) window.Activate();
+        await Until(() => controller.IsPlaying && video.Opacity == 1, "Showing the launcher restores playback");
+        Assert(File.GetLastWriteTimeUtc(cache) == timestamp, "Repeated opens reuse the extracted file without rewriting it");
+        video.Source = new Uri(Path.Combine(_output, "missing-video.mp4")); video.Play();
+        var errorClock = Stopwatch.StartNew();
+        while (controller.LastError is null && errorClock.Elapsed.TotalSeconds < 8) await Task.Delay(50);
+        Assert(controller.LastError is not null && video.Opacity == 0 && !controller.IsOpen,
+            "Decoder failure leaves the poster visible and closes playback without a dialog");
+        File.WriteAllText(Path.Combine(_output, "video-metrics.json"), JsonSerializer.Serialize(new
+        { cpuOneCorePercent, completedLoops = controller.CompletedLoops, cacheBytes = new FileInfo(cache).Length,
+            note = "CPU is this test process during active playback, expressed as percent of one logical CPU; hardware dependent." }, new JsonSerializerOptions { WriteIndented = true }));
+        if (_recordVideo)
+        {
+            var recordingWait = Stopwatch.StartNew();
+            while (!File.Exists(Path.Combine(_output, "recording.done")) && recordingWait.Elapsed.TotalSeconds < 45) await Task.Delay(100);
+            Assert(File.Exists(Path.Combine(_output, "recording.done")), "Window recording completed");
+        }
+        window.Close();
+        Assert(!controller.IsOpen && !controller.IsPlaying, "Closing disposes the decoder");
+    }
+
+    private static async Task AuditIntro()
+    {
+        var frames = await IntroWindow.LoadFramesAsync();
+        Assert(frames.Length == 73 && frames.All(f => f.IsFrozen && f.PixelWidth == 512 && f.PixelHeight == 512),
+            "All 73 embedded alpha frames decode and can cross threads");
+        foreach (var index in new[] { 0, 24, 72 })
+        {
+            var converted = new FormatConvertedBitmap(frames[index], PixelFormats.Bgra32, null, 0);
+            var pixels = new byte[512 * 512 * 4];
+            converted.CopyPixels(pixels, 512 * 4, 0);
+            Assert(pixels[3] == 0 && pixels[(256 * 512 + 256) * 4 + 3] == 255,
+                $"Intro frame {index}: transparent exterior and opaque interior");
+        }
+        IntroWindow MakeIntro() => new(frames)
+        {
+            ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -32000, Top = -32000
+        };
+        var intro = MakeIntro();
+        Assert(intro.AllowsTransparency && intro.WindowStyle == WindowStyle.None && !intro.ShowInTaskbar,
+            "Intro is a transparent borderless window without a taskbar entry");
+        var clock = Stopwatch.StartNew();
+        Assert(await intro.PlayAsync().WaitAsync(TimeSpan.FromSeconds(8)), "Natural intro completion proceeds to launcher");
+        Assert(clock.Elapsed.TotalSeconds >= 3 && clock.Elapsed.TotalSeconds < 6 && !intro.IsPlaying,
+            "Playback follows source duration and detaches rendering on completion");
+        intro.Close();
+        Assert(intro.Content is null, "Closing the intro releases decoded image references");
+        var skip = MakeIntro();
+        var skipTask = skip.PlayAsync();
+        skip.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0,
+            System.Windows.Input.MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonDownEvent });
+        Assert(await skipTask && !skip.IsPlaying, "Click skips the intro and stops playback");
+        skip.Close();
+        var cancel = MakeIntro();
+        var cancelTask = cancel.PlayAsync();
+        cancel.Close();
+        Assert(!await cancelTask && !cancel.IsPlaying, "Closing the startup window cancels startup without a lingering renderer");
     }
 
     private static async Task Audit()
@@ -81,7 +232,7 @@ internal static class Program
         preview.SetAuditState("", playerName: "");
         var openedLinks = new List<Uri>();
         preview.OpenExternalLink = openedLinks.Add;
-        foreach (var (name, address) in new[] { ("DiscordLink", "https://dsc.gg/destiny-dynasty-mc"), ("YouTubeLink", "https://www.youtube.com/@destiny_dynasty"), ("XLink", "https://x.com/DestinyDynasty_") })
+        foreach (var (name, address) in new[] { ("DiscordLink", "https://dsc.gg/destiny-dynasty-mc"), ("YouTubeLink", "https://www.youtube.com/@destiny_dynasty"), ("XLink", "https://x.com/DestinyDynasty_"), ("TatnikHostLink", "https://tatnikhost.net/l/crC7CrzY") })
         {
             var button = Get<Button>(preview, name);
             Assert(button.IsVisible && button.Focusable && button.ToolTip is string && button.MinHeight >= 36, $"{name} is visible, keyboard accessible and labelled");
@@ -90,7 +241,8 @@ internal static class Program
                 $"{name} opens the exact HTTPS address without changing the launcher page");
         }
         var news = Get<NewsCarousel>(preview, "News");
-        Assert(news.SlideCount == 2, "Two bundled samples appear before any network request");
+        Assert(news.SlideCount == 3, "Three bundled announcements appear before any network request");
+        news.SetSlides(NewsFeedService.BundledNews().Take(2).ToArray()); // Two-slide fixture exercises wrap-around.
         Assert(((Border)news.FindName("CaptionSurface")).Opacity == 0, "News is image-only until hover or keyboard focus");
         Assert(news.FindName("PauseButton") is null, "Carousel has no redundant pause button");
         var nextNews = (Button)news.FindName("NextButton");
@@ -137,14 +289,14 @@ internal static class Program
         Assert(outgoingNews.Source is null && incomingNews.RenderTransform.Transform(new Point()).X == 0,
             "Resizing during a swipe settles to a complete image without a stale offset");
         news.Width = newsWidth;
-        news.SetSlides(NewsFeedService.BundledSamples());
+        news.SetSlides(NewsFeedService.BundledNews());
         Assert(!news.IsPlaying, "Inactive offscreen preview does not spend time rotating images");
         news.SetSlides([]);
         Assert(news.Visibility == Visibility.Collapsed && !news.IsPlaying, "Empty editorial feed hides the carousel and stops its timer");
-        news.SetSlides(NewsFeedService.BundledSamples().Take(1).ToArray());
+        news.SetSlides(NewsFeedService.BundledNews().Take(1).ToArray());
         Assert(((StackPanel)news.FindName("Indicators")).Visibility == Visibility.Collapsed && !news.IsPlaying,
             "A single news image has no misleading pagination or rotation");
-        news.SetSlides(NewsFeedService.BundledSamples());
+        news.SetSlides(NewsFeedService.BundledNews());
         Assert(Text(preview, "PrimaryLabel") == "INSTALAR", "First run offers installation");
         Assert(Text(preview, "PackLatestVersionText") == "No disponible", "Unknown remote version has no invented fallback");
         Assert(preview.DataPaths.InstallDirectory.StartsWith(_output, StringComparison.OrdinalIgnoreCase), "Preview installation is isolated");
@@ -351,6 +503,47 @@ internal static class Program
         await AuditGameLifetime();
     }
 
+    private static Task AuditUninstall()
+    {
+        var paths = new LauncherPaths(Path.Combine(_output, "isolated-uninstall-data")); paths.Ensure();
+        File.WriteAllText(paths.ConfigFile, "test profile - keep");
+        var data = new InstallationDataService(paths);
+        var instance = Path.Combine(paths.Root, "instances", "DestinyDynasty-con-una-ruta-larga-para-comprobar-el-ajuste-del-texto");
+        Directory.CreateDirectory(instance);
+        File.WriteAllText(Path.Combine(instance, "destiny-installed.json"), "{\"Version\":\"1.4.7\"}");
+        File.WriteAllText(Path.Combine(instance, "world.fixture"), "keep"); data.Register(instance);
+        var dialog = new UninstallDialog(data);
+        var root = (FrameworkElement)dialog.Content; dialog.Content = null;
+        System.Windows.Documents.TextElement.SetForeground(root, (Brush)Application.Current.FindResource("Ink"));
+        var profiles = Get<CheckBox>(dialog, "ProfilesOption"); var games = Get<CheckBox>(dialog, "GamesOption");
+        Assert(profiles.IsChecked != true && games.IsChecked != true, "Uninstall preserves all player data by default");
+        void Render(string name, double scale, double width = 780, double height = 566)
+        {
+            root.Measure(new Size(width, height)); root.Arrange(new Rect(0, 0, width, height)); root.UpdateLayout();
+            foreach (var visual in Descendants<UIElement>(root)) visual.InvalidateVisual();
+            root.InvalidateVisual(); root.UpdateLayout();
+            var bitmap = new RenderTargetBitmap((int)(width * scale), (int)(height * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32); bitmap.Render(root);
+            var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var file = File.Create(Path.Combine(_output, name + ".png"))) encoder.Save(file);
+            var action = Get<Button>(dialog, "RemoveButton");
+            var bounds = action.TransformToAncestor(root).TransformBounds(new Rect(action.RenderSize));
+            Assert(bounds.Bottom <= height && bounds.Right <= width && bounds.Width >= 150 && bounds.Height >= 40, "Uninstall action remains visible: " + name);
+        }
+        foreach (var scale in new[] { 1d, 1.25, 1.5, 2d }) Render("uninstall-default-" + scale, scale);
+        profiles.IsChecked = true;
+        Assert(Get<TextBlock>(dialog, "Summary").Text.Contains("instalaciones del juego"), "Profile-only cleanup communicates that games are preserved");
+        games.IsChecked = true;
+        Assert(Get<Border>(dialog, "GameDetails").Visibility == Visibility.Visible && Get<TextBlock>(dialog, "GamePaths").Text.Contains(instance), "Game cleanup reveals exact owned paths before confirmation");
+        Render("uninstall-game-removal", 1);
+        Render("uninstall-compact", 1, 730, 440);
+        games.IsChecked = false; profiles.IsChecked = false;
+        Assert(Get<Border>(dialog, "GameDetails").Visibility == Visibility.Collapsed, "Deselection hides destructive game warning");
+        Assert(File.ReadAllText(paths.ConfigFile) == "test profile - keep" && File.Exists(Path.Combine(instance, "world.fixture")), "Selection and rendering never delete player files");
+        Assert(!dialog.IsVisible && PresentationSource.FromVisual(root) is null, "Uninstaller preview does not open a window or capture desktop input");
+        dialog.Close();
+        return Task.CompletedTask;
+    }
+
     private static async Task AuditHeadless()
     {
         // No Show, Activate, native handle creation, input injection, or game-session watcher.
@@ -388,6 +581,21 @@ internal static class Program
             Assert(footer.Visibility == Visibility.Collapsed, $"Idle state '{installed}' has no bottom microcopy");
         }
         CaptureContent("home");
+        if (_newsArtwork)
+        {
+            var news = Get<NewsCarousel>(window, "News");
+            news.Visibility = Visibility.Collapsed;
+            Layout(); CaptureContent("launcher-no-news");
+            news.Visibility = Visibility.Visible;
+            for (var slide = 0; slide < news.SlideCount; slide++)
+            {
+                ((RadioButton)((StackPanel)news.FindName("Indicators")).Children[slide]).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                news.SuspendPlayback(true);
+                Layout(); CaptureContent($"news-{slide + 1}-home");
+            }
+            news.SetSlides([]); news.SetSlides(NewsFeedService.BundledNews());
+            news.SuspendPlayback(false);
+        }
         var gameOptions = Get<Button>(window, "GameOptionsButton");
         var gameMenu = gameOptions.ContextMenu;
         var gameItems = gameMenu.Items.OfType<MenuItem>().ToArray();
@@ -449,6 +657,14 @@ internal static class Program
         var settings = (SettingsPage)Get<ContentControl>(window, "SettingsPageHost").Content;
         var multi = Descendants<CheckBox>(settings).Single(c => System.Windows.Automation.AutomationProperties.GetAutomationId(c) == "MultiAccountToggle");
         var autoJoin = Descendants<CheckBox>(settings).Single(c => System.Windows.Automation.AutomationProperties.GetAutomationId(c) == "AutoJoinServerToggle");
+        var gameWidth = Descendants<TextBox>(settings).Single(c => System.Windows.Automation.AutomationProperties.GetAutomationId(c) == "GameWidthInput");
+        var gameHeight = Descendants<TextBox>(settings).Single(c => System.Windows.Automation.AutomationProperties.GetAutomationId(c) == "GameHeightInput");
+        var gameModes = Descendants<RadioButton>(settings).Where(c => c.GroupName == "GameWindowMode").ToArray();
+        Assert(gameModes.Length == 3 && gameModes.Count(c => c.IsChecked == true) == 1 && gameWidth.IsEnabled, "Game settings expose three exclusive modes with editable windowed resolution");
+        gameModes.Single(c => Equals(c.Content, "Maximizada")).IsChecked = true;
+        Assert(!gameWidth.IsEnabled && !gameHeight.IsEnabled, "Maximized mode uses the desktop area instead of a conflicting custom window size");
+        gameModes.Single(c => Equals(c.Content, "Ventana")).IsChecked = true;
+        gameWidth.Text = "1600"; gameHeight.Text = "900";
         Assert(autoJoin.IsChecked == true, "Settings expose enabled automatic server entry by default");
         autoJoin.IsChecked = false;
         Assert(settings.HasChanges, "Changing automatic server entry participates in unsaved settings tracking");
@@ -503,6 +719,10 @@ internal static class Program
         save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         Assert(saved?.MultiAccountEnabled == true && saved.PlayerName == "Player_Destiny16" && !saved.AutoJoinServer,
             "Settings save multicuentas and disabled server entry without changing the active offline name");
+        Assert(saved?.GameWidth == 1600 && saved.GameHeight == 900 && saved.WindowMode == GameWindowMode.Windowed, "Resolution is saved alongside server entry and existing player settings");
+        gameWidth.Text = "0"; saved = null; save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(saved is null && Descendants<TextBlock>(settings).Any(t => t.Text.Contains("640 y 7680")), "Invalid game width is rejected before settings can be saved");
+        gameWidth.Text = "1600";
         Layout(); CaptureContent("settings");
         foreach (var (width, height) in new[] { (820d, 560d), (760d, 500d), (680d, 480d) })
         {
@@ -746,6 +966,17 @@ internal static class Program
         }
 
         window.SetAuditProgress("Preparando Minecraft", .4);
+        var readyGate = new TaskCompletionSource<bool>();
+        window.GameWindowReady = (_, token) => readyGate.Task.WaitAsync(token);
+        using (var starting = StartGameFixture(1800, 0))
+        {
+            var waiting = window.FollowGameProcessAsync(starting);
+            Assert(window.IsVisible && Get<TextBlock>(window, "PrimaryLabel").Text == "INICIANDO…", "Launcher stays visible while Java has not created a game window");
+            readyGate.SetResult(true); await Idle();
+            Assert(!window.IsVisible, "Launcher hides only after the game-window readiness signal");
+            Assert(await waiting == 0 && window.IsVisible, "Launcher still returns after a delayed game start exits normally");
+        }
+        window.GameWindowReady = null;
         using var unrelated = StartGameFixture(30000, 0);
         using (var game = StartGameFixture(11000, 0))
         {

@@ -7,21 +7,36 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <Version>1.2.0</Version>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
+    <Product>Destiny Launcher</Product>
+    <Company>Destiny Dynasty</Company>
+    <Description>Launcher de Minecraft para Destiny Dynasty</Description>
+    <Copyright>Copyright © 2026 Destiny Dynasty contributors</Copyright>
+    <RepositoryUrl>https://github.com/Destiny-Dynasty/Destiny-Launcher</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CmlLib.Core" Version="4.0.6" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Assets\Intro\emblem.zip" />
+    <EmbeddedResource Include="Assets\Video\reino-rayos-v6.mp4" />
+    <EmbeddedResource Include="Assets\Signing\launcher-update-public.pem" />
     <Resource Include="Assets\destiny-launcher.ico" />
     <Resource Include="Assets\destiny-hero-gold-v3.png" />
+    <Resource Include="Assets\experiment\server-background.jpg" />
+    <Resource Include="Assets\Video\reino-poster.jpg" />
+    <Resource Include="Assets\News\*.jpg" />
     <Resource Include="Assets\destiny-hero-gold-v2.png" />
     <Resource Include="Assets\experiment\obsidian-gold-v1\obsidian-texture.png" />
     <Resource Include="Assets\experiment\obsidian-gold-v1\card-surface-v2.png" />
     <Resource Include="Assets\experiment\obsidian-gold-v1\primary-button-plate.png" />
     <Resource Include="Assets\experiment\obsidian-gold-v1\edition-selector-plate.png" />
     <Resource Include="Assets\experiment\obsidian-gold-v1\destiny-emblem.png" />
-    <Resource Include="Assets\experiment\obsidian-gold-v1\destiny-combination-mark.png" />
+    <Resource Include="Assets\experiment\obsidian-gold-v1\Combination-Mark-Destiny.png" />
   </ItemGroup>
 
 </Project>

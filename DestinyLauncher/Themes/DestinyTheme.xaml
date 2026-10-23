@@ -66,6 +66,13 @@
             <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value=".4"/><Setter Property="Cursor" Value="Arrow"/></Trigger>
         </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
     </Style>
+    <Style x:Key="GameModeOption" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{StaticResource Muted}"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Padding" Value="16,9"/><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}"/>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton"><Border x:Name="Surface" Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="5" Padding="{TemplateBinding Padding}"><ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/></Border><ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True"><Setter TargetName="Surface" Property="Background" Value="#30291D"/><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource Gold}"/><Setter Property="Foreground" Value="{StaticResource GoldBright}"/></Trigger>
+            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource GoldBright}"/></Trigger>
+        </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style x:Key="RepairCheckBox" TargetType="CheckBox">
         <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="Cursor" Value="Hand"/><Setter Property="MinHeight" Value="30"/><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}"/>
         <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox"><Grid Background="Transparent"><Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -84,7 +91,7 @@
         <Setter Property="Background"><Setter.Value><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#D5B577"/><GradientStop Color="#B89250" Offset="1"/></LinearGradientBrush></Setter.Value></Setter>
         <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
             <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="{TemplateBinding Padding}">
-                <Grid><Path Data="M0,7 L0,0 L7,0 M0,14 L0,21 L7,21" Stroke="#5A411E" StrokeThickness=".8" Width="7" Height="21" HorizontalAlignment="Left" VerticalAlignment="Center" Opacity=".65" IsHitTestVisible="False"/><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" Margin="10,0"/></Grid>
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" Margin="10,0"/>
             </Border>
             <ControlTemplate.Triggers>
                 <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#DFC18A"/></Trigger>

@@ -1,0 +1,39 @@
+name: Build and test launcher
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build and isolated regression tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build DestinyLauncher/DestinyLauncher.csproj -c Release
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          foreach ($project in @('InstallationSmoke','MinecraftSmoke','PackUpdaterSmoke','NewsFeedSmoke')) {
+            dotnet run --project "tools/$project/$project.csproj" -c Release -- "artifacts/ci/$project"
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
+          dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/ci/ui --headless
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Publish installer experiment
+        shell: pwsh
+        run: |
+          ./tools/Ensure-InnoSetup.ps1 | Out-Null
+          ./tools/Publish-Launcher.ps1 -OutputPath "$pwd/artifacts/ci/payload"
+          ./tools/Build-Installer.ps1 -PublishPath "$pwd/artifacts/ci/payload" -OutputPath "$pwd/artifacts/ci/installers" -Offline -Experimental -DataRoot 'C:\DestinyLauncherTestData'
+          ./tools/Build-Installer.ps1 -PublishPath "$pwd/artifacts/ci/payload" -OutputPath "$pwd/artifacts/ci/installers" -Experimental -DataRoot 'C:\DestinyLauncherTestData'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: unsigned-installer-experiment
+          path: artifacts/ci/installers/*.exe
+          retention-days: 14

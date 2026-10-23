@@ -1,14 +1,37 @@
-# Instalador online
+# Instalador de Destiny Launcher
 
-El instalador es pequeño y se instala sólo para el usuario actual: ofrece acceso desde Inicio, un acceso opcional en el escritorio y desinstalación desde Windows. Descarga el paquete de la última release desde una URL pública y deja intactos los datos guardados por el launcher bajo `%LOCALAPPDATA%\DestinyLauncher`, además del juego y modpack instalados en la carpeta elegida por el usuario (por defecto `%APPDATA%\.minecraft\versions\DestinyDynasty`).
+El instalador conserva Inno Setup 6.5.4 como motor. Su interfaz personalizada utiliza controles nativos, sin navegador, DLL de terceros ni runtime adicional. La portada, el progreso real y la finalización se muestran en la misma ventana de 840×520; el directorio y el acceso directo se configuran en «Instalación personalizada». La instalación rápida conserva el directorio anterior si existe, o utiliza `%LOCALAPPDATA%\Programs\Destiny Launcher`. No activa inicio automático con Windows.
 
-La URL predeterminada usa la última release pública de `Destiny-Dynasty/Destiny-Launcher`. El repositorio ya es público; el setup podrá descargar el ZIP cuando `DestinyLauncher-win-x64.zip` esté publicado como asset. No se necesita un repositorio privado separado para los binarios: el instalador debe poder descargarlos sin iniciar sesión.
+Se registra en Inicio y en Aplicaciones instaladas de Windows. La carpeta del programa es independiente de los datos del launcher y de las instalaciones de Minecraft. LICENSE y THIRD_PARTY_NOTICES.md acompañan al ejecutable.
 
-## Flujo de publicación
+## Compilar el experimento
 
-1. Ejecutar `tools/Publish-Launcher.ps1` para actualizar el ejecutable de `publish/`.
-2. Ejecutar `tools/Package-Launcher.ps1` y crear una release pública que incluya `publish/DestinyLauncher-win-x64.zip`.
-3. Ejecutar `tools/Build-Installer.ps1`; se genera `publish/DestinyLauncherSetup.exe` con la URL pública predeterminada.
-4. Subir `publish/DestinyLauncherSetup.exe` como asset de esa misma release.
+```powershell
+./tools/Publish-Launcher.ps1 -OutputPath artifacts/installer-experiment/payload
+./tools/Build-Installer.ps1 -PublishPath artifacts/installer-experiment/payload -OutputPath artifacts/installer-experiment/offline -Offline -Experimental -DataRoot artifacts/installed-experiment/data
+./tools/Build-Installer.ps1 -PublishPath artifacts/installer-experiment/payload -OutputPath artifacts/installer-experiment/online -Experimental -DataRoot artifacts/installed-experiment/data
+```
 
-El setup sólo podrá instalar cuando exista el ZIP en una release pública. No se suben compilaciones de prueba al repositorio como commits. Antes de una distribución amplia, conviene añadir firma digital al instalador y al paquete para que Windows pueda verificar al editor.
+`DestinyLauncherSetup.exe` incluye todos los archivos. `DestinyLauncherWebSetup.exe` descarga el ZIP de la release correspondiente a su versión y comprueba el SHA-256 fijado al compilar. La descarga pública requiere que exista ese asset en GitHub; no utiliza una URL mutable de «latest».
+
+No se modifica `publish` al utilizar las rutas anteriores. El experimento tiene registro, accesos y datos separados de la instalación normal.
+
+## Repintado del progreso
+
+`InstallerProgressSurface.iss` compone fondo, texto y barra en dos bitmaps persistentes. Un único panel con HWND propio presenta el último fotograma completo mediante `BitBlt` en `WM_PAINT`; procesa `WM_ERASEBKGND` sin un borrado separado. Se intercambian los buffers solo después de terminar la composición. Esto evita el borrado del padre que afectaba a los controles gráficos sin ventana. El callback se retira antes de liberar el panel y los bitmaps, y no se crea en instalaciones silenciosas.
+
+Se utiliza el patrón documentado por Microsoft para [contextos de memoria](https://learn.microsoft.com/en-us/windows/win32/gdi/memory-device-contexts), [WM_ERASEBKGND](https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-erasebkgnd) y [SetWindowSubclass](https://learn.microsoft.com/en-us/windows/win32/api/commctrl/nf-commctrl-setwindowsubclass), sin copiar bibliotecas de terceros. Como referencia del comportamiento anterior se revisó [TBitmapImage de Inno Setup 6.5.4](https://github.com/jrsoftware/issrc/blob/is-6_5_4/Components/BitmapImage.pas).
+
+Las pruebas `-UiAudit -Experimental -Offline` instalan únicamente en su carpeta de `artifacts`, con AppId separado. `Capture-InstallerFrames.ps1` registra la ventana a 60 fps. `Analyze-InstallerFrames.py --expect-status` comprueba cada fotograma: bloques de borrado, desaparición de la barra, retrocesos del relleno y ausencia del texto. Los temporizadores y la ralentización de prueba no se incluyen en los instaladores normales.
+
+## Capturas del servidor
+
+Consulta [Assets/README.md](Assets/README.md). Al añadir `installer/Assets/background.png`, la siguiente compilación lo incorpora automáticamente. También se puede pasar `-BackgroundPath "ruta/captura.jpg"`. El recurso original no se modifica y el instalador muestra la portada sin conexión.
+
+## Actualizaciones y desinstalación
+
+Los parámetros silenciosos del motor se conservan para las actualizaciones automáticas. La interfaz personalizada no se crea durante `/SILENT` o `/VERYSILENT`. `/AUTORESTART=1` sigue devolviendo el launcher al usuario al terminar una actualización.
+
+La desinstalación interactiva utiliza la ventana propia de Destiny; cancelar aborta antes de eliminar el programa. Las opciones de eliminar perfiles o instalaciones del juego están desmarcadas por defecto. Una desinstalación administrativa silenciosa conserva los datos personales.
+
+Los workflows preparan artefactos y un borrador de release. La firma Windows mediante SignPath depende de aprobación y configuración externas; compilar un instalador no confirma que esté firmado ni que el canal público de actualizaciones esté publicado.

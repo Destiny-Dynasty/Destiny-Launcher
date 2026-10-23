@@ -14,6 +14,7 @@ namespace DestinyLauncher;
 /// </summary>
 public partial class App : Application
 {
+    private Mutex? _instance;
     private async void Application_Startup(object sender, StartupEventArgs e)
     {
         if (e.Args.Length == 2 && e.Args[0].Equals("--render-preview", StringComparison.OrdinalIgnoreCase))
@@ -50,10 +51,60 @@ public partial class App : Application
             return;
         }
 
-        if (!LauncherStartupOptions.TryParse(e.Args, out var startup)) { Shutdown(2); return; }
-        MainWindow = new MainWindow(dataRoot: startup.DataRoot, initialEdition: startup.Edition);
-        MainWindow.Show();
+        var uninstall = e.Args.FirstOrDefault() == "--uninstall";
+        if (!LauncherStartupOptions.TryParse(uninstall ? e.Args.Skip(1).ToArray() : e.Args, out var startup)) { Shutdown(2); return; }
+        var installation = LauncherInstallation.Read(AppContext.BaseDirectory);
+        var dataRoot = startup.DataRoot ?? installation?.DataRoot;
+        // Installed sessions use the same mutex even when shortcuts specify the default data root.
+        var defaultRoot = new LauncherPaths().Root;
+        if (dataRoot is not null && Path.GetFullPath(dataRoot).Equals(defaultRoot, StringComparison.OrdinalIgnoreCase)) dataRoot = null;
+        var mutexRoot = dataRoot is not null && !Path.GetFullPath(dataRoot).Equals(defaultRoot, StringComparison.OrdinalIgnoreCase) ? dataRoot : null;
+        _instance = new Mutex(false, LauncherInstallation.MutexName(mutexRoot), out var firstInstance);
+        if (!firstInstance)
+        {
+            MessageBox.Show("Cierra Destiny Launcher antes de continuar.", "Destiny Launcher", MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown(1); return;
+        }
+        if (uninstall)
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            var paths = new LauncherPaths(dataRoot); paths.Ensure();
+            var data = new InstallationDataService(paths);
+            try { if (File.Exists(paths.ConfigFile)) data.RegisterConfigured(new ConfigService(paths).Load().InstallDirectory); }
+            catch (Exception ex) { MessageBox.Show("No se pudo registrar la instalación: " + ex.Message, "Destiny Launcher"); }
+            var dialog = new UninstallDialog(data);
+            Shutdown(dialog.ShowDialog() == true ? 0 : 1); return;
+        }
+        // Closing the temporary intro must not shut down the application before
+        // the real main window exists. Preview commands above remain unchanged.
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        IntroWindow? intro = null;
+        try
+        {
+            if (SystemParameters.ClientAreaAnimation)
+            {
+                try { intro = new IntroWindow(await IntroWindow.LoadFramesAsync()); }
+                catch (Exception ex) { System.Diagnostics.Trace.WriteLine($"Intro omitida: {ex}"); }
+            }
+
+            var playback = intro?.PlayAsync();
+            // Let the first logo frame paint before preparing the main view.
+            await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
+            var launcher = new MainWindow(dataRoot: dataRoot, initialEdition: startup.Edition);
+            MainWindow = launcher;
+            if (playback is not null && !await playback)
+            {
+                launcher.Close();
+                Shutdown();
+                return;
+            }
+
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
+            launcher.Show();
+        }
+        finally { intro?.Close(); }
     }
+    protected override void OnExit(ExitEventArgs e) { _instance?.Dispose(); base.OnExit(e); }
 
     private async Task RenderPreviewAsync(string outputPath, bool includePlayerSkin, int previewWidth = 1000, int previewHeight = 620)
     {
