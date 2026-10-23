@@ -98,7 +98,7 @@ Los tres iconos inferiores de la barra lateral abren en el navegador predetermin
 
 ## Novedades del launcher
 
-El carrusel de Inicio consume `https://destiny-dynasty.github.io/Launcher-News/news.json`. El repositorio editorial independiente es [Destiny-Dynasty/Launcher-News](https://github.com/Destiny-Dynasty/Launcher-News); su README explica cómo subir imágenes y editar el feed desde GitHub. No se incluyen credenciales en el launcher y publicar una noticia no requiere recompilarlo.
+El carrusel de Inicio consume `https://destiny-dynasty.github.io/news.json`. La web y el feed se mantienen juntos en [Destiny-Dynasty/destiny-dynasty.github.io](https://github.com/Destiny-Dynasty/destiny-dynasty.github.io); su README explica cómo subir imágenes y editar el feed desde GitHub. No se incluyen credenciales en el launcher y publicar una noticia no requiere recompilarlo.
 
 La imagen cambia aproximadamente cada cinco segundos. El texto breve y las flechas aparecen al pasar el cursor o dar foco con el teclado. Al avanzar, la imagen nueva entra desde la derecha mientras la anterior sale por la izquierda; al retroceder se invierte el sentido. Ambas recorren el ancho completo y frenan suavemente al final. Los indicadores permiten seleccionar una noticia. Hover, foco, ventana inactiva/minimizada y operaciones del juego pausan el temporizador. Con movimiento reducido del sistema se usa navegación manual sin transiciones.
 

@@ -10,7 +10,7 @@ namespace DestinyLauncher.Services;
 /// <summary>Optional public content. Its cache and failures are independent of game installation.</summary>
 public sealed class NewsFeedService : IDisposable
 {
-    public static readonly Uri FeedUri = new("https://destiny-dynasty.github.io/Launcher-News/news.json");
+    public static readonly Uri FeedUri = new("https://destiny-dynasty.github.io/news.json");
     private const int MaxFeedBytes = 128 * 1024;
     private const int MaxImageBytes = 4 * 1024 * 1024;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
