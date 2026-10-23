@@ -12,20 +12,20 @@ internal static class FloatingModsAudit
     {
         Directory.CreateDirectory(root);
         using var http = new HttpClient(); http.DefaultRequestHeaders.UserAgent.ParseAdd("DestinyLauncher-Test");
-        using var response = await http.GetAsync($"https://raw.githubusercontent.com/Destiny-Dynasty/Mod-Releases/main/channels/destiny-realms.json?check={Guid.NewGuid():N}");
+        using var response = await http.GetAsync($"https://raw.githubusercontent.com/Destiny-Dynasty/Mod-Releases/main/channels/destiny-dynasty.json?check={Guid.NewGuid():N}");
         response.EnsureSuccessStatusCode();
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var asset = json.RootElement.GetProperty("assets").EnumerateArray().Single(a => a.GetProperty("name").GetString() is string name && !name.EndsWith("-sources.jar") && name.EndsWith(".jar"));
-        var file = new PackManifestFile { Path = "mods/destiny-realms.jar", Url = asset.GetProperty("browser_download_url").GetString()!,
+        var file = new PackManifestFile { Path = "mods/destiny-dynasty.jar", Url = asset.GetProperty("browser_download_url").GetString()!,
             Size = asset.GetProperty("size").GetInt64(), Sha256 = asset.GetProperty("digest").GetString()![7..],
-            GitHub = new() { Repository = "Destiny-Dynasty/Mod-Releases", Release = "latest", Channel = "destiny-realms", Asset = "destiny-realms-*.jar" } };
+            GitHub = new() { Repository = "Destiny-Dynasty/Mod-Releases", Release = "latest", Channel = "destiny-dynasty", Asset = "destiny-dynasty-*.jar" } };
         var manifest = new PackManifest { PackId = "destiny", Version = "2026.0.1-alpha", SchemaVersion = 2, Files = [file] };
         var paths = new LauncherPaths(Path.Combine(root, Guid.NewGuid().ToString("N"))); paths.Ensure();
         var updater = new GitHubPackUpdater(paths, new AppLogger(paths), http);
         var pack = new PackDefinition();
         var initial = await updater.PrepareForPlayAsync(pack, manifest, "", null, CancellationToken.None);
         await updater.ApplyAsync(pack, initial, null, CancellationToken.None);
-        var downloaded = Path.Combine(paths.Instance("destiny"), "mods", "destiny-realms.jar");
+        var downloaded = Path.Combine(paths.Instance("destiny"), "mods", "destiny-dynasty.jar");
         using var jar = System.IO.Compression.ZipFile.OpenRead(downloaded);
         if (jar.GetEntry("fabric.mod.json") is null || (await updater.PrepareForPlayAsync(pack, manifest, manifest.Version, null, CancellationToken.None)).HasChanges) throw new Exception("Live GitHub mod verification failed");
         File.WriteAllText(Path.Combine(root, "live-github-result.json"), JsonSerializer.Serialize(new { verified = true, file.Url, file.Sha256, downloaded, executed = false }, new JsonSerializerOptions { WriteIndented = true }));

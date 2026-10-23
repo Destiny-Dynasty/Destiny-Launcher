@@ -4,7 +4,7 @@ param(
     [string]$Repository = 'Destiny-Dynasty/Mod-Releases'
 )
 $ErrorActionPreference='Stop'
-if($Repository -ne 'Destiny-Dynasty/Mod-Releases' -or $ReleaseTag -notmatch '^mod-(?<id>[a-z0-9][a-z0-9-]*)-(?<version>\d+\.\d+\.\d+[0-9A-Za-z.+_-]*)$'){throw 'Use a Mod-Releases tag such as mod-destiny-realms-0.1.1.'}
+if($Repository -ne 'Destiny-Dynasty/Mod-Releases' -or $ReleaseTag -notmatch '^mod-(?<id>[a-z0-9][a-z0-9-]*)-(?<version>\d+\.\d+\.\d+[0-9A-Za-z.+_-]*)$'){throw 'Use a Mod-Releases tag such as mod-destiny-dynasty-0.1.1.'}
 $modId=$Matches.id
 $release=& gh api "repos/$Repository/releases/tags/$ReleaseTag"|ConvertFrom-Json
 if($LASTEXITCODE){throw 'Could not read published release.'}

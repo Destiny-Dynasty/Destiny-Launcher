@@ -20,8 +20,8 @@ if (args.FirstOrDefault() == "--live-manifests")
         if (manifest.Version != args[2] || manifest.SchemaVersion != 2)
             throw new Exception($"Unexpected public release metadata: {id}");
         var plan = await updater.PrepareForPlayAsync(pack, manifest, "", null, timeout.Token);
-        var realms = plan.Manifest.Files.Single(f => f.Path == "mods/destiny-realms.jar");
-        if (plan.ChangedFiles.Count != manifest.Files.Count || realms.GitHub?.Channel != "destiny-realms"
+        var realms = plan.Manifest.Files.Single(f => f.Path == "mods/destiny-dynasty.jar");
+        if (plan.ChangedFiles.Count != manifest.Files.Count || realms.GitHub?.Channel != "destiny-dynasty"
             || realms.GitHub.Repository != "Destiny-Dynasty/Mod-Releases"
             || plan.Manifest.Files.Any(f => f.Url.Contains("/Modpack/releases/download/") && !f.Url.Contains($"/modpack-{args[2]}/")))
             throw new Exception($"Public install plan is inconsistent: {id}");
@@ -31,7 +31,7 @@ if (args.FirstOrDefault() == "--live-manifests")
     }
     Directory.CreateDirectory(root);
     File.WriteAllText(Path.Combine(root, "public-manifests.json"), JsonSerializer.Serialize(results, new JsonSerializerOptions { WriteIndented = true }));
-    Console.WriteLine("PASS: actual launcher validates all public manifests and resolves Realms latest for all variants. No game files installed.");
+    Console.WriteLine("PASS: actual launcher validates all public manifests and resolves Destiny Dynasty latest for all variants. No game files installed.");
     return 0;
 }
 
