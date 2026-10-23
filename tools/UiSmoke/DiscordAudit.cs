@@ -18,16 +18,43 @@ internal static partial class Program
             { ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -32000, Top = -32000 };
         window.Show(); await Idle();
         Assert(Get<RadioButton>(window, "StaffButton").Visibility == Visibility.Collapsed, "Staff is absent before Discord authorization");
+        Get<Button>(window, "InstallationNav").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await Idle();
+        void CheckCards(int count, string size)
+        {
+            var panel = Get<Grid>(window, "EditionGrid");
+            var cards = new[] { "DestinyButton", "LiteButton", "StaffButton" }.Select(name => Get<RadioButton>(window, name)).Where(card => card.IsVisible).ToArray();
+            Assert(cards.Length == count && cards.All(card => card.ActualHeight > card.ActualWidth), $"{size}: authorized variants form {count} portrait cards");
+            Assert(cards.All(card => Math.Abs(card.ActualWidth - cards[0].ActualWidth) < 1 && Math.Abs(card.ActualHeight - cards[0].ActualHeight) < 1), $"{size}: cards retain equal dimensions");
+            var viewport = Descendants<ScrollContentPresenter>(Get<ScrollViewer>(window, "InstallationScroll")).First();
+            var bounds = panel.TransformToAncestor(viewport).TransformBounds(new Rect(panel.RenderSize));
+            Assert(Math.Abs(bounds.Left + bounds.Width / 2 - viewport.ActualWidth / 2) < 1 && bounds.Left >= -.5 && bounds.Right <= viewport.ActualWidth + .5,
+                $"{size}: visible cards fit the viewport and are centered with no reserved Staff gap");
+            Assert(cards.All(card => card.Background is System.Windows.Media.ImageBrush { ImageSource: System.Windows.Media.Imaging.BitmapSource { PixelWidth: > 0 } }), $"{size}: each card uses a decoded bundled illustration");
+        }
+        CheckCards(2, "1000x620, no Staff"); Capture(window, "installation-two-cards");
+        Get<RadioButton>(window, "LiteButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await Idle();
         var handler = new DiscordAuditHandler();
         var service = new DiscordLinkService(window.DataPaths, new HttpClient(handler), new Uri("http://127.0.0.1/"));
         await service.LinkAsync(_ => {}, null, CancellationToken.None);
         typeof(MainWindow).GetField("_discord", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(window, service);
-        window.SetAuditState("", playerName: "Destiny_Test");
+        window.SetAuditState("", playerName: "Destiny_Test", edition: PackEdition.DestinyLite);
         Assert(Get<RadioButton>(window, "StaffButton").Visibility == Visibility.Visible, "Authorized Discord session reveals the Staff selector");
         Get<Button>(window, "InstallationNav").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await Idle(); Capture(window, "staff-installation");
         Assert(Get<RadioButton>(window, "StaffButton").IsVisible, "Staff selector is actually visible inside the Installation page");
+        Assert(Get<RadioButton>(window, "LiteButton").IsChecked == true && Get<RadioButton>(window, "StaffButton").IsChecked == false, "Granting Staff preserves the selected modpack");
+        CheckCards(3, "1000x620, Staff");
+        foreach (var (width, height) in new[] { (820d, 560d), (680d, 480d) })
+        {
+            window.Width = width; window.Height = height; await Idle(); CheckCards(3, $"{width}x{height}, Staff");
+            var action = Get<Button>(window, "InstallPrimaryButton");
+            var actionBounds = action.TransformToAncestor(window).TransformBounds(new Rect(action.RenderSize));
+            Assert(actionBounds.Left >= 0 && actionBounds.Right <= window.ActualWidth && actionBounds.Bottom <= window.ActualHeight, $"{width}x{height}: install action remains within the window");
+            Capture(window, $"staff-installation-{width}-{height}");
+        }
+        window.Width = 1000; window.Height = 620; await Idle();
         handler.Staff = false; await service.RefreshAsync(CancellationToken.None); window.SetAuditState("", playerName: "Destiny_Test");
         Assert(Get<RadioButton>(window, "StaffButton").Visibility == Visibility.Collapsed, "Removing Discord role hides Staff again");
+        CheckCards(2, "Staff revoked"); Capture(window, "installation-after-revoke");
         var offline = new DiscordLinkService(window.DataPaths, new HttpClient(new DiscordOfflineHandler()));
         var dialog = new DiscordLinkDialog(offline, _ => throw new Exception("Offline flow must not open browser"))
             { Owner = window, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -32000, Top = -32000 };

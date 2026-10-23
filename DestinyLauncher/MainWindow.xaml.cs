@@ -86,9 +86,13 @@ public partial class MainWindow : Window
             ex => _log.Error("Animated background unavailable; keeping the still image", ex), !previewMode);
         ConfigureInitialWindowSize();
         SizeChanged += (_, _) => ApplyResponsiveLayout();
-        WindowFrame.SizeChanged += (_, _) => UpdateFrameClip();
+        WindowFrame.SizeChanged += (_, _) => { UpdateFrameClip(); ApplyResponsiveLayout(); };
         StateChanged += (_, _) => UpdateWindowFrame();
         Hero.SizeChanged += (_, _) => ApplyResponsiveLayout();
+        InstallationScroll.ScrollChanged += (_, args) =>
+        {
+            if (args.ViewportWidthChange != 0 || args.ViewportHeightChange != 0) UpdateEditionLayout();
+        };
         News.SetSlides(NewsFeedService.BundledNews());
         Loaded += async (_, _) =>
         {
@@ -165,11 +169,11 @@ public partial class MainWindow : Window
     private void ApplyResponsiveLayout()
     {
         if (Hero is null) return;
-        var width = ActualWidth > 0 ? ActualWidth : Width;
+        var width = WindowFrame.ActualWidth > 0 ? WindowFrame.ActualWidth : ActualWidth > 0 ? ActualWidth : Width;
         var narrow = width < 860;
         var stacked = width < 740;
         SidebarColumn.Width = new GridLength(narrow ? 70 : 80);
-        var height = ActualHeight > 0 ? ActualHeight : Height;
+        var height = WindowFrame.ActualHeight > 0 ? WindowFrame.ActualHeight : ActualHeight > 0 ? ActualHeight : Height;
         var compactHero = Hero.ActualHeight < 380;
         HeroMark.Width = compactHero ? 190 : narrow ? 230 : 250;
         HeroMark.Height = compactHero ? 106 : 178;
@@ -181,10 +185,30 @@ public partial class MainWindow : Window
         ProfilePanel.Width = narrow ? 214 : 234;
         ProfilePanel.Margin = new Thickness(0, 0, narrow ? 20 : 28, 22);
         InstallationView.Margin = new Thickness(narrow ? 20 : 28, 24, narrow ? 20 : 28, 20);
+        UpdateEditionLayout();
         LaunchLayout.ColumnDefinitions[1].Width = new GridLength(stacked ? 0 : narrow ? 264 : 290);
         Grid.SetRow(ActionPanel, stacked ? 1 : 0);
         Grid.SetColumn(ActionPanel, stacked ? 0 : 1);
         ActionPanel.Margin = stacked ? new Thickness(0, 18, 0, 0) : new Thickness(0);
+    }
+
+    private void UpdateEditionLayout()
+    {
+        if (EditionGrid is null) return;
+        var width = WindowFrame.ActualWidth > 0 ? WindowFrame.ActualWidth : ActualWidth > 0 ? ActualWidth : Width;
+        var height = WindowFrame.ActualHeight > 0 ? WindowFrame.ActualHeight : ActualHeight > 0 ? ActualHeight : Height;
+        var staff = StaffButton.Visibility == Visibility.Visible;
+        var count = staff ? 3 : 2;
+        var cardHeight = Math.Clamp(height - 320, 210, 310);
+        var available = Math.Max(260, width - SidebarColumn.Width.Value - InstallationView.Margin.Left - InstallationView.Margin.Right - 7);
+        if (InstallationScroll.ViewportWidth > 0 && double.IsFinite(InstallationScroll.ViewportWidth))
+            available = Math.Min(available, InstallationScroll.ViewportWidth);
+        EditionGrid.Width = Math.Min(available, count * cardHeight * .82 + (count - 1) * 16);
+        EditionGrid.Height = cardHeight;
+        EditionGrid.ColumnDefinitions[3].Width = new GridLength(staff ? 16 : 0);
+        EditionGrid.ColumnDefinitions[4].Width = staff ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        var titleSize = (EditionGrid.Width - (count - 1) * 16) / count < 210 ? 21 : 26;
+        DestinyTitle.FontSize = LiteTitle.FontSize = StaffTitle.FontSize = titleSize;
     }
 
     private string Installed(PackDefinition pack) => _configService.InstalledVersion(pack.Slug);
@@ -219,6 +243,7 @@ public partial class MainWindow : Window
         DestinyButton.IsChecked = _config.SelectedEdition == PackEdition.Destiny;
         LiteButton.IsChecked = _config.SelectedEdition == PackEdition.DestinyLite;
         StaffButton.Visibility = _discord.Access?.Staff == true ? Visibility.Visible : Visibility.Collapsed;
+        UpdateEditionLayout();
         StaffButton.IsChecked = _config.SelectedEdition == PackEdition.DestinyStaff;
         StaffState.Text = EditionStatus(PackEdition.DestinyStaff, _config.DestinyStaff);
         DestinyState.Text = EditionStatus(PackEdition.Destiny, _config.Destiny);

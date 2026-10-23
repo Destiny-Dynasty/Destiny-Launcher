@@ -134,39 +134,37 @@
                         <TextBlock Text="Instalación" FontFamily="{StaticResource DisplayFont}" FontSize="28" Margin="0,0,0,20"/>
                         <ScrollViewer x:Name="InstallationScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False" Padding="0,0,7,0">
                             <StackPanel>
-                                <StackPanel x:Name="EditionSelector">
-                                    <Grid KeyboardNavigation.TabNavigation="Once">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                        <RadioButton x:Name="DestinyButton" GroupName="Edition" Style="{StaticResource EditionOption}" Tag="Destiny" Click="Edition_Click" Margin="0,0,12,0" AutomationProperties.Name="Destiny, experiencia completa">
-                                            <StackPanel><TextBlock Text="Destiny" FontFamily="{StaticResource DisplayFont}" FontSize="22"/><TextBlock Text="La experiencia completa" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="DestinyState" FontSize="11" Foreground="{StaticResource GoldBright}" Margin="0,12,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                <Grid x:Name="EditionGrid" Height="300" Width="508" HorizontalAlignment="Center" KeyboardNavigation.TabNavigation="Once">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/><ColumnDefinition Width="0"/><ColumnDefinition Width="0"/></Grid.ColumnDefinitions>
+                                        <RadioButton x:Name="DestinyButton" GroupName="Edition" Style="{StaticResource EditionOption}" Tag="Destiny" Click="Edition_Click" AutomationProperties.Name="Destiny, experiencia completa">
+                                            <RadioButton.Background><ImageBrush Stretch="UniformToFill" AlignmentY="Top"><ImageBrush.ImageSource><BitmapImage UriSource="Assets/Modpacks/destiny-v1.jpg" DecodePixelWidth="600"/></ImageBrush.ImageSource></ImageBrush></RadioButton.Background>
+                                            <StackPanel VerticalAlignment="Bottom"><TextBlock x:Name="DestinyTitle" Text="Destiny" FontFamily="{StaticResource DisplayFont}" FontSize="26" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="DestinyState" FontSize="11" Foreground="{StaticResource GoldBright}" Margin="0,8,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
                                         </RadioButton>
-                                        <RadioButton x:Name="LiteButton" Grid.Column="1" GroupName="Edition" Style="{StaticResource EditionOption}" Tag="DestinyLite" Click="Edition_Click" AutomationProperties.Name="Destiny Lite, alternativa ligera">
-                                            <StackPanel><TextBlock Text="Destiny Lite" FontFamily="{StaticResource DisplayFont}" FontSize="22"/><TextBlock Text="Una alternativa ligera" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="LiteState" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,12,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                        <RadioButton x:Name="LiteButton" Grid.Column="2" GroupName="Edition" Style="{StaticResource EditionOption}" Tag="DestinyLite" Click="Edition_Click" AutomationProperties.Name="Destiny Lite, alternativa ligera">
+                                            <RadioButton.Background><ImageBrush Stretch="UniformToFill" AlignmentY="Top"><ImageBrush.ImageSource><BitmapImage UriSource="Assets/Modpacks/lite-v1.jpg" DecodePixelWidth="600"/></ImageBrush.ImageSource></ImageBrush></RadioButton.Background>
+                                            <StackPanel VerticalAlignment="Bottom"><TextBlock x:Name="LiteTitle" Text="Destiny Lite" FontFamily="{StaticResource DisplayFont}" FontSize="26" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="LiteState" FontSize="11" Foreground="#CFC8B8" Margin="0,8,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
                                         </RadioButton>
-                                    </Grid>
-                                    <RadioButton x:Name="StaffButton" GroupName="Edition" Style="{StaticResource EditionOption}" Tag="DestinyStaff" Click="Edition_Click" Visibility="Collapsed" Margin="0,12,0,0" AutomationProperties.Name="Destiny Staff">
-                                        <StackPanel><TextBlock Text="Destiny Staff" FontFamily="{StaticResource DisplayFont}" FontSize="22"/><TextBlock x:Name="StaffState" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,12,0,0"/></StackPanel>
+                                    <RadioButton x:Name="StaffButton" Grid.Column="4" GroupName="Edition" Style="{StaticResource EditionOption}" Tag="DestinyStaff" Click="Edition_Click" Visibility="Collapsed" AutomationProperties.Name="Destiny Staff">
+                                        <RadioButton.Background><ImageBrush Stretch="UniformToFill" AlignmentY="Top"><ImageBrush.ImageSource><BitmapImage UriSource="Assets/Modpacks/staff-v1.jpg" DecodePixelWidth="600"/></ImageBrush.ImageSource></ImageBrush></RadioButton.Background>
+                                        <StackPanel VerticalAlignment="Bottom"><TextBlock x:Name="StaffTitle" Text="Destiny Staff" FontFamily="{StaticResource DisplayFont}" FontSize="26" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="StaffState" FontSize="11" Foreground="#CFC8B8" Margin="0,8,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
                                     </RadioButton>
-                                </StackPanel>
-                                <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="7" Padding="18,16" Margin="0,20,0,0">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Text, ElementName=EditionText}" Style="{StaticResource SectionTitle}"/>
-                                        <WrapPanel Margin="0,12,0,0">
-                                            <TextBlock Text="Instalada  " FontSize="12" Foreground="{StaticResource Muted}"/><TextBlock Text="{Binding Text, ElementName=PackInstalledVersionText}" MaxWidth="160" TextTrimming="CharacterEllipsis" FontSize="12" Margin="0,0,24,0"/>
-                                            <TextBlock Text="Disponible  " FontSize="12" Foreground="{StaticResource Muted}"/><TextBlock Text="{Binding Text, ElementName=PackLatestVersionText}" MaxWidth="160" TextTrimming="CharacterEllipsis" FontSize="12"/>
+                                </Grid>
+                                <Border x:Name="InstallationDetails" Width="{Binding ActualWidth, ElementName=EditionGrid}" HorizontalAlignment="Center" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="7" Padding="14,12" Margin="0,14,0,0">
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                        <WrapPanel Margin="0,0,14,0">
+                                            <TextBlock Text="{Binding Text, ElementName=EditionText}" FontSize="13" FontWeight="SemiBold" Margin="0,0,16,4"/>
+                                            <StackPanel Orientation="Horizontal" Margin="0,1,16,4"><TextBlock Text="Instalada  " FontSize="11" Foreground="{StaticResource Muted}"/><TextBlock Text="{Binding Text, ElementName=PackInstalledVersionText}" MaxWidth="120" TextTrimming="CharacterEllipsis" FontSize="11"/></StackPanel>
+                                            <StackPanel Orientation="Horizontal" Margin="0,1,0,4"><TextBlock Text="Disponible  " FontSize="11" Foreground="{StaticResource Muted}"/><TextBlock Text="{Binding Text, ElementName=PackLatestVersionText}" MaxWidth="120" TextTrimming="CharacterEllipsis" FontSize="11"/></StackPanel>
                                         </WrapPanel>
-                                        <TextBlock Text="CARPETA DEL JUEGO" Style="{StaticResource Eyebrow}" Margin="0,18,0,0"/>
-                                        <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="InstallationPathText" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,0,14,0"/>
-                                            <Button x:Name="OpenInstallationFolderButton" Grid.Column="1" Click="OpenInstallationFolder_Click" ToolTip="Abrir carpeta del juego" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="Abrir carpeta de la variante seleccionada">
+                                            <TextBlock x:Name="InstallationPathText" Grid.Row="1" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,4,14,0"/>
+                                            <Button x:Name="OpenInstallationFolderButton" Grid.Column="1" Grid.RowSpan="2" Padding="10,8" Click="OpenInstallationFolder_Click" ToolTip="Abrir carpeta del juego" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="Abrir carpeta de la variante seleccionada">
                                                 <StackPanel Orientation="Horizontal"><Path Data="{x:Static local:IconGlyphs.Folder}" Width="17" Height="17" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Margin="0,0,8,0"/><TextBlock Text="Abrir carpeta" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" VerticalAlignment="Center"/></StackPanel>
                                             </Button>
-                                        </Grid>
-                                    </StackPanel>
+                                    </Grid>
                                 </Border>
                             </StackPanel>
                         </ScrollViewer>
-                        <Grid Grid.Row="2" Margin="0,18,7,0">
+                        <Grid x:Name="InstallationActions" Grid.Row="2" Width="{Binding ActualWidth, ElementName=EditionGrid}" HorizontalAlignment="Center" Margin="0,18,7,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <Button Content="Volver a Inicio" Click="Home_Click" HorizontalAlignment="Left" Style="{StaticResource QuietButton}"/>
                             <Button x:Name="InstallPrimaryButton" Grid.Column="1" MinWidth="210" Height="46" Style="{StaticResource GoldButton}" Click="Primary_Click"><TextBlock Text="{Binding Text, ElementName=PrimaryLabel}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" FontWeight="Bold" FontSize="13"/></Button>
