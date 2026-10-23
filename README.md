@@ -127,3 +127,5 @@ El instalador online y su proceso de publicación se mantienen en `installer/` y
 ## Modpack compartido y mods propios
 
 Consulta [la guía de variantes](docs/MODPACK_VARIANTS.md) para componer Destiny/Lite/Staff desde una base y publicar mods propios con releases fijas o latest. El código privado de los mods no se distribuye con los JAR.
+
+Vinculación opcional y acceso Staff: [Discord](docs/DISCORD_STAFF.md).

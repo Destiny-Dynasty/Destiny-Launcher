@@ -138,7 +138,7 @@ public sealed class SettingsPage : UserControl
     public Func<LauncherConfig, Task>? SaveRequested { get; set; }
     internal void MarkSaved() => _saved = true;
 
-    public SettingsPage(LauncherConfig source)
+    public SettingsPage(LauncherConfig source, Func<Task>? manageDiscord = null, Func<string>? discordStatus = null, Func<bool>? discordLinked = null)
     {
         _source = source;
         _installationFolderName = LauncherPaths.InstallationFolderName(source.InstallDirectory);
@@ -160,6 +160,20 @@ public sealed class SettingsPage : UserControl
         Grid.SetColumn(accountOption, 1); heading.Children.Add(accountOption);
         layout.Children.Add(heading);
         var content = new StackPanel();
+        var discord = Card(); discord.Margin = new Thickness(0, 0, 0, 14);
+        var discordBody = new Grid();
+        discordBody.ColumnDefinitions.Add(new ColumnDefinition()); discordBody.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var discordInfo = new StackPanel(); discordInfo.Children.Add(Title("Discord"));
+        var discordState = Help(discordStatus?.Invoke() ?? "Sin vincular", new Thickness(0, 7, 12, 0)); discordInfo.Children.Add(discordState); discordBody.Children.Add(discordInfo);
+        var discordButton = ProfileDialog.DialogButton(discordLinked?.Invoke() == true ? "Desvincular" : "Vincular Discord", false);
+        AutomationProperties.SetAutomationId(discordButton, "ManageDiscordLink");
+        discordButton.Click += async (_, _) =>
+        {
+            discordButton.IsEnabled = false;
+            try { if (manageDiscord is not null) await manageDiscord(); }
+            finally { discordState.Text = discordStatus?.Invoke() ?? "Sin vincular"; discordButton.Content = discordLinked?.Invoke() == true ? "Desvincular" : "Vincular Discord"; discordButton.IsEnabled = true; }
+        };
+        Grid.SetColumn(discordButton, 1); discordBody.Children.Add(discordButton); discord.Child = discordBody; content.Children.Add(discord);
         var installation = Card();
         var installBody = new StackPanel();
         installBody.Children.Add(Title("Carpeta de instalación"));
@@ -174,7 +188,7 @@ public sealed class SettingsPage : UserControl
         pathRow.Children.Add(_installDirectory);
         var folderName = new TextBlock
         {
-            Text = "\\" + _installationFolderName + (source.SelectedEdition == PackEdition.DestinyLite ? "-Lite" : ""),
+            Text = "\\" + _installationFolderName + (source.SelectedEdition == PackEdition.DestinyLite ? "-Lite" : source.SelectedEdition == PackEdition.DestinyStaff ? "-Staff" : ""),
             FontSize = 12, Foreground = ProfileDialog.ResourceBrush("Muted"), VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(10, 0, 0, 0)
         };
@@ -296,7 +310,7 @@ public sealed class SettingsPage : UserControl
             var updated = new LauncherConfig { PlayerName = source.PlayerName, SelectedEdition = source.SelectedEdition, InstallDirectory = path,
                 MultiAccountEnabled = _multiAccount.IsChecked == true, Accounts = source.Accounts.ToList(), AutoJoinServer = _autoJoin.IsChecked == true,
                 GameWidth = width, GameHeight = height, WindowMode = SelectedWindowMode,
-                RamGb = ram, JavaArguments = _javaArguments.Text, MinecraftVersion = source.MinecraftVersion, FabricLoaderVersion = source.FabricLoaderVersion, Destiny = source.Destiny, DestinyLite = source.DestinyLite };
+                RamGb = ram, JavaArguments = _javaArguments.Text, MinecraftVersion = source.MinecraftVersion, FabricLoaderVersion = source.FabricLoaderVersion, Destiny = source.Destiny, DestinyLite = source.DestinyLite, DestinyStaff = source.DestinyStaff };
             save.IsEnabled = false;
             try { if (SaveRequested is not null) await SaveRequested(updated); }
             catch (Exception ex) { Error(MainWindow.GetFriendlyError(ex), _installDirectory); }

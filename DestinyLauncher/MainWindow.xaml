@@ -144,6 +144,9 @@
                                             <StackPanel><TextBlock Text="Destiny Lite" FontFamily="{StaticResource DisplayFont}" FontSize="22"/><TextBlock Text="Una alternativa ligera" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="LiteState" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,12,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
                                         </RadioButton>
                                     </Grid>
+                                    <RadioButton x:Name="StaffButton" GroupName="Edition" Style="{StaticResource EditionOption}" Tag="DestinyStaff" Click="Edition_Click" Visibility="Collapsed" Margin="0,12,0,0" AutomationProperties.Name="Destiny Staff">
+                                        <StackPanel><TextBlock Text="Destiny Staff" FontFamily="{StaticResource DisplayFont}" FontSize="22"/><TextBlock x:Name="StaffState" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,12,0,0"/></StackPanel>
+                                    </RadioButton>
                                 </StackPanel>
                                 <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="7" Padding="18,16" Margin="0,20,0,0">
                                     <StackPanel>

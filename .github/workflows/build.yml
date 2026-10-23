@@ -19,7 +19,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           dotnet build DestinyLauncher/DestinyLauncher.csproj -c Release
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          foreach ($project in @('InstallationSmoke','MinecraftSmoke','PackUpdaterSmoke','NewsFeedSmoke')) {
+          foreach ($project in @('InstallationSmoke','MinecraftSmoke','PackUpdaterSmoke','NewsFeedSmoke','DiscordLinkSmoke')) {
             dotnet run --project "tools/$project/$project.csproj" -c Release -- "artifacts/ci/$project"
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           }
@@ -30,6 +30,8 @@ jobs:
           dotnet run --project tools/PackUpdaterSmoke/PackUpdaterSmoke.csproj -c Release -- --floating-only artifacts/ci/floating-mods
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           ./tools/Test-PackVariants.ps1 -OutputDirectory artifacts/ci/variants
+          dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/ci/discord-ui --discord-only
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Publish installer experiment
         shell: pwsh
         run: |

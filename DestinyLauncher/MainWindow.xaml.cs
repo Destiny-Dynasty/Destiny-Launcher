@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private readonly MinecraftService _minecraft;
     private readonly PlayerHeadService _playerHeadService;
     private readonly NewsFeedService _newsFeed;
+    private readonly DiscordLinkService _discord;
     private readonly bool _previewMode;
     private readonly bool _loadRemoteSkinInPreview;
     private readonly BackgroundVideoController _backgroundVideo;
@@ -45,6 +46,7 @@ public partial class MainWindow : Window
     private LauncherRelease? _pendingLauncherUpdate;
     private bool _updateDialogOpen;
     private bool _updateInstalling;
+    private readonly bool _requestedStaff;
 
     public MainWindow(bool previewMode = false, bool loadRemoteSkinInPreview = false, bool startOnSettingsPage = false, string? dataRoot = null, PackEdition? initialEdition = null)
     {
@@ -58,10 +60,13 @@ public partial class MainWindow : Window
         _minecraft = new MinecraftService(_paths, _log);
         _playerHeadService = new PlayerHeadService(_paths);
         _newsFeed = new NewsFeedService(_paths);
+        _discord = new DiscordLinkService(_paths);
         var exists = File.Exists(_paths.ConfigFile);
         _config = previewMode ? new LauncherConfig { PlayerName = loadRemoteSkinInPreview ? "Shady935" : "", InstallDirectory = _paths.InstallDirectory } : _configService.Load();
         if (dataRoot is not null && !exists) _config.InstallDirectory = _paths.InstallDirectory;
         if (initialEdition is not null) _config.SelectedEdition = initialEdition.Value;
+        _requestedStaff = _config.SelectedEdition == PackEdition.DestinyStaff;
+        if (_requestedStaff) _config.SelectedEdition = PackEdition.Destiny;
         CreateDesktopShortcut = edition => GameShortcutService.Create(
             previewMode ? Path.Combine(_paths.Root, "desktop-preview") : Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
             Environment.ProcessPath ?? throw new InvalidOperationException("No se encontró el ejecutable del launcher."), edition, dataRoot);
@@ -93,6 +98,7 @@ public partial class MainWindow : Window
             _initialLoadStarted = true;
             if (!_previewMode) _ = LoadNewsAsync();
             if (_launcherUpdates is not null) _ = CheckLauncherUpdateAsync();
+            if (!_previewMode && _discord.IsLinked && await RefreshDiscordAsync() && _requestedStaff) _config.SelectedEdition = PackEdition.DestinyStaff;
             await RefreshManifestAsync();
         };
         TestModeText.Visibility = dataRoot is not null ? Visibility.Visible : Visibility.Collapsed;
@@ -102,7 +108,7 @@ public partial class MainWindow : Window
         if (startOnSettingsPage) ShowSettingsPage();
     }
 
-    private PackDefinition Pack => _config.SelectedEdition == PackEdition.Destiny ? _config.Destiny : _config.DestinyLite;
+    private PackDefinition Pack => _config.SelectedEdition switch { PackEdition.DestinyLite => _config.DestinyLite, PackEdition.DestinyStaff => _config.DestinyStaff, _ => _config.Destiny };
     internal Task PlayerHeadLoadTask => _playerHeadLoadTask ?? Task.CompletedTask;
     internal LauncherPaths DataPaths => _paths;
     internal Action<Uri> OpenExternalLink { get; set; } = uri => Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
@@ -212,6 +218,9 @@ public partial class MainWindow : Window
         VersionText.Text = $"Minecraft {_config.MinecraftVersion} · Fabric";
         DestinyButton.IsChecked = _config.SelectedEdition == PackEdition.Destiny;
         LiteButton.IsChecked = _config.SelectedEdition == PackEdition.DestinyLite;
+        StaffButton.Visibility = _discord.Access?.Staff == true ? Visibility.Visible : Visibility.Collapsed;
+        StaffButton.IsChecked = _config.SelectedEdition == PackEdition.DestinyStaff;
+        StaffState.Text = EditionStatus(PackEdition.DestinyStaff, _config.DestinyStaff);
         DestinyState.Text = EditionStatus(PackEdition.Destiny, _config.Destiny);
         LiteState.Text = EditionStatus(PackEdition.DestinyLite, _config.DestinyLite);
         DestinyState.Foreground = Brush(_config.SelectedEdition == PackEdition.Destiny ? "GoldBright" : "Muted");
@@ -254,6 +263,7 @@ public partial class MainWindow : Window
     {
         if (_busy) return;
         var edition = Enum.Parse<PackEdition>(((FrameworkElement)sender).Tag!.ToString()!);
+        if (edition == PackEdition.DestinyStaff && !await RefreshDiscordAsync()) return;
         if (edition == _config.SelectedEdition) return;
         var previousEdition = _config.SelectedEdition;
         _config.SelectedEdition = edition;
@@ -403,6 +413,7 @@ public partial class MainWindow : Window
     private async void Primary_Click(object sender, RoutedEventArgs e)
     {
         if (_busy || _checkingManifest) return;
+        if (_config.SelectedEdition == PackEdition.DestinyStaff && !await RefreshDiscordAsync()) return;
         if (string.IsNullOrEmpty(Installed(Pack)) && InstallationView.Visibility != Visibility.Visible)
         {
             ShowInstallationPage();
@@ -569,7 +580,7 @@ public partial class MainWindow : Window
         if (busy) _operationFailed = false;
         PrimaryButton.IsEnabled = !busy;
         InstallPrimaryButton.IsEnabled = !busy;
-        DestinyButton.IsEnabled = LiteButton.IsEnabled = ProfileButton.IsEnabled = SettingsNav.IsEnabled = InstallationNav.IsEnabled = ManageInstallationButton.IsEnabled = !busy;
+        DestinyButton.IsEnabled = LiteButton.IsEnabled = StaffButton.IsEnabled = ProfileButton.IsEnabled = SettingsNav.IsEnabled = InstallationNav.IsEnabled = ManageInstallationButton.IsEnabled = !busy;
         ActionArrow.Visibility = busy ? Visibility.Collapsed : Visibility.Visible;
         RetryCheckButton.Visibility = Visibility.Collapsed;
         Progress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
@@ -767,7 +778,7 @@ public partial class MainWindow : Window
     private void ShowSettingsPage()
     {
         if (_busy || SettingsPageHost.Visibility == Visibility.Visible) return;
-        var page = new SettingsPage(_config) { SaveRequested = SaveSettingsAsync };
+        var page = new SettingsPage(_config, ManageDiscordAsync, () => DiscordStatus, () => _discord.IsLinked) { SaveRequested = SaveSettingsAsync };
         page.BackRequested += ShowHomePage;
         HomeView.Visibility = Visibility.Collapsed;
         InstallationView.Visibility = Visibility.Collapsed;

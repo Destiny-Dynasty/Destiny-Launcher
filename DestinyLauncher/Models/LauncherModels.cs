@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace DestinyLauncher.Models;
 
-public enum PackEdition { Destiny, DestinyLite }
+public enum PackEdition { Destiny, DestinyLite, DestinyStaff }
 public enum GameWindowMode { Windowed, Maximized, Fullscreen }
 public sealed class PackDefinition
 {
@@ -51,6 +51,8 @@ public sealed class LauncherConfig
     public PackDefinition Destiny { get; set; } = new() { Version = "1.4.7" };
     [JsonIgnore]
     public PackDefinition DestinyLite { get; set; } = new() { Name = "Destiny Lite", Slug = "destiny-lite", Version = "0.1.0" };
+    [JsonIgnore]
+    public PackDefinition DestinyStaff { get; set; } = new() { Name = "Destiny Staff", Slug = "destiny-staff", Version = "" };
 }
 public sealed class InstalledPack
 {

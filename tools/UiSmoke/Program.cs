@@ -43,7 +43,8 @@ internal static partial class Program
         {
             try
             {
-                if (args.Contains("--update-only")) await AuditUpdateWindow();
+                if (args.Contains("--discord-only")) await AuditDiscord();
+                else if (args.Contains("--update-only")) await AuditUpdateWindow();
                 else if (args.Contains("--uninstall-only")) await AuditUninstall();
                 else if (args.Contains("--intro-only")) await AuditIntro();
                 else if (args.Contains("--video-only")) await AuditVideo();

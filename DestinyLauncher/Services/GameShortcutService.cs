@@ -29,7 +29,7 @@ internal static class GameShortcutService
     {
         if (!File.Exists(executable)) throw new FileNotFoundException("No se encontró el ejecutable del launcher.", executable);
         Directory.CreateDirectory(desktop);
-        var name = edition == PackEdition.DestinyLite ? "Destiny Lite" : "Destiny";
+        var name = edition switch { PackEdition.DestinyLite => "Destiny Lite", PackEdition.DestinyStaff => "Destiny Staff", _ => "Destiny" };
         var destination = Path.Combine(desktop, $"Destiny Launcher - {name}.lnk");
         var type = Type.GetTypeFromProgID("WScript.Shell") ?? throw new InvalidOperationException("Windows no pudo crear el acceso directo.");
         object? shell = null; object? shortcut = null;
