@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using CmlLib.Core;
 using CmlLib.Core.FileExtractors;
+using CmlLib.Core.VersionLoader;
 using DestinyLauncher.Models;
 using DestinyLauncher.Services;
 
@@ -30,6 +31,25 @@ internal static class JavaRuntimeAudit
         Check(parameters.FileExtractors!.All(e => e is not JavaFileExtractor and not LegacyJavaFileExtractor) && parameters.FileExtractors!.Count() < before,
             "Managed Java prevents CmlLib from also downloading Minecraft's default Java 17");
         Check(parameters.FileExtractors!.Count() >= 3, "Assets, libraries and other Minecraft file installers remain enabled");
+        var instance = parameters.MinecraftPath!;
+        Directory.CreateDirectory(Path.GetDirectoryName(instance.GetVersionJsonPath("1.20.1"))!);
+        File.WriteAllText(instance.GetVersionJsonPath("1.20.1"), """
+            {"id":"1.20.1","type":"release","mainClass":"net.minecraft.client.main.Main","libraries":[]}
+            """);
+        parameters.VersionLoader = new LocalJsonVersionLoader(instance);
+        var options = MinecraftService.CreateLaunchOptions(new LauncherConfig { PlayerName = "Fixture", RamGb = 1, AutoJoinServer = false,
+            JavaArguments = LauncherConfig.DefaultJavaArguments + " -Xms16m -XshowSettings:properties -version" });
+        options.JavaPath = java;
+        using (var process = await new MinecraftLauncher(parameters).BuildProcessAsync("1.20.1", options))
+        {
+            Check(process.StartInfo.FileName == java, "Real Minecraft process builder uses managed Java instead of the Java 17 profile default");
+            JavaArguments.CorrectWindowsQuoting(process.StartInfo, options.ExtraJvmArguments.SelectMany(a => a.Values));
+            using var session = MinecraftGameSession.Start(process);
+            await session.Process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(15));
+            var output = await session.ReadErrorsAsync();
+            File.WriteAllText(Path.Combine(root, "managed-launch-flags.log"), output);
+            Check(session.Process.ExitCode == 0 && output.Contains("java.version = 21."), "Java 21 accepts the actual launcher command line and default JVM flags");
+        }
         var offlineHandler = new OfflineHandler();
         var offline = new JavaRuntimeService(paths, log, new HttpClient(offlineHandler));
         Check(await offline.EnsureAsync(21, progress, CancellationToken.None) == java && offlineHandler.Calls == 0,

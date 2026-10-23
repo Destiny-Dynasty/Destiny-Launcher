@@ -57,6 +57,7 @@ internal static class Program
                 using var service = new LauncherUpdateService(new LauncherPaths(installation.DataRoot), new HttpClient(new DemoHandler(responses, url)), key.ExportSubjectPublicKeyInfoPem(), new Version(1, 1, 0), Path.Combine(target, "DestinyLauncher.exe"));
                 var checkedRelease = await service.CheckAsync(CancellationToken.None) ?? throw new Exception("Demo release was not resolved");
                 var owner = new MainWindow(previewMode: true, dataRoot: installation.DataRoot) { Title = "Destiny Launcher · Prueba de actualización" };
+                ((TextBlock)owner.FindName("LauncherVersionText")).Text = "v1.1.0";
                 owner.Show();
                 var dialog = new UpdateDialog(service, checkedRelease, target) { Owner = owner };
                 dialog.Loaded += async (_, _) =>
