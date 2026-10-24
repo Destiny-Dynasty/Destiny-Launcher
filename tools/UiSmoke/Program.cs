@@ -693,12 +693,16 @@ internal static partial class Program
         var track = (Track)slider.Template.FindName("PART_Track", slider);
         var ticks = Descendants<RamTickBar>(slider).Single();
         Assert(Math.Abs(ticks.ActualWidth - (track.ActualWidth - track.Thumb.ActualWidth)) < .1, "RAM divisions align exactly with the thumb center range");
-        slider.Value = 10;
-        Assert(ram.Text == "10", "RAM slider updates the numeric badge");
+        var quickValue = Math.Max(1, Math.Min(10, MemoryPolicy.System.MaximumGb - 1));
+        slider.Value = quickValue;
+        Assert(ram.Text == quickValue.ToString(), "RAM slider updates the numeric badge");
         Slider.IncreaseSmall.Execute(null, slider);
-        Assert(slider.Value == 11 && ram.Text == "11", "Standard slider commands move RAM by one GB without physical keyboard input");
-        ram.Text = "7";
-        Assert(slider.Value == 7, "Odd RAM values remain supported");
+        var nextValue = Math.Min(quickValue + 1, MemoryPolicy.System.MaximumGb);
+        Assert(slider.Value == nextValue && ram.Text == nextValue.ToString(), "Standard slider commands move RAM by one GB without physical keyboard input");
+        var oddValue = Math.Min(7, MemoryPolicy.System.MaximumGb);
+        if (oddValue % 2 == 0) oddValue--;
+        ram.Text = oddValue.ToString();
+        Assert(slider.Value == oddValue, "Odd RAM values remain supported");
         ram.Text = "32";
         Assert(ram.Text == "32" && slider.Value == Math.Min(32, MemoryPolicy.System.MaximumGb), "Manual RAM entry remains visible while the slider stays within the safe cap");
         LauncherConfig? saved = null;
@@ -707,10 +711,11 @@ internal static partial class Program
         ram.Text = "0";
         save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         Assert(saved is null && Descendants<TextBlock>(settings).Any(t => t.Text.Contains("RAM válida")), "RAM validation remains available after removing help paragraphs");
-        ram.Text = "12";
+        var safeSavedRam = Math.Min(12, MemoryPolicy.System.MaximumGb);
+        ram.Text = safeSavedRam.ToString();
         javaInput.Text = "-Ddestiny.test=custom";
         save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        Assert(saved?.RamGb == 12 && saved.JavaArguments == "-Ddestiny.test=custom" && saved.InstallDirectory == window.DataPaths.Instances,
+        Assert(saved?.RamGb == safeSavedRam && saved.JavaArguments == "-Ddestiny.test=custom" && saved.InstallDirectory == window.DataPaths.Instances,
             "Saving JVM flags and RAM preserves the existing full installation path");
         javaInput.Text = "-Dtest=\"unfinished";
         saved = null;
