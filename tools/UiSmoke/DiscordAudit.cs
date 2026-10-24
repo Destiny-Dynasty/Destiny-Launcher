@@ -24,7 +24,12 @@ internal static partial class Program
             var panel = Get<Grid>(window, "EditionGrid");
             var cards = new[] { "DestinyButton", "LiteButton", "StaffButton" }.Select(name => Get<RadioButton>(window, name)).Where(card => card.IsVisible).ToArray();
             Assert(cards.Length == count && cards.All(card => card.ActualHeight >= 90 && card.ActualWidth >= 150), $"{size}: authorized variants form {count} readable illustrated cards");
-            Assert(cards.All(card => Math.Abs(card.ActualWidth - cards[0].ActualWidth) < 1 && Math.Abs(card.ActualHeight - cards[0].ActualHeight) < 1), $"{size}: cards retain equal dimensions");
+            // Star columns may differ by one physical pixel when the available
+            // width is not divisible by the card count and layout rounding is on.
+            var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(panel);
+            Assert(cards.All(card => Math.Abs(card.ActualWidth - cards[0].ActualWidth) <= 1 / dpi.DpiScaleX + .01
+                && Math.Abs(card.ActualHeight - cards[0].ActualHeight) <= 1 / dpi.DpiScaleY + .01),
+                $"{size}: cards retain equal dimensions within one device pixel ({string.Join(", ", cards.Select(card => $"{card.ActualWidth:F2}x{card.ActualHeight:F2}"))})");
             var viewport = Get<Grid>(window, "InstallationContent");
             var bounds = panel.TransformToAncestor(viewport).TransformBounds(new Rect(panel.RenderSize));
             Assert(Math.Abs(bounds.Left + bounds.Width / 2 - viewport.ActualWidth / 2) < 1 && bounds.Left >= -.5 && bounds.Right <= viewport.ActualWidth + .5,
