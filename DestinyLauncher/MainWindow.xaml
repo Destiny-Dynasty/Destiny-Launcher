@@ -131,7 +131,12 @@
                     </Grid>
                     <Grid x:Name="InstallationView" Visibility="Collapsed" Margin="28,24,28,20">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <TextBlock Text="Instalación" FontFamily="{StaticResource DisplayFont}" FontSize="28" Margin="0,0,0,20"/>
+                        <Grid Margin="0,0,0,20">
+                            <TextBlock Text="Instalación" FontFamily="{StaticResource DisplayFont}" FontSize="28"/>
+                            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="12">
+                                <Hyperlink x:Name="MoreInstallationOptions" Click="MoreInstallationOptions_Click" Foreground="{StaticResource Muted}" AutomationProperties.Name="Más opciones de instalación">Más opciones</Hyperlink>
+                            </TextBlock>
+                        </Grid>
                         <Grid x:Name="InstallationContent" Grid.Row="1">
                             <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                 <Grid x:Name="EditionGrid" MaxHeight="310" Width="508" HorizontalAlignment="Center" KeyboardNavigation.TabNavigation="Once">

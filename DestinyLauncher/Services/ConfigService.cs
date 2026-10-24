@@ -15,13 +15,15 @@ public sealed class ConfigService
             config.Destiny ??= new LauncherConfig().Destiny;
             config.DestinyLite ??= new LauncherConfig().DestinyLite;
             if (string.IsNullOrWhiteSpace(config.InstallDirectory)) config.InstallDirectory = LauncherPaths.DefaultInstallDirectory;
-            config.RamGb = Math.Clamp(config.RamGb, 1, 1024);
+            var safeRam = MemoryPolicy.System.Normalize(config.RamGb);
+            config.RamWasAdjusted = safeRam != config.RamGb;
+            config.RamGb = safeRam;
             config.JavaArguments ??= LauncherConfig.DefaultJavaArguments;
             config.NormalizeAccounts();
             if (!Enum.IsDefined(config.WindowMode)) config.WindowMode = GameWindowMode.Windowed;
             if (config.GameWidth is < 640 or > 7680) config.GameWidth = 1280;
             if (config.GameHeight is < 360 or > 4320) config.GameHeight = 720;
-            if (savedJson is not null && HasRemovedSettings(savedJson))
+            if (savedJson is not null && (config.RamWasAdjusted || HasRemovedSettings(savedJson)))
             {
                 try { Save(config); } catch { }
             }
@@ -44,6 +46,7 @@ public sealed class ConfigService
 
     public void Save(LauncherConfig config)
     {
+        MemoryPolicy.System.Validate(config.RamGb);
         config.NormalizeAccounts();
         var temporary = _paths.ConfigFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try { File.WriteAllText(temporary, JsonSerializer.Serialize(config, _json)); File.Move(temporary, _paths.ConfigFile, true); }

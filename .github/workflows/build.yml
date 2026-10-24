@@ -2,7 +2,7 @@ name: Build and test launcher
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, '1.1.0']
 permissions:
   contents: read
 jobs:
@@ -19,7 +19,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           dotnet build DestinyLauncher/DestinyLauncher.csproj -c Release
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          foreach ($project in @('InstallationSmoke','MinecraftSmoke','PackUpdaterSmoke','NewsFeedSmoke','DiscordLinkSmoke')) {
+          foreach ($project in @('MemorySmoke','InstallationSmoke','MinecraftSmoke','PackUpdaterSmoke','NewsFeedSmoke','DiscordLinkSmoke')) {
             dotnet run --project "tools/$project/$project.csproj" -c Release -- "artifacts/ci/$project"
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           }
@@ -44,3 +44,15 @@ jobs:
           name: unsigned-installer-experiment
           path: artifacts/ci/installers/*.exe
           retention-days: 14
+  linux-core:
+    # WPF is Windows-only. These checks validate shared backend code, not a Linux UI.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: '10.0.x'
+      - name: Shared memory and modpack behavior on Linux
+        run: |
+          dotnet run --project tools/MemorySmoke -c Release
+          dotnet run --project tools/PackUpdaterSmoke -c Release -- artifacts/ci/linux-packs

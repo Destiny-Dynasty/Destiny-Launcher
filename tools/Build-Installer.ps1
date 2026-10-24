@@ -34,8 +34,7 @@ if ($UiAudit) {
     $DataRoot = Join-Path $outputPath 'data'
 }
 if (-not $BackgroundPath) {
-    $customBackground = Join-Path $workspaceRoot 'installer\Assets\background.png'
-    $BackgroundPath = if (Test-Path -LiteralPath $customBackground) { $customBackground } else { Join-Path $workspaceRoot 'DestinyLauncher\Assets\destiny-hero-gold-v3.png' }
+    $BackgroundPath = Join-Path $workspaceRoot 'DestinyLauncher\Assets\Video\reino-poster.jpg'
 }
 $artwork = Join-Path $outputPath 'artwork\setup-background.png'
 $logo = Join-Path $workspaceRoot 'DestinyLauncher\Assets\experiment\obsidian-gold-v1\Combination-Mark-Destiny.png'

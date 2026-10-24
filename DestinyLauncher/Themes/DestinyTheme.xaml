@@ -165,7 +165,7 @@
                     <Track.IncreaseRepeatButton><RepeatButton Command="Slider.IncreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate><Border Height="4" Background="#494435" CornerRadius="2"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
                     <Track.Thumb><Thumb Width="18" Height="18" Cursor="Hand"><Thumb.Template><ControlTemplate TargetType="Thumb"><Border x:Name="Knob" Background="{StaticResource GoldBright}" BorderBrush="#F2DEB7" BorderThickness="1" CornerRadius="9"><Ellipse Width="4" Height="4" Fill="#685333"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Knob" Property="Background" Value="#F0D7A6"/></Trigger><Trigger Property="IsDragging" Value="True"><Setter TargetName="Knob" Property="BorderBrush" Value="{StaticResource Ink}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
                 </Track>
-                <local:RamTickBar Margin="9,0" Value="{TemplateBinding Value}" IsHitTestVisible="False"/>
+                <local:RamTickBar Margin="9,0" Value="{TemplateBinding Value}" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" IsHitTestVisible="False"/>
             </Grid>
         </ControlTemplate></Setter.Value></Setter>
     </Style>

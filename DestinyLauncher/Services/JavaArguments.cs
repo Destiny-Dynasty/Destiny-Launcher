@@ -43,6 +43,19 @@ internal static class JavaArguments
         return result.ToArray();
     }
 
+    internal static void ValidateMemoryOverrides(string? text)
+    {
+        if (Parse(text).Any(value => value.StartsWith("-Xmx", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("-Xms", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("-XX:MaxHeapSize", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("-XX:InitialHeapSize", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("-XX:MaxRAM", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("-XX:InitialRAMPercentage", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("-XX:MinRAMPercentage", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("@", StringComparison.Ordinal)))
+            throw new FormatException("Ajusta la RAM con el selector de memoria, no con argumentos de Java.");
+    }
+
     internal static void CorrectWindowsQuoting(ProcessStartInfo start, IEnumerable<string> arguments)
     {
         // CmlLib 4.0.6 does not double a trailing backslash before a closing quote.

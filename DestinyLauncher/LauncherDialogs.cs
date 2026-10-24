@@ -244,7 +244,9 @@ public sealed class SettingsPage : UserControl
         var ramRow = new Grid { Margin = new Thickness(0, 14, 0, 0) };
         ramRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         ramRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _ramSlider = new Slider { Style = (Style)Application.Current.FindResource("RamSlider"), Minimum = 2, Maximum = 16, SmallChange = 1, LargeChange = 2, TickFrequency = 1, IsSnapToTickEnabled = true, Value = Math.Clamp(source.RamGb, 2, 16), Margin = new Thickness(0, 0, 24, 0), VerticalAlignment = VerticalAlignment.Top };
+        var memoryPolicy = MemoryPolicy.System;
+        var maximumRam = Math.Max(1, memoryPolicy.MaximumGb);
+        _ramSlider = new Slider { Style = (Style)Application.Current.FindResource("RamSlider"), Minimum = 1, Maximum = maximumRam, SmallChange = 1, LargeChange = 2, TickFrequency = 1, IsSnapToTickEnabled = true, Value = memoryPolicy.Normalize(source.RamGb), Margin = new Thickness(0, 0, 24, 0), VerticalAlignment = VerticalAlignment.Top };
         _ramSlider.SetBinding(ToolTipProperty, new System.Windows.Data.Binding(nameof(Slider.Value)) { Source = _ramSlider, StringFormat = "{0:0} GB" });
         AutomationProperties.SetName(_ramSlider, "Memoria del juego en GB");
         _ramSlider.ValueChanged += (_, e) => { if (_syncingRam || _ramValue is null) return; _syncingRam = true; _ramValue.Text = ((int)Math.Round(e.NewValue)).ToString(); _syncingRam = false; };
@@ -252,7 +254,18 @@ public sealed class SettingsPage : UserControl
         _ramValue = new TextBox { Text = source.RamGb.ToString(), Width = 60, MaxLength = 4, TextAlignment = TextAlignment.Center, FontSize = 16, FontWeight = FontWeights.SemiBold, BorderThickness = new Thickness(0), Background = Brushes.Transparent, VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(6, 5, 2, 5) };
         AutomationProperties.SetName(_ramValue, "Memoria en GB");
         AutomationProperties.SetAutomationId(_ramValue, "RamInput");
-        _ramValue.TextChanged += (_, _) => { _ramValue.BorderBrush = ProfileDialog.ResourceBrush("Line"); if (validation is not null) validation.Visibility = Visibility.Collapsed; if (_syncingRam || !int.TryParse(_ramValue.Text, out var value)) return; _syncingRam = true; _ramSlider.Value = Math.Clamp(value, 2, 16); _syncingRam = false; };
+        _ramValue.TextChanged += (_, _) =>
+        {
+            _ramValue.BorderBrush = ProfileDialog.ResourceBrush("Line");
+            if (validation is not null) validation.Visibility = Visibility.Collapsed;
+            if (_syncingRam || !int.TryParse(_ramValue.Text, out var value)) return;
+            _syncingRam = true; _ramSlider.Value = memoryPolicy.Normalize(value); _syncingRam = false;
+            if (value > memoryPolicy.MaximumGb && validation is not null)
+            {
+                validation.Text = memoryPolicy.Warning; validation.Visibility = Visibility.Visible;
+                _ramValue.BorderBrush = ProfileDialog.ResourceBrush("Error");
+            }
+        };
         var valueBadge = new Border { Height = 40, VerticalAlignment = VerticalAlignment.Top, Background = ProfileDialog.ResourceBrush("Canvas"), BorderBrush = ProfileDialog.ResourceBrush("Line"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6) };
         valueBadge.SetBinding(Border.BorderBrushProperty, new System.Windows.Data.Binding(nameof(TextBox.BorderBrush)) { Source = _ramValue });
         var valueContents = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, 0, 12, 0) };
@@ -302,10 +315,11 @@ public sealed class SettingsPage : UserControl
                 path = Path.Combine(Path.GetFullPath(path), _installationFolderName);
             }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { Error("La ruta contiene caracteres no válidos. Elige otra carpeta.", _installDirectory); return; }
-            if (!int.TryParse(_ramValue.Text, out var ram) || ram is < 1 or > 1024) { Error("Introduce un número entero entre 1 y 1024 GB.", _ramValue); return; }
+            if (!int.TryParse(_ramValue.Text, out var ram) || ram < 1) { Error("Introduce una cantidad de RAM válida en GB.", _ramValue); return; }
+            if (ram > memoryPolicy.MaximumGb) { Error(memoryPolicy.Warning, _ramValue); return; }
             if (!int.TryParse(_gameWidth.Text, out var width) || width is < 640 or > 7680) { Error("El ancho debe estar entre 640 y 7680 píxeles.", _gameWidth); return; }
             if (!int.TryParse(_gameHeight.Text, out var height) || height is < 360 or > 4320) { Error("El alto debe estar entre 360 y 4320 píxeles.", _gameHeight); return; }
-            try { JavaArguments.Parse(_javaArguments.Text); }
+            try { JavaArguments.ValidateMemoryOverrides(_javaArguments.Text); }
             catch (FormatException ex) { Error(ex.Message, _javaArguments); return; }
             var updated = new LauncherConfig { PlayerName = source.PlayerName, SelectedEdition = source.SelectedEdition, InstallDirectory = path,
                 MultiAccountEnabled = _multiAccount.IsChecked == true, Accounts = source.Accounts.ToList(), AutoJoinServer = _autoJoin.IsChecked == true,

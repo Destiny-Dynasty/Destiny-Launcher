@@ -26,7 +26,7 @@ Las pruebas `-UiAudit -Experimental -Offline` instalan únicamente en su carpeta
 
 ## Capturas del servidor
 
-Consulta [Assets/README.md](Assets/README.md). Al añadir `installer/Assets/background.png`, la siguiente compilación lo incorpora automáticamente. También se puede pasar `-BackgroundPath "ruta/captura.jpg"`. El recurso original no se modifica y el instalador muestra la portada sin conexión.
+Consulta [Assets/README.md](Assets/README.md). Por defecto se utiliza `DestinyLauncher/Assets/Video/reino-poster.jpg`, compartido con el launcher y el desinstalador. También se puede pasar `-BackgroundPath "ruta/captura.jpg"`. El recurso original no se modifica y el instalador muestra la portada sin conexión.
 
 ## Actualizaciones y desinstalación
 

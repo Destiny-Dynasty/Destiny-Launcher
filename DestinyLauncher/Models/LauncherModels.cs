@@ -40,7 +40,9 @@ public sealed class LauncherConfig
         if (MultiAccountEnabled && !ValidPlayerName(PlayerName)) PlayerName = Accounts.FirstOrDefault() ?? "";
     }
     public PackEdition SelectedEdition { get; set; } = PackEdition.Destiny;
-    public int RamGb { get; set; } = 8;
+    public int RamGb { get; set; } = DestinyLauncher.Services.MemoryPolicy.System.DefaultGb;
+    [JsonIgnore]
+    public bool RamWasAdjusted { get; set; }
     public string JavaArguments { get; set; } = DefaultJavaArguments;
     public string InstallDirectory { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "versions", "DestinyDynasty");
     [JsonIgnore]

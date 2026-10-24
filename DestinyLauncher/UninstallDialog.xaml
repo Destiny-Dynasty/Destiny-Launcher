@@ -42,7 +42,7 @@
         <Grid>
             <Grid.ColumnDefinitions><ColumnDefinition Width="218"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
             <Grid ClipToBounds="True">
-                <Image Source="/DestinyLauncher;component/Assets/destiny-hero-gold-v3.png" Stretch="UniformToFill" HorizontalAlignment="Center" Opacity=".45" RenderOptions.BitmapScalingMode="HighQuality"/>
+                <Image Source="/DestinyLauncher;component/Assets/Video/reino-poster.jpg" Stretch="UniformToFill" HorizontalAlignment="Center" Opacity=".45" RenderOptions.BitmapScalingMode="HighQuality"/>
                 <Border>
                     <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#5010100F"/><GradientStop Color="#E010100F" Offset=".6"/><GradientStop Color="#FF10100F" Offset="1"/></LinearGradientBrush></Border.Background>
                 </Border>

@@ -5,6 +5,20 @@ namespace DestinyLauncher;
 
 public partial class MainWindow
 {
+    private async void MoreInstallationOptions_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (_busy) return;
+        if (_discord.IsLinked)
+        {
+            await RefreshDiscordAsync();
+            LauncherDialog.Inform(this, "Más opciones", _discord.Access?.Staff == true
+                ? "Tu cuenta tiene acceso a Destiny Staff."
+                : "Tu cuenta de Discord no tiene acceso a más modpacks.");
+            return;
+        }
+        if (LauncherDialog.Confirm(this, "Más opciones", "Inicia sesión con Discord para acceder a más opciones.", "Vincular Discord", "Cancelar"))
+            await ManageDiscordAsync();
+    }
     private bool _discordChecking;
     private async Task<bool> RefreshDiscordAsync()
     {

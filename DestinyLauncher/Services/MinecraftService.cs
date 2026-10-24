@@ -17,6 +17,8 @@ public sealed class MinecraftService
     public MinecraftService(LauncherPaths paths, AppLogger log) { _paths = paths; _log = log; }
     public async Task<MinecraftGameSession> PrepareAndLaunchAsync(LauncherConfig config, PackDefinition pack, IProgress<(string status, double value)> progress, CancellationToken token)
     {
+        MemoryPolicy.System.Validate(config.RamGb);
+        JavaArguments.ValidateMemoryOverrides(config.JavaArguments);
         var preparation = Stopwatch.StartNew();
         var options = CreateLaunchOptions(config);
         try { options.JavaPath = await new JavaRuntimeService(_paths, _log).EnsureAsync(pack.JavaVersion, progress, token); }

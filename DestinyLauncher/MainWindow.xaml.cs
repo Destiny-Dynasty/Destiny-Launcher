@@ -102,6 +102,11 @@ public partial class MainWindow : Window
             if (_launcherUpdates is not null) _ = CheckLauncherUpdateAsync();
             if (!_previewMode && _discord.IsLinked && await RefreshDiscordAsync() && _requestedStaff) _config.SelectedEdition = PackEdition.DestinyStaff;
             await RefreshManifestAsync();
+            if (_config.RamWasAdjusted)
+            {
+                SetNotice("RAM ajustada", $"La memoria del juego se ha ajustado a {_config.RamGb} GB para no superar el 80 % de la RAM del equipo.", "Gold");
+                _config.RamWasAdjusted = false;
+            }
         };
         TestModeText.Visibility = dataRoot is not null ? Visibility.Visible : Visibility.Collapsed;
         LauncherVersionText.Text = $"v{typeof(MainWindow).Assembly.GetName().Version?.ToString(3)}";

@@ -19,6 +19,17 @@ internal static partial class Program
         window.Show(); await Idle();
         Assert(Get<RadioButton>(window, "StaffButton").Visibility == Visibility.Collapsed, "Staff is absent before Discord authorization");
         Get<Button>(window, "InstallationNav").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await Idle();
+        var closeOptions = window.Dispatcher.BeginInvoke(new Action(async () =>
+        {
+            var dialog = Application.Current.Windows.OfType<Window>().Single(w => w.IsVisible && w.Owner == window);
+            Assert(dialog.Title == "Más opciones" && Descendants<TextBlock>(dialog).Any(t => t.Text.Contains("Inicia sesión con Discord")), "Installation explains Discord linking in a modal");
+            Assert(Descendants<Button>(dialog).Any(b => Equals(b.Content, "Vincular Discord")), "More options exposes the existing Discord link flow");
+            await Task.Delay(350);
+            Capture(dialog, "installation-more-options");
+            Descendants<Button>(dialog).Single(b => Equals(b.Content, "Cancelar")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        }));
+        ((System.Windows.Documents.Hyperlink)window.FindName("MoreInstallationOptions")).RaiseEvent(new RoutedEventArgs(System.Windows.Documents.Hyperlink.ClickEvent));
+        await closeOptions;
         void CheckCards(int count, string size)
         {
             var panel = Get<Grid>(window, "EditionGrid");

@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../DestinyLauncher/Services/MemoryPolicy.cs" Link="MemoryPolicy.cs" />
     <Compile Include="../../DestinyLauncher/Services/ConfigService.cs" Link="ConfigService.cs" />
     <Compile Include="../../DestinyLauncher/Models/LauncherModels.cs" Link="LauncherModels.cs" />
     <Compile Include="../../DestinyLauncher/Models/PackManifest.cs" Link="PackManifest.cs" />

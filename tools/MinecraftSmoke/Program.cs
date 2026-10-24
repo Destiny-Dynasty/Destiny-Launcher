@@ -76,6 +76,12 @@ var parsedFlags = JavaArguments.Parse(quotedFlags);
 Assert(parsedFlags.SequenceEqual(new[] { "-Ddestiny.path=C:\\Game Folder\\", "-Ddestiny.quote=a\"b", "-Xmx128m" }),
     "Custom JVM parsing preserves Windows paths, spaces, trailing backslashes and escaped quotes");
 Assert(JavaArguments.Parse(" \r\n ").Length == 0, "An intentionally empty JVM field adds no flags");
+foreach (var unsafeFlag in new[] { "-Xmx8G", "-Xms8G", "-XX:MaxHeapSize=8G", "-XX:InitialHeapSize=8G", "-XX:MaxRAMPercentage=100", "@extra-flags.txt" })
+{
+    try { JavaArguments.ValidateMemoryOverrides(unsafeFlag); throw new Exception("Unsafe heap override accepted"); }
+    catch (FormatException) { Assert(true, "Memory selector cannot be bypassed using " + unsafeFlag); }
+}
+JavaArguments.ValidateMemoryOverrides(LauncherConfig.DefaultJavaArguments);
 try { JavaArguments.Parse("-Dtest=\"unfinished"); throw new Exception("Unclosed quote accepted"); }
 catch (FormatException) { checks.Add("Unclosed JVM quotes are rejected before launch"); }
 var configPaths = new LauncherPaths(Path.Combine(root, "config-fixture"));
