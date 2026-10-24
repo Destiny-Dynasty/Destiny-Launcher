@@ -27,9 +27,9 @@ public sealed class NewsFeedService : IDisposable
 
     public static IReadOnlyList<NewsSlide> BundledNews() =>
     [
-        new("launcher-2026-10", "Nuevo launcher: una nueva puerta a Destiny Dynasty.", Bundled("News/nuevo-launcher-v1.jpg"), new Uri(FeedUri, "posts/nuevo-launcher.html")),
-        new("nuevo-comienzo-2026-10", "Próximo reinicio de mundo y nivel. Conservaremos estructuras y objetos compatibles.", Bundled("News/nuevo-comienzo-v1.jpg"), new Uri(FeedUri, "posts/nuevo-comienzo.html")),
-        new("rpg-desarrollo-2026-10", "Un nuevo RPG en desarrollo: misiones, habilidades y una aventura más profunda.", Bundled("News/rpg-en-desarrollo-v1.jpg"), new Uri(FeedUri, "posts/rpg-en-desarrollo.html"))
+        new("launcher-2026-10", "Nuevo launcher: una nueva puerta a Destiny Dynasty.", Bundled("News/nuevo-launcher-v1.jpg"), new Uri(FeedUri, "novedades/nuevo-launcher/")),
+        new("nuevo-comienzo-2026-10", "Próximo reinicio de mundo y nivel. Conservaremos estructuras y objetos compatibles.", Bundled("News/nuevo-comienzo-v1.jpg"), new Uri(FeedUri, "novedades/nuevo-comienzo/")),
+        new("rpg-desarrollo-2026-10", "Un nuevo RPG en desarrollo: misiones, habilidades y una aventura más profunda.", Bundled("News/rpg-en-desarrollo-v1.jpg"), new Uri(FeedUri, "novedades/rpg-en-desarrollo/"))
     ];
 
     private static BitmapImage Bundled(string name)

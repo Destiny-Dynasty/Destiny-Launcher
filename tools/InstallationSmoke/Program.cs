@@ -14,7 +14,8 @@ if (args.FirstOrDefault() == "--live-current-check")
     using var response = await client.GetAsync("https://api.github.com/repos/Destiny-Dynasty/Destiny-Launcher/releases/latest");
     response.EnsureSuccessStatusCode();
     using var metadata = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-    var current = typeof(LauncherUpdateService).Assembly.GetName().Version!;
+    var executable = Path.GetFullPath(args.ElementAtOrDefault(2) ?? "publish/DestinyLauncher.exe");
+    var current = Version.Parse(System.Diagnostics.FileVersionInfo.GetVersionInfo(executable).FileVersion!);
     if (metadata.RootElement.GetProperty("tag_name").GetString() != "v" + current.ToString(3))
         throw new Exception("Stable release does not match the production executable.");
     using var live = new LauncherUpdateService(paths, new HttpClient(), LauncherUpdateService.PublicKey(), current, "missing-unsigned-fixture.exe");
