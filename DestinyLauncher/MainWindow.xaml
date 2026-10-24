@@ -132,9 +132,9 @@
                     <Grid x:Name="InstallationView" Visibility="Collapsed" Margin="28,24,28,20">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Text="Instalación" FontFamily="{StaticResource DisplayFont}" FontSize="28" Margin="0,0,0,20"/>
-                        <ScrollViewer x:Name="InstallationScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False" Padding="0,0,7,0">
-                            <StackPanel>
-                                <Grid x:Name="EditionGrid" Height="300" Width="508" HorizontalAlignment="Center" KeyboardNavigation.TabNavigation="Once">
+                        <Grid x:Name="InstallationContent" Grid.Row="1">
+                            <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <Grid x:Name="EditionGrid" MaxHeight="310" Width="508" HorizontalAlignment="Center" KeyboardNavigation.TabNavigation="Once">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/><ColumnDefinition Width="0"/><ColumnDefinition Width="0"/></Grid.ColumnDefinitions>
                                         <RadioButton x:Name="DestinyButton" GroupName="Edition" Style="{StaticResource EditionOption}" Tag="Destiny" Click="Edition_Click" AutomationProperties.Name="Destiny, experiencia completa">
                                             <RadioButton.Background><ImageBrush Stretch="UniformToFill" AlignmentY="Top"><ImageBrush.ImageSource><BitmapImage UriSource="Assets/Modpacks/destiny-v1.jpg" DecodePixelWidth="600"/></ImageBrush.ImageSource></ImageBrush></RadioButton.Background>
@@ -149,7 +149,7 @@
                                         <StackPanel VerticalAlignment="Bottom"><TextBlock x:Name="StaffTitle" Text="Destiny Staff" FontFamily="{StaticResource DisplayFont}" FontSize="26" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="StaffState" FontSize="11" Foreground="#CFC8B8" Margin="0,8,0,0" TextTrimming="CharacterEllipsis"/></StackPanel>
                                     </RadioButton>
                                 </Grid>
-                                <Border x:Name="InstallationDetails" Width="{Binding ActualWidth, ElementName=EditionGrid}" HorizontalAlignment="Center" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="7" Padding="14,12" Margin="0,14,0,0">
+                                <Border x:Name="InstallationDetails" Grid.Row="1" HorizontalAlignment="Stretch" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="7" Padding="14,12" Margin="0,14,0,0">
                                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                         <WrapPanel Margin="0,0,14,0">
                                             <TextBlock Text="{Binding Text, ElementName=EditionText}" FontSize="13" FontWeight="SemiBold" Margin="0,0,16,4"/>
@@ -162,9 +162,8 @@
                                             </Button>
                                     </Grid>
                                 </Border>
-                            </StackPanel>
-                        </ScrollViewer>
-                        <Grid x:Name="InstallationActions" Grid.Row="2" Width="{Binding ActualWidth, ElementName=EditionGrid}" HorizontalAlignment="Center" Margin="0,18,7,0">
+                        </Grid>
+                        <Grid x:Name="InstallationActions" Grid.Row="2" Margin="0,18,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <Button Content="Volver a Inicio" Click="Home_Click" HorizontalAlignment="Left" Style="{StaticResource QuietButton}"/>
                             <Button x:Name="InstallPrimaryButton" Grid.Column="1" MinWidth="210" Height="46" Style="{StaticResource GoldButton}" Click="Primary_Click"><TextBlock Text="{Binding Text, ElementName=PrimaryLabel}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" FontWeight="Bold" FontSize="13"/></Button>

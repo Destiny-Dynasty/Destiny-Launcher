@@ -1,5 +1,9 @@
 # Destiny Launcher
 
+Versión de producción: **1.0.0**. Para distribuir a jugadores, compartir únicamente
+`DestinyLauncherSetup-1.0.0.exe` (instalador offline autocontenido). El modpack usa
+un versionado independiente; su release actual es `2026.0.1-alpha`.
+
 Launcher de escritorio para el modpack Destiny, construido con WPF y .NET 10.
 
 ## Desarrollo

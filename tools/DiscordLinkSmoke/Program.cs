@@ -20,6 +20,10 @@ Check(browser?.AbsoluteUri == "http://127.0.0.1:24431/launcher/authorize?id=" + 
 Check(access.Staff && access.Username == "Destiny Test", "Staff session is received after proof-bound polling");
 var credential = Path.Combine(root, "discord-session.bin");
 Check(service.IsLinked && !Encoding.UTF8.GetString(File.ReadAllBytes(credential)).Contains(new string('c', 64)), "Saved credential is protected with Windows DPAPI, separate from launcher.json");
+var migrated = new DiscordLinkService(paths, http, new Uri("https://destiny-dynasty-bot.tatnikhost.net/"));
+var callsBeforeMigration = handler.Calls;
+Check(!migrated.IsLinked && await migrated.RefreshAsync(CancellationToken.None) is null && handler.Calls == callsBeforeMigration,
+    "Moving to the HTTPS origin offers a fresh link and never sends an old-origin credential to the new server");
 var restored = new DiscordLinkService(paths, http, new Uri("http://127.0.0.1:24431/"));
 Check((await restored.RefreshAsync(CancellationToken.None))?.Staff == true, "A fresh client restores and revalidates its saved session");
 handler.Staff = false;

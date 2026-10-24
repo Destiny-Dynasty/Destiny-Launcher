@@ -121,7 +121,7 @@
     </Style>
     <Style x:Key="EditionOption" TargetType="RadioButton">
         <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="Background" Value="#191917"/><Setter Property="BorderBrush" Value="{StaticResource Line}"/><Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="MinHeight" Value="210"/><Setter Property="Padding" Value="20,20"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Stretch"/><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}"/><Setter Property="local:UiMotion.Feedback" Value="True"/>
+        <Setter Property="MinHeight" Value="0"/><Setter Property="Padding" Value="20,20"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Stretch"/><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}"/><Setter Property="local:UiMotion.Feedback" Value="True"/>
         <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
             <Border x:Name="Surface" Background="{StaticResource Canvas}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8">
                 <Grid>

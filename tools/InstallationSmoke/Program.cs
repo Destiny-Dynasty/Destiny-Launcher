@@ -6,10 +6,27 @@ using System.Text;
 using System.Text.Json;
 using DestinyLauncher.Services;
 
+if (args.FirstOrDefault() == "--live-current-check")
+{
+    var paths = new LauncherPaths(Path.GetFullPath(args[1]));
+    using var client = new HttpClient();
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("DestinyLauncher-Production-Audit");
+    using var response = await client.GetAsync("https://api.github.com/repos/Destiny-Dynasty/Destiny-Launcher/releases/latest");
+    response.EnsureSuccessStatusCode();
+    using var metadata = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+    var current = typeof(LauncherUpdateService).Assembly.GetName().Version!;
+    if (metadata.RootElement.GetProperty("tag_name").GetString() != "v" + current.ToString(3))
+        throw new Exception("Stable release does not match the production executable.");
+    using var live = new LauncherUpdateService(paths, new HttpClient(), LauncherUpdateService.PublicKey(), current, "missing-unsigned-fixture.exe");
+    if (await live.CheckAsync(CancellationToken.None) is not null)
+        throw new Exception("The production launcher must not offer an old test release or update to itself.");
+    Console.WriteLine($"PASS: stable GitHub release matches {current.ToString(3)} and current launcher offers no spurious update.");
+    return;
+}
 if (args.FirstOrDefault() == "--live-check")
 {
     var livePaths = new LauncherPaths(Path.GetFullPath(args[1])); livePaths.Ensure();
-    using var live = new LauncherUpdateService(livePaths, new HttpClient(), LauncherUpdateService.PublicKey(), new Version(1, 1, 0), "missing-unsigned-fixture.exe");
+    using var live = new LauncherUpdateService(livePaths, new HttpClient(), LauncherUpdateService.PublicKey(), new Version(0, 0, 0), "missing-unsigned-fixture.exe");
     var found = await live.CheckAsync(CancellationToken.None) ?? throw new Exception("No stable signed update found");
     var staged = await live.DownloadAsync(found, new Progress<double>(), CancellationToken.None);
     File.WriteAllText(Path.Combine(livePaths.Root, "live-update-result.json"), JsonSerializer.Serialize(new { verified = true, found.Version, found.InstallerUrl, found.Sha256, staged }, new JsonSerializerOptions { WriteIndented = true }));

@@ -23,13 +23,20 @@ internal static partial class Program
         {
             var panel = Get<Grid>(window, "EditionGrid");
             var cards = new[] { "DestinyButton", "LiteButton", "StaffButton" }.Select(name => Get<RadioButton>(window, name)).Where(card => card.IsVisible).ToArray();
-            Assert(cards.Length == count && cards.All(card => card.ActualHeight > card.ActualWidth), $"{size}: authorized variants form {count} portrait cards");
+            Assert(cards.Length == count && cards.All(card => card.ActualHeight >= 90 && card.ActualWidth >= 150), $"{size}: authorized variants form {count} readable illustrated cards");
             Assert(cards.All(card => Math.Abs(card.ActualWidth - cards[0].ActualWidth) < 1 && Math.Abs(card.ActualHeight - cards[0].ActualHeight) < 1), $"{size}: cards retain equal dimensions");
-            var viewport = Descendants<ScrollContentPresenter>(Get<ScrollViewer>(window, "InstallationScroll")).First();
+            var viewport = Get<Grid>(window, "InstallationContent");
             var bounds = panel.TransformToAncestor(viewport).TransformBounds(new Rect(panel.RenderSize));
             Assert(Math.Abs(bounds.Left + bounds.Width / 2 - viewport.ActualWidth / 2) < 1 && bounds.Left >= -.5 && bounds.Right <= viewport.ActualWidth + .5,
                 $"{size}: visible cards fit the viewport and are centered with no reserved Staff gap");
             Assert(cards.All(card => card.Background is System.Windows.Media.ImageBrush { ImageSource: System.Windows.Media.Imaging.BitmapSource { PixelWidth: > 0 } }), $"{size}: each card uses a decoded bundled illustration");
+            var details = Get<Border>(window, "InstallationDetails");
+            var detailBounds = details.TransformToAncestor(viewport).TransformBounds(new Rect(details.RenderSize));
+            Assert(bounds.Top >= -.5 && bounds.Bottom <= detailBounds.Top + .5 && detailBounds.Bottom <= viewport.ActualHeight + .5,
+                $"{size}: cards and details fit vertically without overlap or scrolling");
+            Assert(cards.All(card => { var b = card.TransformToAncestor(viewport).TransformBounds(new Rect(card.RenderSize)); return b.Top >= -.5 && b.Bottom <= detailBounds.Top + .5; }),
+                $"{size}: individual cards remain fully inside their allocated row");
+            Assert(!Descendants<ScrollViewer>(Get<Grid>(window, "InstallationView")).Any(), $"{size}: Installation has no scroll container");
         }
         CheckCards(2, "1000x620, no Staff"); Capture(window, "installation-two-cards");
         Get<RadioButton>(window, "LiteButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await Idle();
@@ -50,6 +57,20 @@ internal static partial class Program
             var actionBounds = action.TransformToAncestor(window).TransformBounds(new Rect(action.RenderSize));
             Assert(actionBounds.Left >= 0 && actionBounds.Right <= window.ActualWidth && actionBounds.Bottom <= window.ActualHeight, $"{width}x{height}: install action remains within the window");
             Capture(window, $"staff-installation-{width}-{height}");
+        }
+        window.Width = 1000; window.Height = 620; await Idle();
+        foreach (var (width, height) in new[] { (1000d, 620d), (820d, 560d), (760d, 500d) })
+        {
+            window.Width = width; window.Height = height;
+            window.SetAuditState("", error: "El modpack no está disponible en el servidor. Vuelve a comprobarlo más tarde.", edition: PackEdition.DestinyStaff);
+            await Idle(); CheckCards(3, $"{width}x{height}, Staff with error footer");
+            var view = Get<Grid>(window, "InstallationView");
+            var footer = Get<Border>(window, "StatusFooter");
+            var action = Get<Grid>(window, "InstallationActions");
+            var actionBounds = action.TransformToAncestor(window).TransformBounds(new Rect(action.RenderSize));
+            var footerBounds = footer.TransformToAncestor(window).TransformBounds(new Rect(footer.RenderSize));
+            Assert(footer.IsVisible && actionBounds.Bottom <= footerBounds.Top + .5, $"{width}x{height}: actions fit above the visible error footer");
+            Capture(window, $"installation-error-{width}-{height}");
         }
         window.Width = 1000; window.Height = 620; await Idle();
         handler.Staff = false; await service.RefreshAsync(CancellationToken.None); window.SetAuditState("", playerName: "Destiny_Test");

@@ -7,7 +7,7 @@ El repositorio público `Destiny-Dynasty/Modpack` contiene una base compartida y
 - `base/manifest.json`: catálogo común.
 - `variants/*.json`: herencia, exclusiones, inclusiones y sustituciones.
 - `manifests/*.json`: resultados completos, generados juntos y consumidos por el launcher.
-- `channels/*.json`: última release pública de cada mod propio, conservando el código privado.
+- `Destiny-Dynasty/Mod-Releases/channels/*.json`: canales públicos independientes de cada mod propio, conservando el código privado.
 
 `Build-PackVariants.ps1` prepara todas las variantes habilitadas. `Publish-PackVariants.ps1` publica una sola release compartida y después actualiza sus manifiestos juntos. Los archivos sin cambios reutilizan sus URLs; los nuevos assets se verifican y nunca se sobrescriben. `New-PackManifest.ps1` continúa disponible para generar el catálogo base desde una carpeta local.
 

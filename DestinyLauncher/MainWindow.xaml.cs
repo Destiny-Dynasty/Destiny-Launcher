@@ -89,10 +89,8 @@ public partial class MainWindow : Window
         WindowFrame.SizeChanged += (_, _) => { UpdateFrameClip(); ApplyResponsiveLayout(); };
         StateChanged += (_, _) => UpdateWindowFrame();
         Hero.SizeChanged += (_, _) => ApplyResponsiveLayout();
-        InstallationScroll.ScrollChanged += (_, args) =>
-        {
-            if (args.ViewportWidthChange != 0 || args.ViewportHeightChange != 0) UpdateEditionLayout();
-        };
+        InstallationContent.SizeChanged += (_, _) => UpdateEditionLayout();
+        EditionGrid.SizeChanged += (_, _) => UpdateEditionLayout();
         News.SetSlides(NewsFeedService.BundledNews());
         Loaded += async (_, _) =>
         {
@@ -196,18 +194,19 @@ public partial class MainWindow : Window
     {
         if (EditionGrid is null) return;
         var width = WindowFrame.ActualWidth > 0 ? WindowFrame.ActualWidth : ActualWidth > 0 ? ActualWidth : Width;
-        var height = WindowFrame.ActualHeight > 0 ? WindowFrame.ActualHeight : ActualHeight > 0 ? ActualHeight : Height;
         var staff = StaffButton.Visibility == Visibility.Visible;
         var count = staff ? 3 : 2;
-        var cardHeight = Math.Clamp(height - 320, 210, 310);
-        var available = Math.Max(260, width - SidebarColumn.Width.Value - InstallationView.Margin.Left - InstallationView.Margin.Right - 7);
-        if (InstallationScroll.ViewportWidth > 0 && double.IsFinite(InstallationScroll.ViewportWidth))
-            available = Math.Min(available, InstallationScroll.ViewportWidth);
-        EditionGrid.Width = Math.Min(available, count * cardHeight * .82 + (count - 1) * 16);
-        EditionGrid.Height = cardHeight;
+        // The star row gives the artwork only the space left after the heading,
+        // details, actions and any status footer. Never impose a minimum height.
+        var cardHeight = EditionGrid.ActualHeight > 0 ? EditionGrid.ActualHeight : 300;
+        var available = InstallationContent.ActualWidth > 0 ? InstallationContent.ActualWidth
+            : Math.Max(0, width - SidebarColumn.Width.Value - InstallationView.Margin.Left - InstallationView.Margin.Right);
+        EditionGrid.Width = Math.Min(available, count * Math.Max(160, cardHeight * .82) + (count - 1) * 16);
         EditionGrid.ColumnDefinitions[3].Width = new GridLength(staff ? 16 : 0);
         EditionGrid.ColumnDefinitions[4].Width = staff ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-        var titleSize = (EditionGrid.Width - (count - 1) * 16) / count < 210 ? 21 : 26;
+        var cardWidth = (EditionGrid.Width - (count - 1) * 16) / count;
+        var titleSize = cardWidth < 180 ? 19 : cardWidth < 210 ? 21 : 26;
+        DestinyButton.Padding = LiteButton.Padding = StaffButton.Padding = new Thickness(cardWidth < 180 ? 14 : 20);
         DestinyTitle.FontSize = LiteTitle.FontSize = StaffTitle.FontSize = titleSize;
     }
 

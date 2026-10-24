@@ -23,6 +23,11 @@ principal para partidas sin acceso al manifiesto.
 
 ## Release oficial
 
+La primera versión de producción es **1.0.0**. La release 1.2.0 anterior era de
+pruebas y se conserva como pre-release; no debe ser Latest. Las compilaciones
+locales 1.3.x también eran experimentales. La siguiente actualización de producción
+será 1.0.1 o superior. El versionado anual del modpack es independiente.
+
 1. Aumentar versión X.Y.Z y compilar con `tools/Publish-Launcher.ps1`.
 2. Crear instalador offline con `tools/Build-Installer.ps1 -Offline -OutputPath ...`.
 3. Firmar metadatos con `tools/New-LauncherReleaseManifest.ps1`. La clave privada

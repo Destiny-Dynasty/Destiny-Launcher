@@ -1,138 +1,99 @@
-# Base común, variantes y mods de GitHub
+# Base compartida, variantes y mods independientes
 
-Repositorio de distribución único: `Destiny-Dynasty/Modpack`. El código de cada mod
-puede seguir en su repositorio privado; los jugadores solo descargan los JAR compilados.
-El launcher no incluye tokens ni credenciales de GitHub.
+## Repositorios
 
-## Estructura
+- **Destiny-Dynasty/Modpack**: catálogo `base/manifest.json`, reglas `variants/*.json`,
+  manifiestos completos `manifests/*.json` y assets del pack.
+- **Destiny-Dynasty/Mod-Releases**: releases de JAR propios o parcheados y canales
+  `channels/<mod-id>.json`. Las fuentes privadas permanecen en su repositorio original.
 
-```
-base/manifest.json          # catálogo completo del pack normal
-variants/destiny.json       # reglas de la variante normal
-variants/destiny-lite.json  # herencia, exclusiones, inclusiones y sustituciones
-variants/destiny-staff.json # preparado, deshabilitado hasta definir acceso/contenido
-extras/lite/mods/...        # JAR exclusivos de Lite, si se proporcionan localmente
-overrides/lite/config/...   # configuraciones específicas
-channels/<mod-id>.json      # punteros públicos a releases de cada mod propio
-manifests/*.json            # resultados completos que consume el launcher
-```
+Las instancias Destiny, Destiny-Lite y Destiny-Staff son independientes. Staff se
+muestra únicamente después de verificar el acceso mediante Destiny Bot y Discord.
 
-Las carpetas de instancias siguen separadas: Destiny, Destiny-Lite y Destiny-Staff.
-Staff aún no aparece en la interfaz; el bot y la habilitación de usuarios siguen pendientes.
+## Versiones
 
-Ejemplo de definición de Lite:
+Formato `AÑO.MAYOR.MENOR[-etapa]`: `2026.0.1-alpha`, `2026.0.1-beta`, `2026.0.1`.
+También se admite `rc` e iteraciones como `-alpha.2`. Las tres variantes llevan la
+misma versión; las etapas se publican como pre-release en GitHub.
+El launcher compara el identificador del pack como texto: no necesita convertirlo
+a System.Version. Este cambio no modifica la versión del ejecutable del launcher.
 
-```json
-{
-  "id": "destiny-lite",
-  "enabled": true,
-  "extends": "destiny",
-  "exclude": ["mods/visual-*.jar"],
-  "include": ["extras/lite/mods/performance.jar"],
-  "overrides": "overrides/lite"
-}
-```
+## Composición
 
-`include` también acepta entradas remotas completas (`path`, `url`, `size`, `sha256`)
-o referencias GitHub. `overrides` puede ser una carpeta con estructura de instancia,
-o una lista de entradas que sustituyan rutas heredadas existentes. Las inclusiones
-que colisionan con una ruta existente fallan: la sustitución debe ser explícita.
-`exclude` admite glob de rutas y `mod:<id>` cuando el catálogo declara `modId`.
-Los JAR locales incluidos por el compositor extraen su ID de `fabric.mod.json`.
-Se rechazan ciclos, rutas fuera de los directorios administrados, enlaces, IDs
-duplicados declarados y dependencias explícitas `requires` ausentes. Esto no reemplaza
-probar la compatibilidad real entre mods ni resuelve rangos de dependencias de Fabric.
+`extends` hereda otra variante; `exclude` admite glob de rutas o `mod:<id>` cuando
+se declara el ID; `include` añade archivos y `overrides` sustituye rutas existentes.
+Las inclusiones que colisionan se rechazan. `fabricLoaderVersion` puede personalizarse
+por variante y se hereda. Todas usan actualmente 0.19.5 por los requisitos de los JAR.
 
-## Release fija y latest
+Las entradas remotas incluyen path, URL HTTPS, size y sha256. Los archivos locales
+van en `extras/<variante>/<directorio-administrado>/...`; `overrides` admite una carpeta
+con estructura de instancia. Se rechazan ciclos, rutas inseguras y IDs declarados
+duplicados. Las pruebas no sustituyen una partida real para comprobar compatibilidad.
 
-Referencia fijada en una definición:
+## Mods latest
+
+Destiny Dynasty está configurado como override del pack normal y se hereda también en Lite y Staff:
 
 ```json
 {
-  "path": "mods/destiny-patches.jar",
+  "path": "mods/destiny-dynasty.jar",
+  "modId": "destinydynasty",
   "github": {
-    "repository": "Destiny-Dynasty/Modpack",
-    "release": "mod-destiny-patches-0.1.0",
-    "asset": "destiny-patches-*.jar"
-  }
-}
-```
-
-Al publicar se resuelve a una URL inmutable, tamaño y SHA-256. El jugador utiliza
-siempre ese archivo hasta que se publique un nuevo manifiesto del modpack.
-
-Referencia flotante para varios mods alojados en el mismo repositorio:
-
-```json
-{
-  "path": "mods/destiny-patches.jar",
-  "github": {
-    "repository": "Destiny-Dynasty/Modpack",
+    "repository": "Destiny-Dynasty/Mod-Releases",
     "release": "latest",
-    "channel": "destiny-patches",
-    "asset": "destiny-patches-*.jar"
+    "channel": "destiny-dynasty",
+    "asset": "destiny-dynasty-*.jar"
   }
 }
 ```
 
-El canal es necesario para distinguir el último Patches del último Kingdoms o del
-último modpack. `Publish-ModRelease.ps1` mantiene ese JSON después de publicar y
-verificar el JAR. Para un repositorio público dedicado a un solo mod puede omitirse
-`channel`: entonces se utiliza la API oficial `/releases/latest`, que sigue las
-releases estables. El selector admite `*` y `?`, omite fuentes/javadoc y debe coincidir
-con un único JAR (seleccionar explícitamente Minecraft, Fabric y cliente si hay varias builds).
+El canal es obligatorio para distinguir cada mod en este repositorio compartido.
+No utilizar `/releases/latest` del repositorio completo. Combat 0.1.1+ef20.14.17 usa la ruta estable mods/destiny-combat.jar y una URL fija, compartida entre las tres variantes; no usa latest. Destiny Dynasty tiene como snapshot actual la release 0.1.1. La primera build de Destiny Dynasty
+es la importada del pack normal existente, sin recompilar el HEAD privado.
 
-El manifiesto compilado con `latest` conserva una instantánea verificable y usa
-`schemaVersion: 2`. Los clientes antiguos rechazan ese esquema; deben actualizar el
-launcher antes de habilitarlo. Las variantes solo fijas mantienen esquema 1.
+El compositor genera schemaVersion 2 y una instantánea con URL, tamaño y SHA-256.
+Al pulsar Jugar se revisan los mods latest, se agrupan consultas y se usa ETag/304.
+El nombre de destino estable permite sustituir el JAR sin duplicarlo. Sin conexión,
+se conserva la última resolución instalada. Las modificaciones/eliminaciones locales
+siguen protegidas; Reparar restaura explícitamente los archivos administrados.
+Publicar en el canal solo builds compatibles con Minecraft, Java, Fabric y dependencias.
 
-Al pulsar Jugar se comprueban únicamente los mods `latest`, incluso si el pack sigue
-en 1.4.9. Se aprovecha ETag/304 y se agrupan consultas del mismo origen. El archivo
-de destino es estable, por ejemplo `mods/destiny-patches.jar`, aunque la release
-publique `destiny-patches-0.1.1.jar`. Así se sustituye el anterior sin duplicarlo.
-Las descargas se verifican y se aplican con staging y respaldo. Sin conexión o con
-límite de API se conserva la resolución instalada, sin degradarla a la instantánea.
-Las modificaciones y eliminaciones voluntarias siguen protegidas; Reparar es la
-acción explícita para restaurarlas. Añadir mods ajenos sigue estando permitido.
+Para fijar un mod: usar su tag exacto en `release`, sin `channel`. El compositor
+resuelve la URL y el checksum al publicar; no se comprueba latest durante el juego.
 
-Un `latest` debe reservarse para builds compatibles con la versión de Minecraft,
-Java y mods del pack. El sistema verifica integridad, no puede garantizar que un mod
-nuevo no rompa compatibilidad. Una release ambigua o sin SHA-256 se rechaza.
+## Publicar un mod
 
-## Publicar todo el modpack
+Desde un checkout limpio y actualizado de **Mod-Releases**:
 
-Desde PowerShell 7 y un checkout actualizado de Modpack:
+```powershell
+./tools/Publish-ModRelease.ps1 -RepositoryRoot . -ModId destiny-dynasty `
+  -Version 0.1.1 -JarPath 'E:/destiny-realms/build/libs/destinydynasty-0.1.1.jar'
+```
+
+La versión y la ruta son ejemplos. Se publica un solo JAR, se verifica el digest y
+se actualiza el canal únicamente después. Nunca se sobrescriben builds publicadas.
+El comando no cambia la versión del pack. También se puede publicar una release estable desde GitHub con tag mod-<id>-<versión> y un único JAR <id>-<versión>.jar: el workflow de Mod-Releases actualiza su canal automáticamente. La sincronización verifica digest y es idempotente. El mismo script está aquí por conveniencia,
+pero exige un checkout de Mod-Releases como RepositoryRoot y rechaza Modpack.
+
+El repositorio privado puede usar `templates/publish-private-mod.yml`, adaptando
+la selección del JAR cuando hay varios módulos. Necesita el secreto
+`MOD_DISTRIBUTION_TOKEN` con Contents: write únicamente sobre Mod-Releases.
+La configuración de ese secreto no se hace automáticamente ni se distribuye al cliente.
+
+## Publicar el pack
+
+Desde un checkout actualizado de Modpack, PowerShell 7 y GitHub CLI:
 
 ```powershell
 ./tools/Build-PackVariants.ps1 -RepositoryRoot . -PackDirectory 'E:/Pack-Normal' `
-  -ContentDirectory . -Version 1.4.9 -OutputDirectory 'E:/Builds/modpack-1.4.9'
-./tools/Publish-PackVariants.ps1 -RepositoryRoot . -PreparedDirectory 'E:/Builds/modpack-1.4.9'
+  -ContentDirectory . -Version 2026.0.2-alpha -OutputDirectory 'E:/Builds/2026.0.2-alpha'
+./tools/Publish-PackVariants.ps1 -RepositoryRoot . -PreparedDirectory 'E:/Builds/2026.0.2-alpha'
 ```
 
-El generador de base reutiliza URLs de archivos sin cambios. El compositor genera
-todas las variantes habilitadas y deduplica sus extras locales. El publicador sube
-una sola release compartida, verifica los digests y confirma todos los manifiestos
-en un único commit, después de que los assets sean públicos. Las salidas se conservan
-para revisión y recuperación. Nunca sobrescribe una release ya publicada.
-Puede omitirse `PackDirectory` para preparar solo cambios de reglas sobre el catálogo
-existente. Los scripts antiguos por edición siguen disponibles para compatibilidad;
-el flujo recomendado es Build-PackVariants + Publish-PackVariants.
-
-## Publicar solo un mod propio
-
-```powershell
-./tools/Publish-ModRelease.ps1 -RepositoryRoot . -ModId destiny-patches `
-  -Version 0.1.1 -JarPath 'E:/Destiny-Patches/build/libs/destiny-patches-0.1.1.jar'
-```
-
-Solo se sube ese JAR compilado, a `mod-destiny-patches-0.1.1`; después se actualiza su
-canal público. El comando no cambia la versión ni los manifiestos del modpack.
-Los jugadores que tengan `latest` recibirán la nueva build al jugar; los fijados a
-0.1.0 seguirán en 0.1.0.
-
-El repositorio de distribución contiene `templates/publish-private-mod.yml` para
-copiar al repositorio privado del mod. Requiere el secreto `MOD_DISTRIBUTION_TOKEN`,
-con permiso Contents de escritura exclusivamente sobre Modpack. El token vive en
-GitHub Actions, nunca en el launcher ni en un manifiesto. También puede publicarse
-manualmente usando la sesión local de `gh`. No se hicieron públicos repositorios
-de código privado ni se crearon credenciales persistentes automáticamente.
+Omitir PackDirectory para regenerar usando el catálogo existente. Al cambiar el
+catálogo conservar la ruta estable de Destiny Dynasty para que su override siga aplicando;
+no volver a añadir otra copia del mismo mod con el nombre versionado del JAR.
+Los assets se publican y verifican antes de actualizar los manifiestos. Las URLs de
+archivos sin cambios se reutilizan, por lo que una release usada por un manifiesto
+no debe borrarse sin consolidar antes sus assets. La migración inicial sí consolida
+todas las referencias antes de retirar las releases anteriores.

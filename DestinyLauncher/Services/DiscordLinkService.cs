@@ -12,15 +12,15 @@ public sealed record DiscordAccess(string Username, bool Staff);
 
 public sealed class DiscordLinkService
 {
-    // Test-server HTTP is intentional. Production only needs a new HTTPS endpoint;
-    // no Discord secret or bot token is ever distributed with the application.
-    public const string DefaultEndpoint = "http://66.45.252.226:24431/";
+    // Stable public hostname: moving the bot only requires updating its DNS/backend.
+    // No Discord secret or bot token is ever distributed with the application.
+    public const string DefaultEndpoint = "https://destiny-dynasty-bot.tatnikhost.net/";
     private readonly HttpClient _http;
     private readonly Uri _endpoint;
     private readonly string _credentialFile;
     private sealed record Credential(string Endpoint, string Token);
     public DiscordAccess? Access { get; private set; }
-    public bool IsLinked => File.Exists(_credentialFile);
+    public bool IsLinked => Load() is not null;
     public DiscordLinkService(LauncherPaths paths, HttpClient? http = null, Uri? endpoint = null)
     {
         _credentialFile = Path.Combine(paths.Root, "discord-session.bin");
@@ -48,7 +48,7 @@ public sealed class DiscordLinkService
     }
     private string? Load()
     {
-        if (!IsLinked) return null;
+        if (!File.Exists(_credentialFile)) return null;
         try
         {
             InstallationDataService.RejectLinks(_credentialFile);
@@ -56,7 +56,7 @@ public sealed class DiscordLinkService
             var data = JsonSerializer.Deserialize<Credential>(ProtectedData.Unprotect(File.ReadAllBytes(_credentialFile), null, DataProtectionScope.CurrentUser));
             return data?.Endpoint == _endpoint.AbsoluteUri ? data.Token : null;
         }
-        catch (Exception ex) when (ex is CryptographicException or JsonException or IOException) { return null; }
+        catch (Exception ex) when (ex is CryptographicException or JsonException or IOException or UnauthorizedAccessException) { return null; }
     }
     private void Save(string token)
     {
