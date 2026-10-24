@@ -25,7 +25,7 @@ internal sealed class MicrosoftSignInDialog : Window
         var cancel = ProfileDialog.DialogButton("Cancelar", false); cancel.Click += (_, _) => Close(); actions.Children.Add(cancel);
         var retry = ProfileDialog.DialogButton("Reintentar", true); retry.Margin = new Thickness(10, 0, 0, 0); retry.Visibility = Visibility.Collapsed;
         actions.Children.Add(retry); body.Children.Add(actions);
-        DialogChrome.Create(this, "Microsoft · experimento SISU", body, 490, 250);
+        DialogChrome.Create(this, "Iniciar sesión con Microsoft", body, 490, 250);
         async Task Link()
         {
             retry.Visibility = Visibility.Collapsed; status.Text = "Conectando con Microsoft…"; status.Foreground = ProfileDialog.ResourceBrush("Muted");
@@ -54,7 +54,7 @@ internal sealed class MicrosoftWebUi(Window owner, LauncherPaths paths) : IWebUI
     public Task<CodeFlowAuthorizationResult> DisplayDialogAndInterceptUri(Uri uri, ICodeFlowUrlChecker checker, CancellationToken cancel)
         => owner.Dispatcher.InvokeAsync(() => ShowAsync(uri, checker, cancel)).Task.Unwrap();
     public Task DisplayDialogAndNavigateUri(Uri uri, CancellationToken cancel)
-        => throw new NotSupportedException("El experimento solo utiliza el navegador para iniciar sesión.");
+        => throw new NotSupportedException("Este método de inicio de sesión requiere el navegador integrado.");
 
     internal static bool IsCallback(Uri uri) => uri.Scheme == "https" && uri.Host.Equals("login.live.com", StringComparison.OrdinalIgnoreCase)
         && uri.AbsolutePath.Equals("/oauth20_desktop.srf", StringComparison.Ordinal);

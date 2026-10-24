@@ -1,6 +1,6 @@
-# Experimento Microsoft / SISU
+# Autenticación Microsoft / SISU
 
-Solo en la rama `1.1.0`. No es una release. No modifica el setup ni los assets de `v1.0.0`.
+El login Microsoft queda habilitado en las compilaciones oficiales desde 1.0.5. La variante de prueba conserva sus datos aislados mediante `-SisuExperiment`; no se migran ni se borran credenciales del usuario. El instalador público fijo de `v1.0.0` se conserva.
 
 ```powershell
 ./tools/Publish-Launcher.ps1 -Experiment -SisuExperiment
@@ -10,7 +10,7 @@ Ejecutable: `publish-experiment/DestinyLauncher.exe`. Sin instalador. La compila
 
 ## Prueba manual
 
-1. Abrir el EXE experimental y pulsar la tarjeta del nombre. Elegir «Iniciar sesión con Microsoft». Con multicuentas activo, elegir «Añadir cuenta de Microsoft» en el desplegable.
+1. Abrir el EXE experimental y pulsar la tarjeta del nombre. Elegir «Iniciar sesión con Microsoft». Con multicuentas activo, abrir «Gestionar cuentas», «Añadir cuenta» y «Microsoft».
 2. Autorizar en la ventana de Microsoft. La ruta experimental usa el Client ID público del juego `00000000402b5328` (`XboxGameTitles.MinecraftJava`), por lo que no se presenta como una app de Destiny registrada y aprobada. No pedir al usuario contraseñas dentro de formularios propios.
 3. Comprobar OAuth → Xbox SISU → token Minecraft Java → licencia → perfil/UUID. No guardar ni seleccionar una cuenta si falla cualquiera de esos pasos.
 4. Pulsar Jugar solo cuando se quiera probar el juego. El lanzamiento renueva la sesión sin abrir otro navegador; si necesita autorización nueva, informa del fallo. No cambia a offline automáticamente. El juego recibe UUID, access token y tipo `msa` de esa cuenta, nunca el UUID derivado del nickname offline.

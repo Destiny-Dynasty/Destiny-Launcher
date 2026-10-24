@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.IO;
 using System.Security.Cryptography;
 using System.Windows;
@@ -17,6 +17,7 @@ internal sealed class BackgroundVideoController : IDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private Task<string>? _sourceTask;
     private bool _enabled, _opening, _failed, _disposed;
+    private readonly HashSet<Window> _ownedWindows = [];
 
     internal bool Enabled { get => _enabled; set { _enabled = value; Update(); } }
     internal bool IsOpen { get; private set; }
@@ -32,7 +33,7 @@ internal sealed class BackgroundVideoController : IDisposable
     {
         _video = video; _window = window; _paths = paths;
         _allowed = allowed; _reportError = reportError; _enabled = enabled;
-        HasPlaybackFocus = () => _window.IsActive;
+        HasPlaybackFocus = () => HasPlaybackFocusIn(_window, window => window.IsActive);
         _video.MediaOpened += MediaOpened;
         _video.MediaEnded += MediaEnded;
         _video.MediaFailed += MediaFailed;
@@ -56,11 +57,11 @@ internal sealed class BackgroundVideoController : IDisposable
         if (_disposed) return;
         if (!CanPlay)
         {
-            // Preserve the decoded frame across minimization as well as focus
-            // changes. Reopening on restore exposes the decoder's black startup
-            // frame. Real hiding, other tabs and game operations still close it.
+            // Keep the source and decoded frame when Home is temporarily hidden.
+            // Reopening the decoder on every tab change exposes a black startup frame.
+            // Game operations and hiding the launcher still release the decoder.
             var preserveFrame = _enabled && !_failed && _allowed() && SystemParameters.ClientAreaAnimation
-                && (_window.WindowState == WindowState.Minimized || (_window.IsVisible && _video.IsVisible));
+                && (_window.WindowState == WindowState.Minimized || _window.IsVisible);
             if (!preserveFrame) ClosePlayer();
             else if (IsOpen && IsPlaying) { _video.Pause(); IsPlaying = false; }
             return;
@@ -146,7 +147,46 @@ internal sealed class BackgroundVideoController : IDisposable
         _video.Close(); _video.Source = null;
     }
 
-    private void WindowChanged(object? sender, EventArgs e) => Update();
+    internal static bool HasPlaybackFocusIn(Window window, Func<Window, bool> isActive) => isActive(window)
+        || window.OwnedWindows.Cast<Window>().Any(child => HasPlaybackFocusIn(child, isActive));
+
+    private void ObserveOwnedWindows(Window window)
+    {
+        foreach (Window child in window.OwnedWindows)
+        {
+            if (_ownedWindows.Add(child))
+            {
+                child.Activated += WindowChanged;
+                child.Deactivated += WindowChanged;
+                child.Closed += OwnedWindowClosed;
+            }
+            ObserveOwnedWindows(child);
+        }
+    }
+
+    private void OwnedWindowClosed(object? sender, EventArgs e)
+    {
+        if (sender is Window child)
+        {
+            child.Activated -= WindowChanged;
+            child.Deactivated -= WindowChanged;
+            child.Closed -= OwnedWindowClosed;
+            _ownedWindows.Remove(child);
+        }
+        WindowChanged(sender, e);
+    }
+
+    private void WindowChanged(object? sender, EventArgs e)
+    {
+        // Activation transfers to an owned modal after the owner deactivates.
+        // Evaluate once WPF has completed that transfer instead of pausing in between.
+        _window.Dispatcher.InvokeAsync(() =>
+        {
+            if (_disposed) return;
+            ObserveOwnedWindows(_window);
+            Update();
+        }, System.Windows.Threading.DispatcherPriority.Background);
+    }
     private void VisibilityChanged(object? sender, DependencyPropertyChangedEventArgs e) => Update();
     private void PreferenceChanged(object? sender, PropertyChangedEventArgs e)
     { if (e.PropertyName == nameof(SystemParameters.ClientAreaAnimation)) _window.Dispatcher.InvokeAsync(Update); }
@@ -155,6 +195,11 @@ internal sealed class BackgroundVideoController : IDisposable
     {
         if (_disposed) return;
         _disposed = true; _lifetime.Cancel();
+        foreach (var child in _ownedWindows)
+        {
+            child.Activated -= WindowChanged; child.Deactivated -= WindowChanged; child.Closed -= OwnedWindowClosed;
+        }
+        _ownedWindows.Clear();
         _video.MediaOpened -= MediaOpened; _video.MediaEnded -= MediaEnded; _video.MediaFailed -= MediaFailed;
         _video.IsVisibleChanged -= VisibilityChanged;
         _window.Loaded -= WindowChanged; _window.Activated -= WindowChanged;

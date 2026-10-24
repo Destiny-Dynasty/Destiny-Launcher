@@ -1,4 +1,4 @@
-﻿using System.Configuration;
+using System.Configuration;
 using System.Data;
 using System.Windows;
 using System.Windows.Media;
@@ -55,7 +55,7 @@ public partial class App : Application
         if (!LauncherStartupOptions.TryParse(uninstall ? e.Args.Skip(1).ToArray() : e.Args, out var startup)) { Shutdown(2); return; }
         var installation = LauncherInstallation.Read(AppContext.BaseDirectory);
         var dataRoot = startup.DataRoot ?? installation?.DataRoot;
-        if (SisuExperiment.Enabled && dataRoot is null)
+        if (SisuExperiment.UsesIsolatedData && dataRoot is null)
             dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DestinyLauncher-SisuExperiment");
         // Installed sessions use the same mutex even when shortcuts specify the default data root.
         var defaultRoot = new LauncherPaths().Root;

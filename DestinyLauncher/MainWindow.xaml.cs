@@ -239,7 +239,9 @@ public partial class MainWindow : Window
     {
         if (_closed) return;
         PlayerNameText.Text = string.IsNullOrWhiteSpace(_config.PlayerName) ? "Añadir nombre" : _config.PlayerName;
-        PlayerAccountType.Visibility = string.IsNullOrEmpty(_config.MicrosoftAccountId) ? Visibility.Collapsed : Visibility.Visible;
+        PlayerAccountType.Children.Clear();
+        PlayerAccountType.Children.Add(AccountTypeLabel.Create(!string.IsNullOrEmpty(_config.MicrosoftAccountId)));
+        PlayerAccountType.Visibility = string.IsNullOrWhiteSpace(_config.PlayerName) ? Visibility.Collapsed : Visibility.Visible;
         PlayerNameText.ToolTip = string.IsNullOrWhiteSpace(_config.PlayerName) ? "Elige tu nombre para jugar" : _config.PlayerName;
         PlayerInitial.Text = string.IsNullOrWhiteSpace(_config.PlayerName) ? "D" : _config.PlayerName[..1].ToUpperInvariant();
         RefreshAccountMenu();
@@ -340,6 +342,7 @@ public partial class MainWindow : Window
             _editionChecks[edition] = check;
             _config.MinecraftVersion = check.Manifest.MinecraftVersion;
             _config.FabricLoaderVersion = check.Manifest.FabricLoaderVersion;
+
             pack.JavaVersion = check.Manifest.JavaVersion;
             _log.Info($"Manifest ready for {pack.Slug}: {check.Manifest.Version}");
         }
@@ -492,6 +495,7 @@ public partial class MainWindow : Window
                 _editionChecks[_config.SelectedEdition] = _manifestCheck;
                 _config.MinecraftVersion = manifestCheck.Manifest.MinecraftVersion;
                 _config.FabricLoaderVersion = manifestCheck.Manifest.FabricLoaderVersion;
+
                 pack.JavaVersion = manifestCheck.Manifest.JavaVersion;
                 _configService.SaveInstalled(pack.Slug, manifestCheck.Manifest.Version, pack.JavaVersion);
                 _configService.Save(_config);
@@ -499,10 +503,11 @@ public partial class MainWindow : Window
             else if (string.IsNullOrWhiteSpace(installedVersion))
                 throw new InvalidOperationException("No hay una instalación local ni un manifiesto disponible.");
             if (manifestCheck is null) pack.JavaVersion = _configService.InstalledJavaVersion(pack.Slug);
+
             CmlLib.Core.Auth.MSession? premiumSession = null;
             if (!string.IsNullOrEmpty(_config.MicrosoftAccountId))
             {
-                if (_microsoft is null) throw new InvalidOperationException("Esta cuenta requiere la compilación experimental de Microsoft.");
+                if (_microsoft is null) throw new InvalidOperationException("El inicio de sesión con Microsoft no está disponible en esta versión.");
                 try { premiumSession = await _microsoft.RefreshAsync(_config.MicrosoftAccountId, new Progress<string>(text => SetNotice(text, "", "Gold")), _lifetime.Token); }
                 catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { throw; }
                 catch (Exception error) { throw new InvalidOperationException(MicrosoftAccountService.FriendlyError(error)); }

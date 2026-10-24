@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -25,13 +25,16 @@ internal static class DialogChrome
         owner.ShowInTaskbar = false;
         owner.UseLayoutRounding = true;
         WindowChrome.SetWindowChrome(owner, new WindowChrome { CaptionHeight = 48, ResizeBorderThickness = new Thickness(0), GlassFrameThickness = new Thickness(0), UseAeroCaptionButtons = false });
-        var frame = new Border { Background = owner.Background, BorderBrush = (Brush)Application.Current.FindResource("GoldDim"), BorderThickness = new Thickness(1) };
+        var frame = new Border { CornerRadius = new CornerRadius(14), Background = new LinearGradientBrush(Color.FromRgb(39, 36, 29), Color.FromRgb(17, 18, 16), 65), BorderBrush = (Brush)Application.Current.FindResource("GoldDim"), BorderThickness = new Thickness(1) };
+        var surface = new Grid();
+        var grain = new Border { Opacity = .075, IsHitTestVisible = false, Background = new ImageBrush(new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/DestinyLauncher;component/Assets/experiment/obsidian-gold-v1/obsidian-texture.png"))) { Stretch = Stretch.UniformToFill } };
+        surface.Children.Add(grain);
         var layout = new Grid();
         layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(48) });
         layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var bar = new Grid { Background = (Brush)Application.Current.FindResource("Panel") };
+        var bar = new Grid { Background = Brushes.Transparent };
         bar.Children.Add(new TextBlock { Text = title, FontFamily = new FontFamily("Georgia"), FontSize = 18, Margin = new Thickness(24, 0, 55, 0), VerticalAlignment = VerticalAlignment.Center });
-        var close = new Button { Style = (Style)Application.Current.FindResource("CloseControl"), Content = "×", FontSize = 20, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, ToolTip = "Cerrar" };
+        var close = new Button { Style = (Style)Application.Current.FindResource("CloseControl"), Content = new System.Windows.Shapes.Path { Data = Geometry.Parse("M0,0 L14,14 M14,0 L0,14"), Stroke = ProfileDialog.ResourceBrush("Muted"), StrokeThickness = 1.4, Width = 14, Height = 14, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round }, Margin = new Thickness(0, 0, 8, 0), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, ToolTip = "Cerrar" };
         AutomationProperties.SetName(close, "Cerrar diálogo");
         WindowChrome.SetIsHitTestVisibleInChrome(close, true);
         close.Click += (_, _) => owner.Close();
@@ -39,7 +42,13 @@ internal static class DialogChrome
         layout.Children.Add(bar);
         Grid.SetRow(body, 1);
         layout.Children.Add(body);
-        frame.Child = layout;
+        surface.Children.Add(layout);
+        surface.SizeChanged += (_, _) => surface.Clip = new RectangleGeometry(new Rect(0, 0, surface.ActualWidth, surface.ActualHeight), 13, 13);
+        frame.Child = surface;
+        DialogWindowCorners.Attach(owner);
+        DialogBackdrop.Attach(owner);
+        var divider = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(24, 0, 24, 0), Background = new LinearGradientBrush(Colors.Transparent, Color.FromArgb(100, 198, 163, 98), 0) };
+        bar.Children.Add(divider);
         owner.Content = frame;
         owner.Loaded += (_, _) => UiMotion.Enter(body as FrameworkElement ?? frame);
         owner.PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { owner.Close(); e.Handled = true; } };
@@ -94,7 +103,7 @@ public sealed class ProfileDialog : Window
     internal static Brush ResourceBrush(string key) => (Brush)Application.Current.FindResource(key);
     internal static Button DialogButton(string label, bool primary) => new()
     {
-        Style = (Style)Application.Current.FindResource(primary ? "GoldButton" : "QuietButton"),
+        Style = (Style)Application.Current.FindResource(primary ? "GoldButton" : "DialogQuietButton"),
         Content = label, MinWidth = 108, Height = 40, Padding = new Thickness(16, 8, 16, 8)
     };
 }

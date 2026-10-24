@@ -13,7 +13,7 @@ internal static partial class Program
 {
     private static async Task AuditMicrosoftProfile()
     {
-        Assert(SisuExperiment.Enabled, "Microsoft entry is enabled only in the explicit experimental build");
+        Assert(SisuExperiment.Enabled, "Microsoft sign in is enabled in the production build");
         var window = new MainWindow(previewMode: true, dataRoot: Path.Combine(_output, "data"))
         { ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -32000, Top = -32000 };
         window.Show(); await Idle();

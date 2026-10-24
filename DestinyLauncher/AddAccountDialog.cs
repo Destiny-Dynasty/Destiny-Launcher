@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 
@@ -16,10 +16,20 @@ internal sealed class AddAccountDialog : Window
         var choices = new Grid();
         choices.ColumnDefinitions.Add(new ColumnDefinition()); choices.ColumnDefinitions.Add(new ColumnDefinition());
         var offline = ProfileDialog.DialogButton("Offline", false);
-        offline.Height = 86; offline.Margin = new Thickness(0, 0, allowMicrosoft ? 6 : 0, 0); offline.VerticalAlignment = VerticalAlignment.Top;
+        offline.Style = (Style)Application.Current.FindResource("AccountProviderButton");
+        var identity = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
+        identity.Children.Add(new System.Windows.Shapes.Path { Data = System.Windows.Media.Geometry.Parse("M8,0 A5,5 0 1 1 7.99,0 M0,25 C0,13 16,13 16,25"), Width = 24, Height = 30, Stretch = System.Windows.Media.Stretch.Uniform, Stroke = ProfileDialog.ResourceBrush("GoldBright"), StrokeThickness = 1.5, Margin = new Thickness(0, 0, 0, 12) });
+        identity.Children.Add(new TextBlock { Text = "Offline", FontSize = 16, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center });
+        offline.Content = identity;
+        AutomationProperties.SetName(offline, "Offline");
+        offline.Height = 132; offline.Margin = new Thickness(0, 0, allowMicrosoft ? 6 : 0, 0); offline.VerticalAlignment = VerticalAlignment.Top;
         AutomationProperties.SetAutomationId(offline, "ChooseOfflineAccount"); choices.Children.Add(offline);
-        var microsoft = ProfileDialog.DialogButton("", false); microsoft.Content = MicrosoftBrand.Label("Microsoft", 14, 21);
-        microsoft.Height = 86; microsoft.Margin = new Thickness(6, 0, 0, 0); microsoft.VerticalAlignment = VerticalAlignment.Top;
+        var microsoft = ProfileDialog.DialogButton("", false); microsoft.Style = (Style)Application.Current.FindResource("AccountProviderButton");
+        var brand = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
+        brand.Children.Add(new Image { Source = MicrosoftBrand.Symbol, Width = 30, Height = 30, Margin = new Thickness(0, 0, 0, 12) });
+        brand.Children.Add(new TextBlock { Text = "Microsoft", FontSize = 16, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center });
+        microsoft.Content = brand;
+        microsoft.Height = 132; microsoft.Margin = new Thickness(6, 0, 0, 0); microsoft.VerticalAlignment = VerticalAlignment.Top;
         AutomationProperties.SetName(microsoft, "Microsoft"); AutomationProperties.SetAutomationId(microsoft, "ChooseMicrosoftAccount");
         microsoft.Visibility = allowMicrosoft ? Visibility.Visible : Visibility.Collapsed;
         if (!allowMicrosoft) Grid.SetColumnSpan(offline, 2);
@@ -51,6 +61,6 @@ internal sealed class AddAccountDialog : Window
         offline.Click += (_, _) => { choices.Visibility = Visibility.Collapsed; form.Visibility = Visibility.Visible; back.Visibility = add.Visibility = Visibility.Visible; input.Focus(); };
         microsoft.Click += (_, _) => { MicrosoftRequested = true; DialogResult = true; };
         Grid.SetColumn(actions, 1); footer.Children.Add(actions); Grid.SetRow(footer, 1); body.Children.Add(footer);
-        DialogChrome.Create(this, "Añadir cuenta", body, 470, 295);
+        DialogChrome.Create(this, "Añadir cuenta", body, 490, 310);
     }
 }

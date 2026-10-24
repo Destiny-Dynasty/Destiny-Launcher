@@ -52,6 +52,33 @@ Admite hasta ocho notas de 240 caracteres. Los manifiestos antiguos siguen siend
 compatibles y ocultan la sección si no contienen notas. El workflow de release ofrece
 el campo `changelog`, con una nota por línea.
 
+## Compatibilidad con la futura distribución Linux
+
+La versión Windows puede publicarse antes del port Linux sin necesitar otra
+actualización para incorporar ese port. Se mantiene su contrato actual: este
+repositorio distribuye el canal Windows mediante `/releases/latest`, con
+`launcher-update.json`, `launcher-update.sig`, plataforma `win-x64` y
+`DestinyLauncherSetup.exe`. No cambiar esos nombres, esquema ni clave de firma
+para introducir Linux.
+
+La distribución Linux tendrá un repositorio/canal de releases independiente,
+que se creará durante el port. No publicar releases exclusivas de Linux como
+Latest de `Destiny-Dynasty/Destiny-Launcher`: el cliente Windows consulta esa
+release y espera los metadatos e instalador Windows. El repositorio de código
+puede seguir siendo compartido; separar distribución no exige duplicar código.
+
+Los manifiestos del modpack y el acceso Discord se pueden reutilizar en Linux.
+Mantener el contrato consumido por Windows; cualquier recurso específico de Linux
+se resolverá desde el cliente Linux o mediante un manifiesto separado, sin
+introducir binarios nativos Linux en la lista de archivos común. Los JAR también
+deben validarse en Linux: compartir manifiesto no garantiza compatibilidad de
+todos los mods con ambos sistemas.
+
+La adaptación de interfaz, Java, rutas, credenciales, login y actualización Linux
+se hará en el port. No incorporar dependencias ni payloads Linux al instalador
+Windows. Esto deja preparada la distribución; no supone que exista ya un cliente
+Linux funcional. No publicar ninguna release sin autorización del propietario.
+
 ## Prueba repetible aislada
 
 `tools/UpdatePreview` utiliza el diálogo y descargador de producción y un transporte

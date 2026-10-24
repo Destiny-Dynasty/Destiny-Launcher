@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -31,6 +31,9 @@ internal static partial class Program
                     {
                         await Task.Delay(350);
                         Assert(choice.Owner == manager, "Add-account dialog belongs to the account manager");
+                        Assert(((FrameworkElement)manager.Content).Effect is System.Windows.Media.Effects.BlurEffect, "Nested modal blurs its owner only");
+                        var backdropLayer = System.Windows.Documents.AdornerLayer.GetAdornerLayer((FrameworkElement)manager.Content);
+                        Assert(backdropLayer?.GetAdorners((FrameworkElement)manager.Content)?.Length > 0, "Nested modal adds a dark backdrop above its owner");
                         var offline = Descendants<Button>(choice).Single(b => AutomationProperties.GetAutomationId(b) == "ChooseOfflineAccount");
                         var microsoft = Descendants<Button>(choice).Single(b => AutomationProperties.GetAutomationId(b) == "ChooseMicrosoftAccount");
                         Assert(offline.IsVisible && microsoft.IsVisible && !Descendants<TextBox>(choice).Any(t => t.IsVisible), "First step offers Offline and Microsoft only");
@@ -52,6 +55,8 @@ internal static partial class Program
                     finally { if (choice.IsVisible) choice.Close(); }
                 });
                 add.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); await fill.Task.Unwrap();
+                Assert(((FrameworkElement)manager.Content).Effect is null, "Closing a nested modal restores its owner effect");
+                Assert(System.Windows.Documents.AdornerLayer.GetAdornerLayer((FrameworkElement)manager.Content)?.GetAdorners((FrameworkElement)manager.Content) is not { Length: > 0 }, "Closing a nested modal removes its backdrop");
                 Assert(manager.Editor.AccountNames.Contains("Third_Player") && names.Length == 2, "New local account changes only the draft");
                 var chooseMicrosoft = manager.Dispatcher.InvokeAsync(() =>
                 {

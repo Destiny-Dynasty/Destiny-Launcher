@@ -18,7 +18,8 @@ namespace DestinyLauncher.Services;
 
 internal static class SisuExperiment
 {
-    internal static bool Enabled
+    internal static bool Enabled => true;
+    internal static bool UsesIsolatedData
     {
         get
         {
@@ -119,7 +120,7 @@ internal sealed class MicrosoftAccountService
         if (error is JEAuthException je)
             return je.StatusCode switch
             {
-                403 => "Minecraft rechazó la autenticación SISU (403). Este experimento no ha podido validar la cuenta.",
+                403 => "Minecraft rechazó el inicio de sesión (403). No se pudo validar la cuenta.",
                 404 => "Esta cuenta no tiene un perfil de Minecraft Java disponible.",
                 _ => "No se pudo verificar Minecraft Java. Comprueba que la cuenta tenga el juego y un perfil creado."
             };

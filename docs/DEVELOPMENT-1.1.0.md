@@ -1,6 +1,6 @@
 # Desarrollo 1.1.0
 
-Rama: `1.1.0`. Estado: desarrollo, no distribuir. No crear tags ni publicar releases sin indicación del propietario. `main`, la release `v1.0.0`, el instalador del escritorio y sus assets públicos se conservan.
+Rama: `1.1.0`. El propietario autorizó publicar estos cambios para Windows como **1.0.5**, el 24 de octubre de 2026. Linux sigue aplazado. No crear tags ni publicar releases sin indicación del propietario. `main`, la release `v1.0.0`, el instalador del escritorio y sus assets públicos se conservan.
 
 ## Instalador público fijo
 
@@ -45,6 +45,6 @@ XboxAuthNet implementa OAuth de Microsoft y autenticación Xbox (Basic, Full, SI
 
 Con un Client ID propio, la documentación de CmlLib indica que hay que habilitarlo para Minecraft para evitar `403 Forbidden`. Los ejemplos SISU con `XboxGameTitles.MinecraftJava` usan el ID del juego oficial; no representan la aprobación de un Client ID de Destiny. Es un camino técnicamente distinto, cuya disponibilidad para nuestro caso no se ha verificado con una cuenta real. No afirmar que la dependencia elimina el trámite para una app propia.
 
-Se ha implementado un [experimento SISU opt-in](SISU-EXPERIMENT.md), desactivado en compilaciones normales. No se anuncia como login premium de producción. Las credenciales se introducen únicamente en la página de Microsoft dentro de WebView2. Antes de exponerlo en producción falta completar login, cancelación, MFA, renovación y arranque autenticado con una cuenta real. Linux queda aplazado por decisión del propietario; esta prueba es Windows y no genera instalador.
+Se ha implementado un [experimento SISU opt-in](SISU-EXPERIMENT.md), habilitado también en producción desde 1.0.5. La opción experimental solo separa los datos de prueba. Las credenciales se introducen únicamente en la página de Microsoft dentro de WebView2. El propietario confirmó login, lanzamiento y renovación con su cuenta real; las pruebas aisladas cubren cancelación, validación de licencia y errores. No se ha certificado cada combinación de MFA o restricciones familiares. Linux queda aplazado por decisión del propietario; esta prueba es Windows y no genera instalador.
 
 Fuentes: [XboxAuthNet](https://github.com/AlphaBs/XboxAuthNet), [Client ID y allowlist](https://cmllib.github.io/CmlLib.Core-wiki/en/auth.microsoft/xboxauthnet.game.msal/clientid/), [restricciones y ejemplo SISU](https://cmllib.github.io/CmlLib.Core-wiki/en/auth.microsoft/xboxauthnet.game/xboxauth/).

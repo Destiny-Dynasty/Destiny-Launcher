@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -42,7 +42,10 @@ internal sealed class AccountsEditor : UserControl
         _list.ItemTemplate = new DataTemplate { VisualTree = new FrameworkElementFactory(typeof(AccountIdentity)) };
         AutomationProperties.SetName(_list, "Cuentas guardadas"); AutomationProperties.SetAutomationId(_list, "AccountsList");
         _list.SelectedItem = _accounts.FirstOrDefault(a => !string.IsNullOrEmpty(activeMicrosoftId) ? a.MicrosoftId == activeMicrosoftId : !a.IsMicrosoft && a.Name.Equals(active, StringComparison.OrdinalIgnoreCase));
-        Grid.SetRow(_list, 2); body.Children.Add(_list);
+        _list.Background = System.Windows.Media.Brushes.Transparent;
+        _list.BorderThickness = new Thickness(0);
+        var listFrame = new Border { CornerRadius = new CornerRadius(10), Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(120, 13, 14, 12)), BorderBrush = ProfileDialog.ResourceBrush("Line"), BorderThickness = new Thickness(1), Padding = new Thickness(5), Child = _list };
+        Grid.SetRow(listFrame, 2); body.Children.Add(listFrame);
         var actions = new Grid { Margin = new Thickness(0, 20, 0, 0) };
         actions.ColumnDefinitions.Add(new ColumnDefinition()); actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var remove = ProfileDialog.DialogButton("Eliminar", false); remove.HorizontalAlignment = HorizontalAlignment.Left; remove.IsEnabled = _list.SelectedItem is AccountRow;

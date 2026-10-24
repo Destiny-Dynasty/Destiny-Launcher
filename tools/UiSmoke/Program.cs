@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Net.Http;
@@ -139,9 +139,26 @@ internal static partial class Program
                 $"Minimize/restore cycle {cycle+1} preserves the video surface");
         }
         Get<Button>(window, "SettingsNav").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); await Idle();
-        Assert(!controller.IsOpen, "Settings page closes the invisible background decoder");
+        Assert(controller.IsOpen && !controller.IsPlaying && ReferenceEquals(video.Source, beforeMinimizeSource), "Settings pauses and retains the same decoder and source");
         Get<Button>(window, "HomeNav").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         await Until(() => controller.IsPlaying && video.Opacity == 1, "Home resumes the animated background");
+        Assert(ReferenceEquals(video.Source, beforeMinimizeSource), "Returning Home does not reopen or replace the source");
+        var modal = new Window { Owner = window, ShowActivated = false, ShowInTaskbar = false, Width = 200, Height = 100, WindowStartupLocation = WindowStartupLocation.Manual, Left = -32000, Top = -32000 };
+        modal.Show();
+        var nested = new Window { Owner = modal, ShowActivated = false, ShowInTaskbar = false, Width = 150, Height = 80, WindowStartupLocation = WindowStartupLocation.Manual, Left = -32000, Top = -32000 };
+        nested.Show();
+        Window? focused = nested;
+        controller.HasPlaybackFocus = () => BackgroundVideoController.HasPlaybackFocusIn(window, candidate => ReferenceEquals(candidate, focused));
+        controller.Update();
+        var modalPosition = video.Position;
+        await Task.Delay(350);
+        Assert(controller.IsPlaying && video.Position > modalPosition && ReferenceEquals(video.Source, beforeMinimizeSource), "Nested owned modal keeps the original video playing");
+        focused = null; controller.Update(); await Task.Delay(150);
+        Assert(!controller.IsPlaying && controller.IsOpen, "Switching from an owned modal to another app still pauses video");
+        focused = modal; controller.Update(); await Task.Delay(150);
+        Assert(controller.IsPlaying, "Returning to an owned modal resumes playback");
+        nested.Close(); modal.Close();
+        controller.HasPlaybackFocus = () => playbackFocus;
         window.SetAuditProgress("Preparando Minecraft", .1); await Idle();
         Assert(!controller.IsOpen, "Game preparation releases background video resources");
         window.EndAuditProgress();

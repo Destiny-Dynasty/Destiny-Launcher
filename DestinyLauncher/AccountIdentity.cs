@@ -14,7 +14,7 @@ internal sealed class AccountIdentity : Grid
     private readonly Image _head;
     private readonly TextBlock _initial;
     private readonly TextBlock _name;
-    private readonly StackPanel _microsoft;
+    private readonly StackPanel _accountType;
     private string Username => DataContext switch { AccountRow row => row.Name, string name => name, _ => "" };
     private CancellationTokenSource? _request;
     public AccountIdentity()
@@ -34,13 +34,16 @@ internal sealed class AccountIdentity : Grid
         layers.Children.Add(_initial); layers.Children.Add(_head); avatar.Child = layers; Children.Add(avatar);
         _name = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         SetColumn(_name, 1); Children.Add(_name);
-        _microsoft = MicrosoftBrand.Label(); _microsoft.Margin = new Thickness(12, 0, 0, 0); _microsoft.Visibility = Visibility.Collapsed;
-        SetColumn(_microsoft, 2); Children.Add(_microsoft);
+        _accountType = MicrosoftBrand.Label(); _accountType.Margin = new Thickness(12, 0, 0, 0); _accountType.Visibility = Visibility.Collapsed;
+        SetColumn(_accountType, 2); Children.Add(_accountType);
         DataContextChanged += async (_, _) =>
         {
             CancelRequest();
             _name.Text = Username;
-            _microsoft.Visibility = DataContext is AccountRow { IsMicrosoft: true } ? Visibility.Visible : Visibility.Collapsed;
+            var premium = DataContext is AccountRow { IsMicrosoft: true };
+            _accountType.Children.Clear();
+            _accountType.Children.Add(AccountTypeLabel.Create(premium));
+            _accountType.Visibility = string.IsNullOrEmpty(Username) ? Visibility.Collapsed : Visibility.Visible;
             _initial.Text = _name.Text.Length > 0 ? _name.Text[..1].ToUpperInvariant() : "D";
             _head.Source = null; _head.Visibility = Visibility.Collapsed; _initial.Visibility = Visibility.Visible;
             if (IsLoaded) await LoadHeadAsync();
