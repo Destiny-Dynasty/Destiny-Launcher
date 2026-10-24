@@ -102,12 +102,16 @@ internal sealed class MicrosoftAccountService
             || session.AccessToken is "null" or "0" or "offline")
             throw new InvalidDataException("Microsoft no devolvió una sesión válida de Minecraft Java.");
     }
-    internal void Forget(string id)
+    internal void Forget(string id) => ForgetMany([id]);
+    internal void ForgetMany(IEnumerable<string> ids)
     {
         var storage = new ProtectedMicrosoftStorage(_file);
         var node = storage.ReadAsJsonNode() as JsonObject;
         if (node is null) return;
-        node.Remove(id); storage.Write(node, null); storage.Commit();
+        var requested = ids.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+        foreach (var id in node.Select(item => item.Key).Where(requested.Contains).ToArray()) changed |= node.Remove(id);
+        if (changed) { storage.Write(node, null); storage.Commit(); }
     }
     internal static string FriendlyError(Exception error)
     {

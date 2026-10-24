@@ -27,6 +27,8 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           dotnet run --project tools/UiSmoke -c Release -p:SisuExperiment=true -- artifacts/ci/microsoft-ui --microsoft-ui-only
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          dotnet run --project tools/UiSmoke -c Release -p:SisuExperiment=true -- artifacts/ci/accounts-ui --accounts-only
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/ci/ui --headless
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/ci/update-ui --update-only

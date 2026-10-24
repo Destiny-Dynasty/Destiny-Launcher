@@ -43,7 +43,8 @@ internal static partial class Program
         {
             try
             {
-                if (args.Contains("--microsoft-ui-only")) await AuditMicrosoftProfile();
+                if (args.Contains("--accounts-only")) await AuditAccountFlow();
+                else if (args.Contains("--microsoft-ui-only")) await AuditMicrosoftProfile();
                 else if (args.Contains("--microsoft-webview-only")) await AuditMicrosoftWebView();
                 else if (args.Contains("--discord-only")) await AuditDiscord();
                 else if (args.Contains("--update-only")) await AuditUpdateWindow();
@@ -758,7 +759,7 @@ internal static partial class Program
             "Lite displays its fixed sibling folder while sharing the same editable base");
         window.SetAuditAccounts(true, ["First_Player", "Second_Player"], "First_Player");
         var profileButton = Get<Button>(window, "ProfileButton");
-        Assert(profileButton.ContextMenu.Items.OfType<MenuItem>().Count() == (SisuExperiment.Enabled ? 4 : 3) && profileButton.ContextMenu.Items.OfType<MenuItem>().Count(m => m.IsChecked) == 1,
+        Assert(profileButton.ContextMenu.Items.OfType<MenuItem>().Count() == 3 && profileButton.ContextMenu.Items.OfType<MenuItem>().Count(m => m.IsChecked) == 1,
             "Account dropdown contains saved names, exactly one selection and Manage accounts");
         var menu = profileButton.ContextMenu;
         menu.Measure(new Size(250, 340)); menu.Arrange(new Rect(0, 0, 250, menu.DesiredSize.Height)); menu.UpdateLayout();
@@ -853,37 +854,34 @@ internal static partial class Program
         System.Windows.Documents.TextElement.SetForeground(root, (Brush)Application.Current.FindResource("Ink"));
         void Layout() { root.Measure(new Size(520, 440)); root.Arrange(new Rect(0, 0, 520, 440)); root.UpdateLayout(); }
         Layout();
-        var input = Descendants<TextBox>(root).Single();
-        var add = Descendants<Button>(root).Single(b => Equals(b.Content, "Añadir"));
+        Assert(!Descendants<TextBox>(root).Any(), "Account manager has no inline name field");
+        var add = Descendants<Button>(root).Single(b => Equals(b.Content, "Añadir cuenta"));
         var remove = Descendants<Button>(root).Single(b => Equals(b.Content, "Eliminar"));
         var save = Descendants<Button>(root).Single(b => Equals(b.Content, "Guardar"));
-        input.Text = "first_player"; add.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        var addRequested = false; editor.AddRequested += () => addRequested = true;
+        add.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(addRequested, "The manager requests the account-type dialog");
+        editor.AddLocal("first_player");
         Assert(editor.AccountNames.Count == 2 && Descendants<TextBlock>(root).Any(t => t.Text == "Esta cuenta ya está guardada."), "Duplicate offline names are rejected regardless of case");
-        input.Text = "ab"; add.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        editor.AddLocal("ab");
         Assert(editor.AccountNames.Count == 2 && Descendants<TextBlock>(root).Any(t => t.Text.StartsWith("Usa de 3 a 16")), "Account manager validates offline names");
-        input.Text = "Third_Player"; add.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        Assert(editor.AccountNames.Count == 3 && input.Text == "", "Adding a valid account selects it and clears the input");
+        editor.AddLocal("Third_Player");
+        Assert(editor.AccountNames.Count == 3, "A valid offline result is added to the draft");
         remove.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         Assert(editor.AccountNames.SequenceEqual(original) && original.Length == 2, "Removing a draft account leaves the original list untouched");
         var accepted = false; editor.SaveRequested += () => accepted = true;
-        input.Text = "bad name"; save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        Assert(!accepted, "Saving cannot accept an invalid pending account");
-        input.Text = "Fourth_Player"; save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        Assert(accepted && editor.AccountNames.Contains("Fourth_Player"), "Save includes a valid name still typed in the input");
-        input.Text = "Example_Player";
+        editor.AddLocal("Fourth_Player"); save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert(accepted && editor.AccountNames.Contains("Fourth_Player"), "Save submits the explicit account draft");
+        editor.AddMicrosoft(new MicrosoftProfile("1234567890abcdef1234567890abcdef", "Fourth_Player"));
+        Assert(editor.Rows.Count == 4 && editor.Rows.Count(r => r.Name == "Fourth_Player") == 2, "Local and Microsoft identities with the same nickname remain distinct");
+        editor.AddMicrosoft(new MicrosoftProfile("1234567890abcdef1234567890abcdef", "Fourth_Player"));
+        Assert(editor.Rows.Count == 4, "Reauthorizing the same Microsoft UUID does not add a duplicate");
         Layout();
-        var textView = Descendants<FrameworkElement>(input).Single(e => e.GetType().Name == "TextBoxView");
-        Assert(textView.ActualHeight >= 16, "Account input gives typed text a full line instead of clipping it to two pixels");
-        var inputBitmap = new RenderTargetBitmap((int)Math.Ceiling(input.ActualWidth), 40, 96, 96, PixelFormats.Pbgra32);
-        inputBitmap.Render(input);
-        var pixels = new byte[inputBitmap.PixelWidth * 40 * 4]; inputBitmap.CopyPixels(pixels, inputBitmap.PixelWidth * 4, 0);
-        Assert(Enumerable.Range(0, pixels.Length / 4).Count(i => pixels[i * 4] > 120 && pixels[i * 4 + 1] > 150 && pixels[i * 4 + 2] > 150) > 40,
-            "Typed account name produces visible light-colored glyphs in its actual 40px field");
         var portraits = Descendants<AccountIdentity>(editor).ToArray();
-        Assert(portraits.Length == editor.AccountNames.Count && portraits.All(p => ReferenceEquals(p.GetValue(AccountIdentity.HeadServiceProperty), heads)),
+        Assert(portraits.Length == editor.Rows.Count && portraits.All(p => ReferenceEquals(p.GetValue(AccountIdentity.HeadServiceProperty), heads)),
             "Each account list row inherits the shared cached-head service");
         foreach (var portrait in portraits) await portrait.LoadHeadAsync();
-        Assert(portraits.All(p => Descendants<Image>(p).Single() is { Source: not null, Visibility: Visibility.Visible }),
+        Assert(portraits.All(p => Descendants<Image>(p).Single(i => System.Windows.Automation.AutomationProperties.GetAutomationId(i) == "AccountHeadImage") is { Source: not null, Visibility: Visibility.Visible }),
             "Account manager rows display verified heads to the left of their names");
         var requests = skinHandler.Requests;
         foreach (var portrait in portraits) await portrait.LoadHeadAsync();
@@ -932,7 +930,7 @@ internal static partial class Program
         var identity = new AccountIdentity { DataContext = "Skin_Player" };
         identity.SetValue(AccountIdentity.HeadServiceProperty, service);
         await identity.LoadHeadAsync();
-        var portrait = Descendants<Image>(identity).Single();
+        var portrait = Descendants<Image>(identity).Single(i => System.Windows.Automation.AutomationProperties.GetAutomationId(i) == "AccountHeadImage");
         Assert(portrait.Source is not null && portrait.Visibility == Visibility.Visible && handler.Requests == 3,
             "Dropdown account identity shows its cached portrait without fetching again");
         identity.DataContext = "Another_Player";

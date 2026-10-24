@@ -719,17 +719,18 @@ public partial class MainWindow : Window
         {
             foreach (var profile in MicrosoftProfiles())
             {
-                var identity = new AccountIdentity { DataContext = profile.Username };
+                var identity = new AccountIdentity { DataContext = new AccountRow(profile.Username, profile.Id) };
                 if (!_previewMode) identity.SetValue(AccountIdentity.HeadServiceProperty, _playerHeadService);
-                var row = new StackPanel { Orientation = Orientation.Horizontal }; row.Children.Add(identity);
-                row.Children.Add(new TextBlock { Text = "Microsoft", FontSize = 10, Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = Brush("Muted") });
-                var item = new MenuItem { Header = row, Style = (Style)FindResource("AccountMenuItem"), IsCheckable = true,
+                var item = new MenuItem { Header = identity, Style = (Style)FindResource("AccountMenuItem"), IsCheckable = true,
                     IsChecked = profile.Id.Equals(_config.MicrosoftAccountId, StringComparison.OrdinalIgnoreCase) };
                 item.Click += (_, _) => SelectMicrosoft(profile);
                 menu.Items.Add(item);
             }
-            var addMicrosoft = new MenuItem { Header = "Añadir cuenta de Microsoft", Style = (Style)FindResource("AccountMenuItem") };
-            addMicrosoft.Click += (_, _) => SignInMicrosoft(); menu.Items.Add(addMicrosoft);
+            if (!_config.MultiAccountEnabled)
+            {
+                var addMicrosoft = new MenuItem { Header = "Añadir cuenta de Microsoft", Style = (Style)FindResource("AccountMenuItem") };
+                addMicrosoft.Click += (_, _) => SignInMicrosoft(); menu.Items.Add(addMicrosoft);
+            }
             if (!string.IsNullOrEmpty(_config.MicrosoftAccountId))
             {
                 var signOut = new MenuItem { Header = "Cerrar sesión de Microsoft", Style = (Style)FindResource("AccountMenuItem") };
@@ -742,8 +743,9 @@ public partial class MainWindow : Window
         {
             if (_busy) return;
             if (!_config.MultiAccountEnabled) { EditOfflineProfile(); return; }
-            var dialog = new AccountsDialog(_config.Accounts, _config.PlayerName, SaveAccounts,
-                !_previewMode || _loadRemoteSkinInPreview ? _playerHeadService : null) { Owner = this };
+            var dialog = new AccountsDialog(_config.Accounts, _config.PlayerName, SaveManagedAccounts,
+                !_previewMode || _loadRemoteSkinInPreview ? _playerHeadService : null, MicrosoftProfiles(), _config.MicrosoftAccountId,
+                _microsoft is not null ? SignInMicrosoftForManager : null, DiscardLinkedMicrosoft) { Owner = this };
             dialog.ShowDialog();
         };
         menu.Items.Add(manage);

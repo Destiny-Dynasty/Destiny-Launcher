@@ -32,7 +32,8 @@ internal static partial class Program
         var config = (DestinyLauncher.Models.LauncherConfig)field.GetValue(window)!;
         config.MicrosoftAccountId = "1234567890abcdef1234567890abcdef";
         window.SetAuditState("", playerName: "Premium_Fixture");
-        Assert(Get<TextBlock>(window, "PlayerAccountType").Visibility == Visibility.Visible, "Selected Microsoft identity has a visible account-type label");
+        var accountType = Get<StackPanel>(window, "PlayerAccountType");
+        Assert(accountType.Visibility == Visibility.Visible && Descendants<System.Windows.Controls.Image>(accountType).Any(i => ReferenceEquals(i.Source, MicrosoftBrand.Symbol)), "Selected Microsoft identity has the official symbol and visible account-type label");
         var menu = Get<Button>(window, "ProfileButton").ContextMenu;
         Assert(menu.Items.OfType<MenuItem>().Any(item => Equals(item.Header, "Cerrar sesión de Microsoft")), "Premium profile exposes local sign out");
         Capture(window, "microsoft-selected");

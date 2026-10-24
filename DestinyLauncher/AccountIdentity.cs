@@ -14,11 +14,14 @@ internal sealed class AccountIdentity : Grid
     private readonly Image _head;
     private readonly TextBlock _initial;
     private readonly TextBlock _name;
+    private readonly StackPanel _microsoft;
+    private string Username => DataContext switch { AccountRow row => row.Name, string name => name, _ => "" };
     private CancellationTokenSource? _request;
     public AccountIdentity()
     {
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
         ColumnDefinitions.Add(new ColumnDefinition());
+        ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var avatar = new Border { Width = 28, Height = 28, HorizontalAlignment = HorizontalAlignment.Left,
             Background = ProfileDialog.ResourceBrush("PanelSoft"), BorderBrush = ProfileDialog.ResourceBrush("Line"),
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), Padding = new Thickness(3) };
@@ -26,14 +29,18 @@ internal sealed class AccountIdentity : Grid
         _initial = new TextBlock { Foreground = ProfileDialog.ResourceBrush("GoldBright"), FontSize = 14,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         _head = new Image { Stretch = Stretch.Uniform, Visibility = Visibility.Collapsed };
+        System.Windows.Automation.AutomationProperties.SetAutomationId(_head, "AccountHeadImage");
         RenderOptions.SetBitmapScalingMode(_head, BitmapScalingMode.NearestNeighbor);
         layers.Children.Add(_initial); layers.Children.Add(_head); avatar.Child = layers; Children.Add(avatar);
         _name = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         SetColumn(_name, 1); Children.Add(_name);
+        _microsoft = MicrosoftBrand.Label(); _microsoft.Margin = new Thickness(12, 0, 0, 0); _microsoft.Visibility = Visibility.Collapsed;
+        SetColumn(_microsoft, 2); Children.Add(_microsoft);
         DataContextChanged += async (_, _) =>
         {
             CancelRequest();
-            _name.Text = DataContext as string ?? "";
+            _name.Text = Username;
+            _microsoft.Visibility = DataContext is AccountRow { IsMicrosoft: true } ? Visibility.Visible : Visibility.Collapsed;
             _initial.Text = _name.Text.Length > 0 ? _name.Text[..1].ToUpperInvariant() : "D";
             _head.Source = null; _head.Visibility = Visibility.Collapsed; _initial.Visibility = Visibility.Visible;
             if (IsLoaded) await LoadHeadAsync();
@@ -44,14 +51,15 @@ internal sealed class AccountIdentity : Grid
     internal async Task LoadHeadAsync()
     {
         CancelRequest();
-        if (GetValue(HeadServiceProperty) is not PlayerHeadService service || DataContext is not string name) return;
+        if (GetValue(HeadServiceProperty) is not PlayerHeadService service || string.IsNullOrEmpty(Username)) return;
+        var name = Username;
         _request = new CancellationTokenSource();
         var token = _request.Token;
         try
         {
             void Display(ImageSource? image)
             {
-                if (image is null || token.IsCancellationRequested || !Equals(DataContext, name)) return;
+                if (image is null || token.IsCancellationRequested || !string.Equals(Username, name, StringComparison.Ordinal)) return;
                 _head.Source = image; _head.Visibility = Visibility.Visible; _initial.Visibility = Visibility.Collapsed;
             }
             Display(await service.GetCachedHeadAsync(name, token));

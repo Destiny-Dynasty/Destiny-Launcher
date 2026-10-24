@@ -16,7 +16,13 @@ Ejecutable: `publish-experiment/DestinyLauncher.exe`. Sin instalador. La compila
 4. Pulsar Jugar solo cuando se quiera probar el juego. El lanzamiento renueva la sesión sin abrir otro navegador; si necesita autorización nueva, informa del fallo. No cambia a offline automáticamente. El juego recibe UUID, access token y tipo `msa` de esa cuenta, nunca el UUID derivado del nickname offline.
 5. Probar cancelar, MFA, cuenta sin Java, fallo 403 de Minecraft, cierre y reapertura del launcher, cambio de cuenta local/Microsoft y cerrar sesión de Microsoft. El nombre premium no es editable como si fuera una cuenta local.
 
-La compatibilidad real de esta ruta con cuentas y políticas actuales de Microsoft solo se confirma tras una prueba humana completa. No afirmar que funciona por compilar o por pasar fixtures.
+## Gestor de cuentas
+
+En multicuentas, «Gestionar cuentas» muestra las cuentas locales y Microsoft con su cabeza. «Añadir cuenta» abre un selector Offline/Microsoft: Offline muestra el campo del nombre; Microsoft abre el flujo de autorización con el gestor como propietario. El símbolo oficial de Microsoft acompaña al nombre del proveedor en la tarjeta, el desplegable y la lista.
+
+Las altas locales y las eliminaciones se mantienen como borrador hasta Guardar. Cancelar conserva las cuentas previas y elimina del almacén local únicamente las nuevas cuentas Microsoft vinculadas durante ese borrador. Reautorizar una cuenta ya existente renueva su sesión sin duplicarla. Una cuenta local y una Microsoft con el mismo nickname permanecen separadas por su tipo/UUID.
+
+El 24 de octubre de 2026 el propietario confirmó una prueba humana satisfactoria de inicio de sesión, lanzamiento del juego y persistencia/renovación tras reabrir el launcher. Esa confirmación corresponde a su cuenta y equipo; no significa que estén cubiertas todas las cuentas, MFA o restricciones familiares. El agente no introdujo credenciales ni realizó ese lanzamiento real.
 
 ## Credenciales y diagnóstico
 

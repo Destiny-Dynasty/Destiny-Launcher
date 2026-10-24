@@ -10,6 +10,7 @@ El código original del launcher, instalador, scripts y pruebas se distribuye ba
 | XboxAuthNet.Game | 1.5.0 | MIT · Copyright AlphaBs · https://github.com/CmlLib/CmlLib.Core.Auth.Microsoft |
 | XboxAuthNet | 3.1.0 | MIT; incluye componentes derivados de MSAL.NET bajo MIT · https://github.com/AlphaBs/XboxAuthNet |
 | Microsoft.Web.WebView2 SDK | 1.0.3537.50 | BSD-3-Clause · Copyright Microsoft Corporation · texto conservado en `licenses/Microsoft.Web.WebView2-LICENSE.txt`; utiliza el runtime de WebView2 instalado en Windows, sin incluir un navegador completo · https://www.nuget.org/packages/Microsoft.Web.WebView2/1.0.3537.50 |
+| Símbolo de Microsoft | SVG oficial de 21×21 | Marca de Microsoft, usada para identificar sus cuentas e inicio de sesión; fuente y copia original en `Assets/Branding/README.md` · https://learn.microsoft.com/en-us/entra/identity-platform/howto-add-branding-in-apps |
 | Microsoft.Extensions.Logging.Abstractions / DependencyInjection.Abstractions | 8.0.1 / 8.0.2 | MIT · https://github.com/dotnet/runtime |
 | SharpZipLib | 1.4.2 | MIT · https://github.com/icsharpcode/SharpZipLib |
 | LZMA-SDK (paquete NuGet) | 19.0.0 | MIT, según sus metadatos NuGet · https://github.com/monemihir/LZMA-SDK |
