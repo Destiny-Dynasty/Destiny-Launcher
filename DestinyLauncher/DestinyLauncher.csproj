@@ -18,10 +18,18 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(SisuExperiment)' == 'true'">
+    <DefineConstants>$(DefineConstants);SISU_EXPERIMENT</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="CmlLib.Core" Version="4.0.6" />
+    <PackageReference Include="CmlLib.Core.Auth.Microsoft" Version="3.4.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3537.50" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="..\THIRD_PARTY_NOTICES.md" LogicalName="DestinyLauncher.THIRD_PARTY_NOTICES.md" />
+    <EmbeddedResource Include="..\licenses\Microsoft.Web.WebView2-LICENSE.txt" LogicalName="DestinyLauncher.WebView2-LICENSE.txt" />
     <EmbeddedResource Include="Assets\Intro\emblem.zip" />
     <EmbeddedResource Include="Assets\Video\reino-rayos-v6.mp4" />
     <EmbeddedResource Include="Assets\Signing\launcher-update-public.pem" />

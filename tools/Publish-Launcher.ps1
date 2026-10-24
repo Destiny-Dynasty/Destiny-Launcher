@@ -1,7 +1,8 @@
 [CmdletBinding()]
-param([switch]$Experiment, [string]$OutputPath, [string]$Version)
+param([switch]$Experiment, [switch]$SisuExperiment, [string]$OutputPath, [string]$Version)
 
 $ErrorActionPreference = 'Stop'
+if ($SisuExperiment -and -not $Experiment) { throw 'SISU solo se compila con -Experiment; no se reemplaza el publish de distribución.' }
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $workspaceRoot 'DestinyLauncher\DestinyLauncher.csproj'
 $outputFolder = if ($Experiment) { 'publish-experiment' } else { 'publish' }
@@ -45,6 +46,7 @@ $publishArgs = @(
     '-p:DebugSymbols=false'
 )
 
+if ($SisuExperiment) { $publishArgs += '-p:SisuExperiment=true' }
 if ($Version) {
     if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Version debe tener formato X.Y.Z.' }
     $publishArgs += @("-p:Version=$Version", "-p:AssemblyVersion=$Version.0", "-p:FileVersion=$Version.0")

@@ -14,6 +14,12 @@ using System.IO.Compression;
 using DestinyLauncher.Services;
 using DestinyLauncher.Models;
 
+if (args.FirstOrDefault() == "--microsoft-only")
+{
+    await MicrosoftAudit.Run(Path.GetFullPath(args[1]));
+    return 0;
+}
+
 if (args.FirstOrDefault() == "--java-only")
 {
     await JavaRuntimeAudit.Run(Path.GetFullPath(args[1]));

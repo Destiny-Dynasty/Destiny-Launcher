@@ -73,6 +73,8 @@ foreach (var (profiles, games) in new[] { (false, false), (true, false), (false,
 {
     var paths = new LauncherPaths(Path.Combine(root, $"remove-{profiles}-{games}")); paths.Ensure();
     File.WriteAllText(paths.ConfigFile, "profile-data");
+    var microsoftCredentials = Path.Combine(paths.Root, "microsoft-accounts.bin");
+    File.WriteAllText(microsoftCredentials, "encrypted Microsoft fixture");
     var data = new InstallationDataService(paths);
     var owned = new[] { Path.Combine(paths.Root, "instances", "Destiny"), Path.Combine(paths.Root, "custom", "Destiny-Lite"), Path.Combine(paths.Root, "old-location", "Destiny") };
     foreach (var path in owned)
@@ -84,6 +86,7 @@ foreach (var (profiles, games) in new[] { (false, false), (true, false), (false,
     Check(data.PlanGameRemoval().Count == 3, "History includes both variants and previous custom locations");
     data.RemoveSelected(profiles, games);
     Check(File.Exists(paths.ConfigFile) != profiles, $"Profile deletion is opt-in ({profiles},{games})");
+    Check(File.Exists(microsoftCredentials) != profiles, $"Microsoft credential deletion follows the profiles checkbox ({profiles},{games})");
     Check(owned.All(p => Directory.Exists(p) != games), $"Game deletion is independently opt-in ({profiles},{games})");
     Check(File.ReadAllText(Path.Combine(external, "keep.txt")) == "other instance", "Unregistered Minecraft instances remain untouched");
     if (profiles && !games) Check(data.PlanGameRemoval().Count == 3, "Removing profiles preserves retained-game ownership records");

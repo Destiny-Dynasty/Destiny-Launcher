@@ -50,7 +50,8 @@ public sealed class ProfileDialog : Window
 {
     private readonly TextBox _nameBox;
     public string PlayerName => _nameBox.Text.Trim();
-    public ProfileDialog(string current)
+    internal bool MicrosoftLoginRequested { get; private set; }
+    public ProfileDialog(string current, bool allowMicrosoft = false)
     {
         var body = new StackPanel { Margin = new Thickness(24, 20, 24, 24) };
         var nameLabel = new Label { Content = "Nombre de jugador", Padding = new Thickness(0, 0, 0, 8), Foreground = ResourceBrush("Ink"), FontSize = 12 };
@@ -79,7 +80,15 @@ public sealed class ProfileDialog : Window
         Validate(false);
         save.Click += (_, _) => { if (Regex.IsMatch(PlayerName, "^[A-Za-z0-9_]{3,16}$")) DialogResult = true; };
         actions.Children.Add(cancel); actions.Children.Add(save); body.Children.Add(actions);
-        DialogChrome.Create(this, "Tu perfil", new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false }, 450, 280);
+        if (allowMicrosoft)
+        {
+            var microsoft = DialogButton("Iniciar sesión con Microsoft", false);
+            microsoft.Margin = new Thickness(0, 18, 0, 0); microsoft.HorizontalAlignment = HorizontalAlignment.Stretch;
+            AutomationProperties.SetAutomationId(microsoft, "MicrosoftSignInButton");
+            microsoft.Click += (_, _) => { MicrosoftLoginRequested = true; DialogResult = false; };
+            body.Children.Add(microsoft);
+        }
+        DialogChrome.Create(this, "Tu perfil", new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false }, 450, allowMicrosoft ? 350 : 280);
         Loaded += (_, _) => { _nameBox.Focus(); _nameBox.SelectAll(); };
     }
     internal static Brush ResourceBrush(string key) => (Brush)Application.Current.FindResource(key);
@@ -321,7 +330,7 @@ public sealed class SettingsPage : UserControl
             if (!int.TryParse(_gameHeight.Text, out var height) || height is < 360 or > 4320) { Error("El alto debe estar entre 360 y 4320 píxeles.", _gameHeight); return; }
             try { JavaArguments.ValidateMemoryOverrides(_javaArguments.Text); }
             catch (FormatException ex) { Error(ex.Message, _javaArguments); return; }
-            var updated = new LauncherConfig { PlayerName = source.PlayerName, SelectedEdition = source.SelectedEdition, InstallDirectory = path,
+            var updated = new LauncherConfig { PlayerName = source.PlayerName, MicrosoftAccountId = source.MicrosoftAccountId, SelectedEdition = source.SelectedEdition, InstallDirectory = path,
                 MultiAccountEnabled = _multiAccount.IsChecked == true, Accounts = source.Accounts.ToList(), AutoJoinServer = _autoJoin.IsChecked == true,
                 GameWidth = width, GameHeight = height, WindowMode = SelectedWindowMode,
                 RamGb = ram, JavaArguments = _javaArguments.Text, MinecraftVersion = source.MinecraftVersion, FabricLoaderVersion = source.FabricLoaderVersion, Destiny = source.Destiny, DestinyLite = source.DestinyLite, DestinyStaff = source.DestinyStaff };

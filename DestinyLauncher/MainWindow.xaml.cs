@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private readonly PlayerHeadService _playerHeadService;
     private readonly NewsFeedService _newsFeed;
     private readonly DiscordLinkService _discord;
+    private readonly MicrosoftAccountService? _microsoft;
     private readonly bool _previewMode;
     private readonly bool _loadRemoteSkinInPreview;
     private readonly BackgroundVideoController _backgroundVideo;
@@ -61,6 +62,7 @@ public partial class MainWindow : Window
         _playerHeadService = new PlayerHeadService(_paths);
         _newsFeed = new NewsFeedService(_paths);
         _discord = new DiscordLinkService(_paths);
+        _microsoft = SisuExperiment.Enabled ? new MicrosoftAccountService(_paths) : null;
         var exists = File.Exists(_paths.ConfigFile);
         _config = previewMode ? new LauncherConfig { PlayerName = loadRemoteSkinInPreview ? "Shady935" : "", InstallDirectory = _paths.InstallDirectory } : _configService.Load();
         if (dataRoot is not null && !exists) _config.InstallDirectory = _paths.InstallDirectory;
@@ -237,6 +239,7 @@ public partial class MainWindow : Window
     {
         if (_closed) return;
         PlayerNameText.Text = string.IsNullOrWhiteSpace(_config.PlayerName) ? "Añadir nombre" : _config.PlayerName;
+        PlayerAccountType.Visibility = string.IsNullOrEmpty(_config.MicrosoftAccountId) ? Visibility.Collapsed : Visibility.Visible;
         PlayerNameText.ToolTip = string.IsNullOrWhiteSpace(_config.PlayerName) ? "Elige tu nombre para jugar" : _config.PlayerName;
         PlayerInitial.Text = string.IsNullOrWhiteSpace(_config.PlayerName) ? "D" : _config.PlayerName[..1].ToUpperInvariant();
         RefreshAccountMenu();
@@ -496,7 +499,17 @@ public partial class MainWindow : Window
             else if (string.IsNullOrWhiteSpace(installedVersion))
                 throw new InvalidOperationException("No hay una instalación local ni un manifiesto disponible.");
             if (manifestCheck is null) pack.JavaVersion = _configService.InstalledJavaVersion(pack.Slug);
-            using var session = await _minecraft.PrepareAndLaunchAsync(_config, pack, progress, _lifetime.Token);
+            CmlLib.Core.Auth.MSession? premiumSession = null;
+            if (!string.IsNullOrEmpty(_config.MicrosoftAccountId))
+            {
+                if (_microsoft is null) throw new InvalidOperationException("Esta cuenta requiere la compilación experimental de Microsoft.");
+                try { premiumSession = await _microsoft.RefreshAsync(_config.MicrosoftAccountId, new Progress<string>(text => SetNotice(text, "", "Gold")), _lifetime.Token); }
+                catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { throw; }
+                catch (Exception error) { throw new InvalidOperationException(MicrosoftAccountService.FriendlyError(error)); }
+                _config.PlayerName = premiumSession.Username!;
+                Refresh();
+            }
+            using var session = await _minecraft.PrepareAndLaunchAsync(_config, pack, progress, _lifetime.Token, premiumSession);
             // A settings write failure after a successful start must never abandon the game
             // handle or leave the launcher visible for the rest of the session.
             TrySaveConfig();
@@ -657,29 +670,39 @@ public partial class MainWindow : Window
     private void Profile_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
-        if (_config.MultiAccountEnabled)
+        if (_config.MultiAccountEnabled || (_microsoft is not null && !string.IsNullOrEmpty(_config.MicrosoftAccountId)))
         {
             RefreshAccountMenu();
             ProfileButton.ContextMenu.IsOpen = true;
             return;
         }
-        var dialog = new ProfileDialog(_config.PlayerName) { Owner = this };
-        if (dialog.ShowDialog() != true) return;
+        EditOfflineProfile();
+    }
+
+    private void EditOfflineProfile()
+    {
+        var dialog = new ProfileDialog(string.IsNullOrEmpty(_config.MicrosoftAccountId) ? _config.PlayerName : _config.Accounts.FirstOrDefault() ?? "", _microsoft is not null) { Owner = this };
+        var accepted = dialog.ShowDialog();
+        if (dialog.MicrosoftLoginRequested) { SignInMicrosoft(); return; }
+        if (accepted != true) return;
         var previousName = _config.PlayerName;
+        var previousMicrosoft = _config.MicrosoftAccountId;
         var previousAccounts = _config.Accounts.ToList();
-        _config.Accounts.RemoveAll(n => n.Equals(previousName, StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrEmpty(previousMicrosoft)) _config.Accounts.RemoveAll(n => n.Equals(previousName, StringComparison.OrdinalIgnoreCase));
+        _config.MicrosoftAccountId = "";
         _config.PlayerName = dialog.PlayerName;
         _config.NormalizeAccounts();
-        if (!_previewMode && !TrySaveConfig()) { _config.PlayerName = previousName; _config.Accounts = previousAccounts; return; }
+        if (!_previewMode && !TrySaveConfig()) { _config.PlayerName = previousName; _config.MicrosoftAccountId = previousMicrosoft; _config.Accounts = previousAccounts; return; }
         Refresh();
     }
 
     private void RefreshAccountMenu()
     {
-        ProfileActionGlyph.Data = _config.MultiAccountEnabled ? Geometry.Parse("M3 6l5 5 5-5") : IconGlyphs.Edit;
-        ProfileButton.ToolTip = _config.MultiAccountEnabled ? "Cambiar cuenta" : "Editar nombre de jugador";
+        var menuEnabled = _config.MultiAccountEnabled || (_microsoft is not null && !string.IsNullOrEmpty(_config.MicrosoftAccountId));
+        ProfileActionGlyph.Data = menuEnabled ? Geometry.Parse("M3 6l5 5 5-5") : IconGlyphs.Edit;
+        ProfileButton.ToolTip = menuEnabled ? "Cambiar cuenta" : "Editar nombre de jugador";
         System.Windows.Automation.AutomationProperties.SetName(ProfileButton, (string)ProfileButton.ToolTip);
-        if (!_config.MultiAccountEnabled) { ProfileButton.ContextMenu = null; return; }
+        if (!menuEnabled) { ProfileButton.ContextMenu = null; return; }
         var menu = new ContextMenu { Style = (Style)FindResource("AccountMenu"), PlacementTarget = ProfileButton,
             Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
         foreach (var name in _config.Accounts)
@@ -687,16 +710,38 @@ public partial class MainWindow : Window
             var identity = new AccountIdentity { DataContext = name };
             if (!_previewMode || _loadRemoteSkinInPreview) identity.SetValue(AccountIdentity.HeadServiceProperty, _playerHeadService);
             var item = new MenuItem { Header = identity, Style = (Style)FindResource("AccountMenuItem"),
-                IsCheckable = true, IsChecked = name.Equals(_config.PlayerName, StringComparison.OrdinalIgnoreCase) };
+                IsCheckable = true, IsChecked = string.IsNullOrEmpty(_config.MicrosoftAccountId) && name.Equals(_config.PlayerName, StringComparison.OrdinalIgnoreCase) };
             System.Windows.Automation.AutomationProperties.SetName(item, name);
             item.Click += (_, _) => SetActiveAccount(name);
             menu.Items.Add(item);
+        }
+        if (_microsoft is not null)
+        {
+            foreach (var profile in MicrosoftProfiles())
+            {
+                var identity = new AccountIdentity { DataContext = profile.Username };
+                if (!_previewMode) identity.SetValue(AccountIdentity.HeadServiceProperty, _playerHeadService);
+                var row = new StackPanel { Orientation = Orientation.Horizontal }; row.Children.Add(identity);
+                row.Children.Add(new TextBlock { Text = "Microsoft", FontSize = 10, Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = Brush("Muted") });
+                var item = new MenuItem { Header = row, Style = (Style)FindResource("AccountMenuItem"), IsCheckable = true,
+                    IsChecked = profile.Id.Equals(_config.MicrosoftAccountId, StringComparison.OrdinalIgnoreCase) };
+                item.Click += (_, _) => SelectMicrosoft(profile);
+                menu.Items.Add(item);
+            }
+            var addMicrosoft = new MenuItem { Header = "Añadir cuenta de Microsoft", Style = (Style)FindResource("AccountMenuItem") };
+            addMicrosoft.Click += (_, _) => SignInMicrosoft(); menu.Items.Add(addMicrosoft);
+            if (!string.IsNullOrEmpty(_config.MicrosoftAccountId))
+            {
+                var signOut = new MenuItem { Header = "Cerrar sesión de Microsoft", Style = (Style)FindResource("AccountMenuItem") };
+                signOut.Click += (_, _) => SignOutMicrosoft(); menu.Items.Add(signOut);
+            }
         }
         if (menu.Items.Count > 0) menu.Items.Add(new Separator { Background = Brush("Line"), Margin = new Thickness(8, 4, 8, 4) });
         var manage = new MenuItem { Header = "Gestionar cuentas", Style = (Style)FindResource("AccountMenuItem") };
         manage.Click += (_, _) =>
         {
             if (_busy) return;
+            if (!_config.MultiAccountEnabled) { EditOfflineProfile(); return; }
             var dialog = new AccountsDialog(_config.Accounts, _config.PlayerName, SaveAccounts,
                 !_previewMode || _loadRemoteSkinInPreview ? _playerHeadService : null) { Owner = this };
             dialog.ShowDialog();
@@ -707,10 +752,11 @@ public partial class MainWindow : Window
 
     internal bool SetActiveAccount(string name)
     {
-        if (_busy || !_config.MultiAccountEnabled || !_config.Accounts.Contains(name, StringComparer.OrdinalIgnoreCase)) return false;
+        if (_busy || (!_config.MultiAccountEnabled && (_microsoft is null || string.IsNullOrEmpty(_config.MicrosoftAccountId))) || !_config.Accounts.Contains(name, StringComparer.OrdinalIgnoreCase)) return false;
         var previous = _config.PlayerName;
+        var previousMicrosoft = _config.MicrosoftAccountId; _config.MicrosoftAccountId = "";
         _config.PlayerName = _config.Accounts.First(n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
-        if (!_previewMode && !TrySaveConfig()) { _config.PlayerName = previous; return false; }
+        if (!_previewMode && !TrySaveConfig()) { _config.PlayerName = previous; _config.MicrosoftAccountId = previousMicrosoft; return false; }
         Refresh(); return true;
     }
 
@@ -719,7 +765,7 @@ public partial class MainWindow : Window
         if (_busy || !_config.MultiAccountEnabled) return false;
         var previousNames = _config.Accounts; var previousActive = _config.PlayerName;
         _config.Accounts = names.Where(LauncherConfig.ValidPlayerName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        if (!_config.Accounts.Contains(_config.PlayerName, StringComparer.OrdinalIgnoreCase)) _config.PlayerName = _config.Accounts.FirstOrDefault() ?? "";
+        if (string.IsNullOrEmpty(_config.MicrosoftAccountId) && !_config.Accounts.Contains(_config.PlayerName, StringComparer.OrdinalIgnoreCase)) _config.PlayerName = _config.Accounts.FirstOrDefault() ?? "";
         if (!_previewMode && !TrySaveConfig()) { _config.Accounts = previousNames; _config.PlayerName = previousActive; return false; }
         Refresh(); return true;
     }

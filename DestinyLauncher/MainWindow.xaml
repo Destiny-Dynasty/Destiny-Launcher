@@ -97,7 +97,7 @@
                                             <Border Width="44" Height="48" Background="#29271E" BorderBrush="#665232" BorderThickness="1" CornerRadius="5" VerticalAlignment="Center">
                                                 <Grid Margin="4"><TextBlock x:Name="PlayerInitial" Text="D" FontFamily="{StaticResource DisplayFont}" FontSize="23" Foreground="{StaticResource GoldBright}" VerticalAlignment="Center" HorizontalAlignment="Center"/><Image x:Name="PlayerHead" Visibility="Collapsed" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/></Grid>
                                             </Border>
-                                            <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center"><TextBlock x:Name="PlayerNameText" Text="Añadir nombre" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center"><TextBlock x:Name="PlayerNameText" Text="Añadir nombre" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="PlayerAccountType" Text="Microsoft" FontSize="10" Foreground="{StaticResource Muted}" Margin="0,4,0,0" Visibility="Collapsed"/></StackPanel>
                                             <Path x:Name="ProfileActionGlyph" Grid.Column="2" Data="{x:Static local:IconGlyphs.Edit}" Width="13" Height="13" Stretch="Uniform" Stroke="{StaticResource Gold}" StrokeThickness="1.3" VerticalAlignment="Center"/>
                                         </Grid>
                                     </Button>

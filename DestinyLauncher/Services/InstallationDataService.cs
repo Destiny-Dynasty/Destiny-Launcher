@@ -59,14 +59,14 @@ internal sealed class InstallationDataService
             .Where(path => !retained.Any(game => game.Equals(path, StringComparison.OrdinalIgnoreCase)
                 || game.StartsWith(path + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))).Where(Directory.Exists).ToArray() : [];
         foreach (var path in profileFolders) RejectLinks(path);
-        if (profiles) { RejectLinks(_paths.ConfigFile); RejectLinks(Path.Combine(_paths.Root, "discord-session.bin")); }
+        if (profiles) { RejectLinks(_paths.ConfigFile); RejectLinks(Path.Combine(_paths.Root, "discord-session.bin")); RejectLinks(Path.Combine(_paths.Root, "microsoft-accounts.bin")); }
         foreach (var directory in instances) DeleteTree(directory);
         if (gameFiles && File.Exists(Index)) File.Delete(Index);
         if (profiles)
         {
             // Keep ownership records if installations are intentionally retained.
             // Never recursively delete the data root: a customized game may live inside it.
-            foreach (var file in new[] { "launcher.json", "discord-session.bin" })
+            foreach (var file in new[] { "launcher.json", "discord-session.bin", "microsoft-accounts.bin" })
             {
                 var path = Path.Combine(_paths.Root, file);
                 if (File.Exists(path)) { RejectLinks(path); File.Delete(path); }

@@ -6,6 +6,11 @@ El código original del launcher, instalador, scripts y pruebas se distribuye ba
 | --- | --- | --- |
 | CmlLib.Core | 4.0.6 | MIT · Copyright AlphaBs · https://github.com/CmlLib/CmlLib.Core |
 | CmlLib.Core.Commons | 4.0.0 | MIT · https://github.com/CmlLib/CmlLib.Core.Commons |
+| CmlLib.Core.Auth.Microsoft | 3.4.0 | MIT · Copyright AlphaBs · https://github.com/CmlLib/CmlLib.Core.Auth.Microsoft |
+| XboxAuthNet.Game | 1.5.0 | MIT · Copyright AlphaBs · https://github.com/CmlLib/CmlLib.Core.Auth.Microsoft |
+| XboxAuthNet | 3.1.0 | MIT; incluye componentes derivados de MSAL.NET bajo MIT · https://github.com/AlphaBs/XboxAuthNet |
+| Microsoft.Web.WebView2 SDK | 1.0.3537.50 | BSD-3-Clause · Copyright Microsoft Corporation · texto conservado en `licenses/Microsoft.Web.WebView2-LICENSE.txt`; utiliza el runtime de WebView2 instalado en Windows, sin incluir un navegador completo · https://www.nuget.org/packages/Microsoft.Web.WebView2/1.0.3537.50 |
+| Microsoft.Extensions.Logging.Abstractions / DependencyInjection.Abstractions | 8.0.1 / 8.0.2 | MIT · https://github.com/dotnet/runtime |
 | SharpZipLib | 1.4.2 | MIT · https://github.com/icsharpcode/SharpZipLib |
 | LZMA-SDK (paquete NuGet) | 19.0.0 | MIT, según sus metadatos NuGet · https://github.com/monemihir/LZMA-SDK |
 | .NET / WPF autocontenido | 10 | Licencias de Microsoft y sus componentes · https://github.com/dotnet/runtime/blob/main/LICENSE.TXT · https://github.com/dotnet/runtime/blob/main/THIRD-PARTY-NOTICES.TXT · https://github.com/dotnet/wpf/blob/main/LICENSE.TXT |

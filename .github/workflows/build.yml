@@ -23,6 +23,10 @@ jobs:
             dotnet run --project "tools/$project/$project.csproj" -c Release -- "artifacts/ci/$project"
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           }
+          dotnet run --project tools/MinecraftSmoke -c Release -p:SisuExperiment=true -- --microsoft-only artifacts/ci/microsoft
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          dotnet run --project tools/UiSmoke -c Release -p:SisuExperiment=true -- artifacts/ci/microsoft-ui --microsoft-ui-only
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/ci/ui --headless
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/ci/update-ui --update-only
@@ -33,6 +37,7 @@ jobs:
           dotnet run --project tools/UiSmoke/UiSmoke.csproj -c Release -- artifacts/ci/discord-ui --discord-only
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Publish installer experiment
+        if: github.ref != 'refs/heads/1.1.0'
         shell: pwsh
         run: |
           ./tools/Ensure-InnoSetup.ps1 | Out-Null
@@ -40,6 +45,7 @@ jobs:
           ./tools/Build-Installer.ps1 -PublishPath "$pwd/artifacts/ci/payload" -OutputPath "$pwd/artifacts/ci/installers" -Offline -Experimental -DataRoot 'C:\DestinyLauncherTestData'
           ./tools/Build-Installer.ps1 -PublishPath "$pwd/artifacts/ci/payload" -OutputPath "$pwd/artifacts/ci/installers" -Experimental -DataRoot 'C:\DestinyLauncherTestData'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: github.ref != 'refs/heads/1.1.0'
         with:
           name: unsigned-installer-experiment
           path: artifacts/ci/installers/*.exe

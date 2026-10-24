@@ -15,12 +15,12 @@ public sealed class MinecraftService
     private static readonly HttpClient FabricMetaClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private readonly LauncherPaths _paths; private readonly AppLogger _log;
     public MinecraftService(LauncherPaths paths, AppLogger log) { _paths = paths; _log = log; }
-    public async Task<MinecraftGameSession> PrepareAndLaunchAsync(LauncherConfig config, PackDefinition pack, IProgress<(string status, double value)> progress, CancellationToken token)
+    public async Task<MinecraftGameSession> PrepareAndLaunchAsync(LauncherConfig config, PackDefinition pack, IProgress<(string status, double value)> progress, CancellationToken token, MSession? authenticatedSession = null)
     {
         MemoryPolicy.System.Validate(config.RamGb);
         JavaArguments.ValidateMemoryOverrides(config.JavaArguments);
         var preparation = Stopwatch.StartNew();
-        var options = CreateLaunchOptions(config);
+        var options = CreateLaunchOptions(config, authenticatedSession);
         try { options.JavaPath = await new JavaRuntimeService(_paths, _log).EnsureAsync(pack.JavaVersion, progress, token); }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (Exception ex) { throw new JavaRuntimeException($"No se pudo preparar Java {pack.JavaVersion}. Comprueba la conexión y el espacio disponible y vuelve a intentarlo.", ex); }
@@ -55,9 +55,9 @@ public sealed class MinecraftService
         catch { process.Dispose(); throw; }
     }
 
-    internal static MLaunchOption CreateLaunchOptions(LauncherConfig config) => new()
+    internal static MLaunchOption CreateLaunchOptions(LauncherConfig config, MSession? authenticatedSession = null) => new()
     {
-        Session = MSession.CreateOfflineSession(config.PlayerName),
+        Session = ResolveSession(config, authenticatedSession),
         MaximumRamMb = checked(config.RamGb * 1024),
         ServerIp = config.AutoJoinServer ? "destinydynasty.tatnikhost.net" : null,
         ScreenWidth = config.GameWidth,
@@ -67,6 +67,16 @@ public sealed class MinecraftService
         // arguments remain intact; empty user text deliberately means no extra JVM flags.
         ExtraJvmArguments = [new MArgument(JavaArguments.Parse(config.JavaArguments))]
     };
+
+    internal static MSession ResolveSession(LauncherConfig config, MSession? session)
+    {
+        if (string.IsNullOrEmpty(config.MicrosoftAccountId)) return MSession.CreateOfflineSession(config.PlayerName);
+        if (session is null) throw new InvalidOperationException("Inicia sesión con Microsoft para jugar con esta cuenta.");
+        MicrosoftAccountService.ValidateSession(session);
+        if (!string.Equals(session.UUID, config.MicrosoftAccountId, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("La sesión no corresponde a la cuenta seleccionada.");
+        return session;
+    }
 
     internal static void UseManagedRuntime(MinecraftLauncherParameters parameters)
     {

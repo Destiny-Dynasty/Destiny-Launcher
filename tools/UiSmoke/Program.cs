@@ -43,7 +43,9 @@ internal static partial class Program
         {
             try
             {
-                if (args.Contains("--discord-only")) await AuditDiscord();
+                if (args.Contains("--microsoft-ui-only")) await AuditMicrosoftProfile();
+                else if (args.Contains("--microsoft-webview-only")) await AuditMicrosoftWebView();
+                else if (args.Contains("--discord-only")) await AuditDiscord();
                 else if (args.Contains("--update-only")) await AuditUpdateWindow();
                 else if (args.Contains("--uninstall-only")) await AuditUninstall();
                 else if (args.Contains("--intro-only")) await AuditIntro();
@@ -756,7 +758,7 @@ internal static partial class Program
             "Lite displays its fixed sibling folder while sharing the same editable base");
         window.SetAuditAccounts(true, ["First_Player", "Second_Player"], "First_Player");
         var profileButton = Get<Button>(window, "ProfileButton");
-        Assert(profileButton.ContextMenu.Items.OfType<MenuItem>().Count() == 3 && profileButton.ContextMenu.Items.OfType<MenuItem>().Count(m => m.IsChecked) == 1,
+        Assert(profileButton.ContextMenu.Items.OfType<MenuItem>().Count() == (SisuExperiment.Enabled ? 4 : 3) && profileButton.ContextMenu.Items.OfType<MenuItem>().Count(m => m.IsChecked) == 1,
             "Account dropdown contains saved names, exactly one selection and Manage accounts");
         var menu = profileButton.ContextMenu;
         menu.Measure(new Size(250, 340)); menu.Arrange(new Rect(0, 0, 250, menu.DesiredSize.Height)); menu.UpdateLayout();

@@ -26,6 +26,7 @@ public sealed class LauncherConfig
 {
     public const string DefaultJavaArguments = "-XX:+UseG1GC -XX:MaxGCPauseMillis=200";
     public string PlayerName { get; set; } = "";
+    public string MicrosoftAccountId { get; set; } = "";
     public bool MultiAccountEnabled { get; set; }
     public bool AutoJoinServer { get; set; } = true;
     public GameWindowMode WindowMode { get; set; } = GameWindowMode.Windowed;
@@ -36,7 +37,7 @@ public sealed class LauncherConfig
     public void NormalizeAccounts()
     {
         Accounts = (Accounts ?? []).Select(n => n?.Trim() ?? "").Where(ValidPlayerName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        if (ValidPlayerName(PlayerName) && !Accounts.Contains(PlayerName, StringComparer.OrdinalIgnoreCase)) Accounts.Add(PlayerName);
+        if (string.IsNullOrEmpty(MicrosoftAccountId) && ValidPlayerName(PlayerName) && !Accounts.Contains(PlayerName, StringComparer.OrdinalIgnoreCase)) Accounts.Add(PlayerName);
         if (MultiAccountEnabled && !ValidPlayerName(PlayerName)) PlayerName = Accounts.FirstOrDefault() ?? "";
     }
     public PackEdition SelectedEdition { get; set; } = PackEdition.Destiny;
