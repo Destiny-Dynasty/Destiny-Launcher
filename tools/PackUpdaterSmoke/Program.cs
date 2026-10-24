@@ -214,7 +214,12 @@ try
     Directory.CreateDirectory(Path.Combine(repairInstance, "mods", "z-locked.jar"));
     // A directory collision at a target fails before destructive cleanup and keeps the old content.
     var badTarget = Path.Combine(repairInstance, "mods", "kept.txt"); File.Delete(badTarget); Directory.CreateDirectory(badTarget);
-    await Reject<IOException>(() => repairUpdater.RepairAsync(pack, official, true, null, token));
+    // .NET reports a file/directory collision as IOException on Windows and
+    // UnauthorizedAccessException (EACCES) on Linux. In both cases rollback must hold.
+    var collisionRejected = false;
+    try { await repairUpdater.RepairAsync(pack, official, true, null, token); }
+    catch (Exception error) when (error is IOException or UnauthorizedAccessException) { collisionRejected = true; }
+    Require(collisionRejected, "A directory cannot be overwritten by an official mod file.");
     Require(await File.ReadAllTextAsync(repairAlpha, token) == "rollback original" && File.Exists(extra), "A transaction failure rolls back official replacements and preserves pending extra mods.");
     Directory.Delete(badTarget); await File.WriteAllTextAsync(badTarget, previousKept, token);
     Console.WriteLine("PASS: canceled/invalid repairs and transaction failures preserve installed and personal files.");
