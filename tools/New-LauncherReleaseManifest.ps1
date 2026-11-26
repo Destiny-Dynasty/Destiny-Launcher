@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory)][string]$SetupPath,
     [Parameter(Mandatory)][string]$SigningKeyPath,
     [Parameter(Mandatory)][string]$OutputPath,
-    [string[]]$Changelog = @()
+    [string[]]$Changelog = @(),
+    [string[]]$LinuxPackagePaths = @()
 )
 $ErrorActionPreference='Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Usa una versión estable X.Y.Z.' }
@@ -33,5 +34,23 @@ try {
     } finally { $public.Dispose() }
     [IO.File]::WriteAllBytes((Join-Path $OutputPath 'launcher-update.json'),$bytes)
     [IO.File]::WriteAllBytes((Join-Path $OutputPath 'launcher-update.sig'),$signature)
+    foreach ($packagePath in $LinuxPackagePaths) {
+        $package = Get-Item -LiteralPath $packagePath
+        $platform = switch -Exact ($package.Name) {
+            "destiny-launcher_${Version}_amd64.deb" { 'linux-x64' }
+            "destiny-launcher_${Version}_arm64.deb" { 'linux-arm64' }
+            default { throw "Nombre o versión de paquete Linux inesperado: $($package.Name)" }
+        }
+        $linuxManifest = [ordered]@{
+            schema=1; version=$Version; platform=$platform
+            installerUrl="https://github.com/Destiny-Dynasty/Destiny-Launcher/releases/download/v$Version/$($package.Name)"
+            size=$package.Length; sha256=(Get-FileHash -LiteralPath $package.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            changelog=@($Changelog)
+        }
+        $linuxBytes=[Text.Encoding]::UTF8.GetBytes(($linuxManifest | ConvertTo-Json -Compress))
+        $linuxSignature=$rsa.SignData($linuxBytes,[Security.Cryptography.HashAlgorithmName]::SHA256,[Security.Cryptography.RSASignaturePadding]::Pss)
+        [IO.File]::WriteAllBytes((Join-Path $OutputPath "launcher-update-$platform.json"),$linuxBytes)
+        [IO.File]::WriteAllBytes((Join-Path $OutputPath "launcher-update-$platform.sig"),$linuxSignature)
+    }
 } finally { $rsa.Dispose() }
 Write-Output "Manifiesto de actualización firmado: $Version"

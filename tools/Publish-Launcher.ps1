@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$Experiment, [switch]$SisuExperiment, [string]$OutputPath, [string]$Version)
+param([switch]$Experiment, [switch]$SisuExperiment, [switch]$PortableTest, [string]$OutputPath, [string]$Version)
 
 $ErrorActionPreference = 'Stop'
 if ($SisuExperiment -and -not $Experiment) { throw 'SISU solo se compila con -Experiment; no se reemplaza el publish de distribución.' }
@@ -47,6 +47,7 @@ $publishArgs = @(
 )
 
 if ($SisuExperiment) { $publishArgs += '-p:SisuExperiment=true' }
+if ($PortableTest) { $publishArgs += '-p:PortableTest=true' }
 if ($Version) {
     if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Version debe tener formato X.Y.Z.' }
     $publishArgs += @("-p:Version=$Version", "-p:AssemblyVersion=$Version.0", "-p:FileVersion=$Version.0")

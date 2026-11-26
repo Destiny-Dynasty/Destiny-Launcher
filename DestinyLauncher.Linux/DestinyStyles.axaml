@@ -1,0 +1,88 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:DestinyLauncher.Linux">
+  <Style Selector=":is(Control)"><Setter Property="(local:RenderingQuality.Smooth)" Value="True"/></Style>
+  <Style Selector="TextBlock"><Setter Property="FontFamily" Value="Segoe UI, Noto Sans, Liberation Sans, DejaVu Sans"/><Setter Property="FontSize" Value="13"/></Style>
+  <Style Selector="Button">
+    <Setter Property="FontFamily" Value="Segoe UI, Noto Sans, Liberation Sans, DejaVu Sans"/><Setter Property="FontSize" Value="12"/><Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Foreground" Value="#F2EBDD"/><Setter Property="Background" Value="#22211D"/><Setter Property="BorderBrush" Value="#35332C"/>
+    <Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="6"/><Setter Property="Padding" Value="14,9"/><Setter Property="MinHeight" Value="36"/>
+    <Setter Property="Cursor" Value="Hand"/><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="VerticalAlignment" Value="Stretch"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template"><ControlTemplate><Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}"><ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" TextElement.Foreground="{TemplateBinding Foreground}"/></Border></ControlTemplate></Setter>
+  </Style>
+  <Style Selector="Button:pointerover /template/ Border#Surface"><Setter Property="Background" Value="#302B20"/><Setter Property="BorderBrush" Value="#77603B"/></Style>
+  <Style Selector="Button:pressed /template/ Border#Surface"><Setter Property="Opacity" Value=".72"/></Style>
+  <Style Selector="Button:disabled"><Setter Property="Opacity" Value=".46"/><Setter Property="Cursor" Value="Arrow"/></Style>
+  <Style Selector="Button.quiet"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
+  <Style Selector="Button.gold">
+    <Setter Property="Foreground" Value="#211A0E"/><Setter Property="BorderBrush" Value="#DFC189"/>
+    <Setter Property="Background"><LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%"><GradientStop Color="#D5B577"/><GradientStop Color="#B89250" Offset="1"/></LinearGradientBrush></Setter>
+    <Setter Property="Template"><ControlTemplate><Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="{TemplateBinding Padding}"><ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0" TextElement.Foreground="{TemplateBinding Foreground}"/></Border></ControlTemplate></Setter>
+  </Style>
+  <Style Selector="Button.gold:pointerover /template/ Border#Surface"><Setter Property="Background" Value="#DFC18A"/></Style>
+  <Style Selector="Button.gold:pressed /template/ Border#Surface"><Setter Property="Background" Value="#B58E4A"/></Style>
+  <Style Selector="Button.gold:disabled"><Setter Property="Opacity" Value=".55"/></Style>
+  <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement"><Setter Property="Background" Value="#111210"/><Setter Property="BorderBrush" Value="#69604C"/></Style>
+  <Style Selector="TextBox:focus /template/ Border#PART_BorderElement"><Setter Property="Background" Value="#111210"/><Setter Property="BorderBrush" Value="#E2C58B"/><Setter Property="BorderThickness" Value="1.5"/></Style>
+  <Style Selector="Button.nav">
+    <Setter Property="Height" Value="64"/><Setter Property="Margin" Value="8,3"/><Setter Property="Padding" Value="4"/><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="#B3AC9E"/><Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Template"><ControlTemplate><Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="7"><Grid><Border x:Name="Indicator" Width="2" Height="24" Background="Transparent" HorizontalAlignment="Left" CornerRadius="1"/><ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/></Grid></Border></ControlTemplate></Setter>
+  </Style>
+  <Style Selector="Button.nav:pointerover /template/ Border#Surface"><Setter Property="Background" Value="#24221B"/></Style>
+  <Style Selector="Button.nav.selected"><Setter Property="Foreground" Value="#E2C58B"/></Style>
+  <Style Selector="Button.nav.selected /template/ Border#Surface"><Setter Property="Background" Value="#2B251A"/></Style>
+  <Style Selector="Button.nav.selected /template/ Border#Indicator"><Setter Property="Background" Value="#C6A362"/></Style>
+  <Style Selector="Button.social"><Setter Property="Width" Value="38"/><Setter Property="Height" Value="36"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,1"/><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="Foreground" Value="#B3AC9E"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
+  <Style Selector="Button.social:pointerover"><Setter Property="Foreground" Value="#E2C58B"/></Style>
+  <Style Selector="Button.chrome"><Setter Property="Width" Value="44"/><Setter Property="Height" Value="38"/><Setter Property="MinHeight" Value="0"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Foreground" Value="#B3AC9E"/></Style>
+  <Style Selector="Button.close:pointerover /template/ Border#Surface"><Setter Property="Background" Value="#813D33"/></Style>
+  <Style Selector="Button.edition"><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="#191917"/><Setter Property="BorderBrush" Value="#35332C"/><Setter Property="CornerRadius" Value="8"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Stretch"/><Setter Property="FontWeight" Value="Normal"/></Style>
+  <Style Selector="Button.edition.selected"><Setter Property="BorderBrush" Value="#C6A362"/></Style>
+  <Style Selector="Button.mode"><Setter Property="Padding" Value="16,9"/><Setter Property="FontSize" Value="12"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="Background" Value="#111210"/><Setter Property="Foreground" Value="#B3AC9E"/></Style>
+  <Style Selector="Button.mode.selected"><Setter Property="BorderBrush" Value="#C6A362"/><Setter Property="Foreground" Value="#E2C58B"/><Setter Property="Background" Value="#29251B"/></Style>
+  <Style Selector="TextBox"><Setter Property="FontFamily" Value="Segoe UI, Noto Sans, Liberation Sans, DejaVu Sans"/><Setter Property="FontSize" Value="13"/><Setter Property="Background" Value="#111210"/><Setter Property="Foreground" Value="#F2EBDD"/><Setter Property="BorderBrush" Value="#35332C"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="5"/><Setter Property="Padding" Value="12,9"/><Setter Property="MinHeight" Value="40"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="SelectionBrush" Value="#685332"/><Setter Property="CaretBrush" Value="#E2C58B"/></Style>
+  <Style Selector="TextBlock.section"><Setter Property="FontFamily" Value="Georgia, Liberation Serif, DejaVu Serif"/><Setter Property="FontSize" Value="21"/></Style>
+  <Style Selector="TextBlock.help"><Setter Property="Foreground" Value="#B3AC9E"/><Setter Property="FontSize" Value="12"/></Style>
+  <Style Selector="Border.card"><Setter Property="Background" Value="#191917"/><Setter Property="BorderBrush" Value="#35332C"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="7"/><Setter Property="Padding" Value="20,17,20,18"/></Style>
+  <Style Selector="Border.card TextBlock.cardtitle"><Setter Property="FontSize" Value="15"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="LineHeight" Value="20"/></Style>
+  <Style Selector="Button.dialog"><Setter Property="BorderBrush" Value="#63563D"/><Setter Property="Background"><LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%"><GradientStop Color="#363127"/><GradientStop Color="#24231E" Offset="1"/></LinearGradientBrush></Setter></Style>
+  <Style Selector="CheckBox.toggle"><Setter Property="Width" Value="38"/><Setter Property="Height" Value="24"/><Setter Property="MinWidth" Value="0"/><Setter Property="MinHeight" Value="0"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><ControlTemplate><Border x:Name="Rail" Height="20" Background="#292A23" BorderBrush="#625B49" BorderThickness="1" CornerRadius="10"><Ellipse x:Name="Knob" Width="12" Height="12" Fill="#B3AC9E" HorizontalAlignment="Left" Margin="3,0"/></Border></ControlTemplate></Setter></Style>
+  <Style Selector="CheckBox.toggle:checked /template/ Border#Rail"><Setter Property="Background" Value="#57452B"/><Setter Property="BorderBrush" Value="#C6A362"/></Style>
+  <Style Selector="CheckBox.toggle:checked /template/ Ellipse#Knob"><Setter Property="Fill" Value="#E2C58B"/><Setter Property="HorizontalAlignment" Value="Right"/></Style>
+  <Style Selector="ContextMenu"><Setter Property="Background" Value="#191917"/><Setter Property="BorderBrush" Value="#77603B"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Padding" Value="5"/><Setter Property="CornerRadius" Value="6"/><Setter Property="MaxHeight" Value="340"/><Setter Property="Template"><ControlTemplate><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="5"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><ItemsPresenter x:Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}"/></ScrollViewer></Border></ControlTemplate></Setter></Style>
+  <Style Selector="MenuItem"><Setter Property="FontFamily" Value="Segoe UI, Noto Sans, Liberation Sans, DejaVu Sans"/><Setter Property="FontSize" Value="12"/><Setter Property="Foreground" Value="#F2EBDD"/><Setter Property="MinHeight" Value="38"/><Setter Property="Template"><ControlTemplate><Border x:Name="MenuSurface" CornerRadius="4" Background="Transparent" Padding="14,10"><ContentPresenter Content="{TemplateBinding Header}" VerticalAlignment="Center"/></Border></ControlTemplate></Setter></Style>
+  <Style Selector="MenuItem:pointerover /template/ Border#MenuSurface"><Setter Property="Background" Value="#302B20"/></Style>
+  <Style Selector="MenuItem:disabled"><Setter Property="Opacity" Value=".45"/></Style>
+  <Style Selector="Separator"><Setter Property="Height" Value="1"/><Setter Property="MinHeight" Value="0"/><Setter Property="Margin" Value="8,4"/><Setter Property="Background" Value="#35332C"/><Setter Property="Template"><ControlTemplate><Border Height="1" Background="{TemplateBinding Background}"/></ControlTemplate></Setter></Style>
+  <Style Selector="MenuItem.account"><Setter Property="MinHeight" Value="36"/><Setter Property="Template"><ControlTemplate><Border x:Name="MenuSurface" Background="Transparent" Padding="10,7" CornerRadius="4"><Grid ColumnDefinitions="16,*"><Ellipse x:Name="Selected" Width="5" Height="5" Fill="#E2C58B" IsVisible="False"/><ContentPresenter Grid.Column="1" Content="{TemplateBinding Header}" VerticalAlignment="Center"/></Grid></Border></ControlTemplate></Setter></Style>
+  <Style Selector="MenuItem.account:checked /template/ Ellipse#Selected"><Setter Property="IsVisible" Value="True"/></Style>
+  <Style Selector="MenuItem:pointerover"><Setter Property="Foreground" Value="#E2C58B"/></Style>
+  <Style Selector="ListBox.accounts ListBoxItem"><Setter Property="Foreground" Value="#F2EBDD"/><Setter Property="Padding" Value="12,10"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Template"><ControlTemplate><Border x:Name="Surface" Background="Transparent" Padding="{TemplateBinding Padding}" CornerRadius="4"><ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalAlignment="Stretch"/></Border></ControlTemplate></Setter></Style>
+  <Style Selector="ListBox.accounts ListBoxItem:selected"><Setter Property="Foreground" Value="#E2C58B"/></Style>
+  <Style Selector="ListBox.accounts ListBoxItem:selected /template/ Border#Surface"><Setter Property="Background" Value="#352E20"/></Style>
+  <Style Selector="ListBox.accounts ListBoxItem:pointerover /template/ Border#Surface"><Setter Property="Background" Value="#29271F"/></Style>
+  <Style Selector="Button.provider"><Setter Property="CornerRadius" Value="12"/><Setter Property="Template"><ControlTemplate><Border x:Name="Surface" CornerRadius="12" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"><Grid><Image Source="avares://DestinyLauncher.Linux/Assets/experiment/obsidian-gold-v1/obsidian-texture.png" Stretch="UniformToFill" Opacity=".08" IsHitTestVisible="False"/><ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid></Border></ControlTemplate></Setter></Style>
+  <Style Selector="Button.provider:pointerover /template/ Border#Surface"><Setter Property="BorderBrush" Value="#E2C58B"/><Setter Property="Background" Value="#3A3223"/></Style>
+  <Style Selector="Button.provider:focus /template/ Border#Surface"><Setter Property="BorderBrush" Value="#E2C58B"/></Style>
+  <Style Selector="CheckBox.repair"><Setter Property="MinHeight" Value="30"/><Setter Property="Foreground" Value="#F2EBDD"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><ControlTemplate><Grid ColumnDefinitions="20,*" Background="Transparent"><Border Width="18" Height="18" Background="#10100F" BorderBrush="#77603B" BorderThickness="1" CornerRadius="3"><Path x:Name="Check" Data="M2 6l3 3 7-7" Margin="2" Stroke="#E2C58B" StrokeThickness="1.6" IsVisible="False"/></Border><ContentPresenter Grid.Column="1" Content="{TemplateBinding Content}" Margin="10,0,0,0" VerticalAlignment="Center"/></Grid></ControlTemplate></Setter></Style>
+  <Style Selector="CheckBox.repair:checked /template/ Path#Check"><Setter Property="IsVisible" Value="True"/></Style>
+  <Style Selector="ToolTip"><Setter Property="Background" Value="#25231E"/><Setter Property="Foreground" Value="#F2EBDD"/><Setter Property="BorderBrush" Value="#77603B"/><Setter Property="Padding" Value="10,7"/><Setter Property="FontSize" Value="12"/></Style>
+
+  <Style Selector="Slider">
+    <Setter Property="Height" Value="40"/>
+    <Setter Property="Template"><ControlTemplate><Grid><Track x:Name="PART_Track" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value, Mode=TwoWay}" Orientation="Horizontal" VerticalAlignment="Center">
+      <Track.DecreaseButton><RepeatButton x:Name="PART_DecreaseButton" Focusable="False"><RepeatButton.Template><ControlTemplate><Border Height="4" Background="#C6A362" CornerRadius="2"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseButton>
+      <Track.IncreaseButton><RepeatButton x:Name="PART_IncreaseButton" Focusable="False"><RepeatButton.Template><ControlTemplate><Border Height="4" Background="#494435" CornerRadius="2"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseButton>
+      <Track.Thumb><Thumb x:Name="thumb" Width="18" Height="18"><Thumb.Template><ControlTemplate><Border Background="#E2C58B" BorderBrush="#F2DEB7" BorderThickness="1" CornerRadius="9"><Ellipse Width="4" Height="4" Fill="#685333"/></Border></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+    </Track><local:RamTickBar Margin="9,0" Value="{TemplateBinding Value}" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" IsHitTestVisible="False"/></Grid></ControlTemplate></Setter>
+  </Style>
+  <Style Selector="ScrollBar:vertical">
+    <Setter Property="Width" Value="16"/><Setter Property="AllowAutoHide" Value="False"/>
+    <Setter Property="Template"><ControlTemplate><Track x:Name="PART_Track" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value, Mode=TwoWay}" ViewportSize="{TemplateBinding ViewportSize}" Orientation="Vertical" IsDirectionReversed="True">
+      <Track.DecreaseButton><RepeatButton x:Name="PART_PageUpButton" Focusable="False"><RepeatButton.Template><ControlTemplate><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseButton>
+      <Track.IncreaseButton><RepeatButton x:Name="PART_PageDownButton" Focusable="False"><RepeatButton.Template><ControlTemplate><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseButton>
+      <Track.Thumb><Thumb x:Name="PART_Thumb"><Thumb.Template><ControlTemplate><Border Background="#625841" CornerRadius="3" Margin="1,3"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+    </Track></ControlTemplate></Setter>
+  </Style>
+
+</Styles>
+
+

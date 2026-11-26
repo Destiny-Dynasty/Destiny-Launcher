@@ -11,17 +11,18 @@ namespace DestinyLauncher.Services;
 /// </summary>
 public sealed class GitHubPackUpdater
 {
+    private static readonly HttpClient DefaultClient = new() { Timeout = TimeSpan.FromMinutes(5) };
     private const string StateFileName = ".destiny-managed-files.json";
-    private static readonly HashSet<string> ManagedRoots = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> ManagedRoots = new(FileSystemPathPolicy.Comparer)
     {
         "mods", "config", "defaultconfigs", "resourcepacks", "shaderpacks", "kubejs", "scripts"
     };
-    private static readonly HashSet<string> ProtectedRoots = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> ProtectedRoots = new(FileSystemPathPolicy.Comparer)
     {
         "saves", "screenshots", "logs", "crash-reports", "assets", "libraries", "versions",
         "natives", "resource-cache", "webcache", "shader-cache", "server-resource-packs"
     };
-    private static readonly HashSet<string> ProtectedFiles = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> ProtectedFiles = new(FileSystemPathPolicy.Comparer)
     {
         "options.txt", "optionsof.txt", "servers.dat", "servers.dat_old", "launcher_profiles.json",
         "usercache.json", "usernamecache.json", "launcher_accounts.json", StateFileName,
@@ -37,7 +38,7 @@ public sealed class GitHubPackUpdater
     {
         _paths = paths;
         _log = log;
-        _http = httpClient ?? new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+        _http = httpClient ?? DefaultClient;
     }
 
     public async Task<PackUpdateCheck> CheckAsync(PackDefinition pack, IProgress<(string status, double value)>? progress, CancellationToken token)
@@ -62,15 +63,20 @@ public sealed class GitHubPackUpdater
 
     public async Task<PackUpdateCheck> PlanUpdateAsync(PackDefinition pack, PackManifest manifest,
         IProgress<(string status, double value)>? progress, CancellationToken token)
-        => await PlanUpdateCoreAsync(pack, manifest, progress, token, floatingOnly: false);
+    {
+        ValidateManifest(pack, manifest);
+        var state = ReadState(Path.Combine(_paths.Instance(pack.Slug), StateFileName), pack.Slug);
+        var resolved = await new GitHubModResolver(_paths, _log, _http).ResolveAsync(manifest, state?.Files ?? [], progress, token);
+        return await PlanUpdateCoreAsync(pack, resolved, progress, token, floatingOnly: false);
+    }
 
     public async Task<PackUpdateCheck> PrepareForPlayAsync(PackDefinition pack, PackManifest manifest, string installedVersion,
         IProgress<(string status, double value)>? progress, CancellationToken token)
     {
         ValidateManifest(pack, manifest);
-        var sameVersion = installedVersion == manifest.Version;
-        if (sameVersion && !manifest.Files.Any(GitHubModResolver.IsLatest)) return new PackUpdateCheck(manifest, [], [], []);
         var state = ReadState(Path.Combine(_paths.Instance(pack.Slug), StateFileName), pack.Slug);
+        var sameVersion = installedVersion == manifest.Version && state is not null && state.Version == manifest.Version;
+        if (sameVersion && !manifest.Files.Any(GitHubModResolver.IsLatest)) return new PackUpdateCheck(manifest, [], [], []);
         var resolved = await new GitHubModResolver(_paths, _log, _http).ResolveAsync(manifest, state?.Files ?? [], progress, token);
         return await PlanUpdateCoreAsync(pack, resolved, progress, token, floatingOnly: sameVersion);
     }
@@ -79,16 +85,17 @@ public sealed class GitHubPackUpdater
         IProgress<(string status, double value)>? progress, CancellationToken token, bool floatingOnly)
     {
         ValidateManifest(pack, manifest);
+        await GameProfileSession.SeedProfileConfigAsync(_paths, pack.Slug, token);
         var statePath = Path.Combine(_paths.Instance(pack.Slug), StateFileName);
         var local = ReadState(statePath, pack.Slug);
-        var localFiles = local?.Files.ToDictionary(x => NormalizePath(x.Path), StringComparer.OrdinalIgnoreCase)
-                         ?? new Dictionary<string, ManagedPackFile>(StringComparer.OrdinalIgnoreCase);
-        var overrides = (local?.Overrides ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var preservedOverrides = new HashSet<string>(floatingOnly ? overrides : [], StringComparer.OrdinalIgnoreCase);
+        var localFiles = local?.Files.ToDictionary(x => NormalizePath(x.Path), FileSystemPathPolicy.Comparer)
+                         ?? new Dictionary<string, ManagedPackFile>(FileSystemPathPolicy.Comparer);
+        var overrides = (local?.Overrides ?? []).ToHashSet(FileSystemPathPolicy.Comparer);
+        var preservedOverrides = new HashSet<string>(floatingOnly ? overrides : [], FileSystemPathPolicy.Comparer);
         var changed = new List<PackManifestFile>();
         var completed = 0;
-        var candidates = manifest.Files.Where(file => !localFiles.TryGetValue(NormalizePath(file.Path), out var baseline) ||
-            baseline.Size != file.Size || !baseline.Sha256.Equals(file.Sha256, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var candidateCount = manifest.Files.Count(file => !localFiles.TryGetValue(NormalizePath(file.Path), out var baseline) ||
+            baseline.Size != file.Size || !baseline.Sha256.Equals(file.Sha256, StringComparison.OrdinalIgnoreCase));
         foreach (var file in manifest.Files)
         {
             token.ThrowIfCancellationRequested();
@@ -106,12 +113,12 @@ public sealed class GitHubPackUpdater
                 if (overrides.Contains(normalized)) preservedOverrides.Add(normalized);
                 continue;
             }
-            var target = SafeTargetPath(_paths.Instance(pack.Slug), normalized);
+            var target = PackTargetPath(pack.Slug, normalized);
             if (localFiles.ContainsKey(normalized) && !File.Exists(target))
             {
                 preservedOverrides.Add(normalized); // A player's intentional deletion.
                 completed++;
-                progress?.Report(($"Comprobando archivos · {completed}/{candidates.Length}", .02 + .38 * completed / Math.Max(1, candidates.Length)));
+                progress?.Report(($"Comprobando archivos · {completed}/{candidateCount}", .02 + .38 * completed / Math.Max(1, candidateCount)));
                 continue;
             }
             var isCurrent = false;
@@ -138,15 +145,15 @@ public sealed class GitHubPackUpdater
                 if (!isCurrent) changed.Add(file);
             }
             completed++;
-            progress?.Report(($"Comprobando archivos · {completed}/{candidates.Length}", .02 + .38 * completed / Math.Max(1, candidates.Length)));
+            progress?.Report(($"Comprobando archivos · {completed}/{candidateCount}", .02 + .38 * completed / Math.Max(1, candidateCount)));
         }
 
-        var desired = manifest.Files.Select(x => NormalizePath(x.Path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var desired = manifest.Files.Select(x => NormalizePath(x.Path)).ToHashSet(FileSystemPathPolicy.Comparer);
         var removed = new List<string>();
         foreach (var (path, tracked) in localFiles.Where(x => !desired.Contains(x.Key)))
         {
             if (floatingOnly) continue;
-            var target = SafeTargetPath(_paths.Instance(pack.Slug), path);
+            var target = PackTargetPath(pack.Slug, path);
             if (!File.Exists(target)) continue;
             var localHash = await HashFileAsync(target, token);
             if (overrides.Contains(path) || !localHash.Equals(tracked.Sha256, StringComparison.OrdinalIgnoreCase))
@@ -166,20 +173,21 @@ public sealed class GitHubPackUpdater
         IProgress<(string status, double value)>? progress, CancellationToken token)
     {
         ValidateManifest(pack, manifest);
+        await GameProfileSession.SeedProfileConfigAsync(_paths, pack.Slug, token);
         var installed = ReadState(Path.Combine(_paths.Instance(pack.Slug), StateFileName), pack.Slug);
         manifest = await new GitHubModResolver(_paths, _log, _http).ResolveAsync(manifest, installed?.Files ?? [], progress, token);
-        if (manifest.Files.Count == 0 || (removeThirdPartyMods && !manifest.Files.Any(f => NormalizePath(f.Path).StartsWith("mods/", StringComparison.OrdinalIgnoreCase))))
+        if (manifest.Files.Count == 0 || (removeThirdPartyMods && !manifest.Files.Any(f => NormalizePath(f.Path).StartsWith("mods/", FileSystemPathPolicy.Comparison))))
             throw new InvalidDataException("El manifiesto no contiene archivos oficiales suficientes para reparar el modpack.");
         var instance = _paths.Instance(pack.Slug);
         var changed = new List<PackManifestFile>();
-        var desired = manifest.Files.Select(f => NormalizePath(f.Path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var removed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var preserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var desired = manifest.Files.Select(f => NormalizePath(f.Path)).ToHashSet(FileSystemPathPolicy.Comparer);
+        var removed = new HashSet<string>(FileSystemPathPolicy.Comparer);
+        var preserved = new HashSet<string>(FileSystemPathPolicy.Comparer);
         var completed = 0;
         foreach (var file in manifest.Files)
         {
             token.ThrowIfCancellationRequested();
-            var target = RepairTargetPath(instance, file.Path);
+            var target = PackTargetPath(pack.Slug, file.Path, repair: true);
             if (!File.Exists(target) || new FileInfo(target).Length != file.Size ||
                 !(await HashFileAsync(target, token)).Equals(file.Sha256, StringComparison.OrdinalIgnoreCase)) changed.Add(file);
             progress?.Report(($"Comprobando archivos · {++completed}/{manifest.Files.Count}", .02 + .38 * completed / manifest.Files.Count));
@@ -190,7 +198,7 @@ public sealed class GitHubPackUpdater
             token.ThrowIfCancellationRequested();
             var relative = NormalizePath(file.Path);
             if (desired.Contains(relative)) continue;
-            var target = RepairTargetPath(instance, relative);
+            var target = PackTargetPath(pack.Slug, relative, repair: true);
             if (!File.Exists(target)) continue;
             if ((await HashFileAsync(target, token)).Equals(file.Sha256, StringComparison.OrdinalIgnoreCase)) removed.Add(relative);
             else preserved.Add(relative);
@@ -219,10 +227,12 @@ public sealed class GitHubPackUpdater
     private async Task ApplyCoreAsync(PackDefinition pack, PackUpdateCheck update, IProgress<(string status, double value)>? progress, CancellationToken token, bool repair)
     {
         ValidateManifest(pack, update.Manifest);
+        using var gameLock = SharedGameDirectoryLock.Acquire(_paths, "Minecraft está usando la carpeta compartida. Cierra el juego antes de actualizar los archivos del perfil.");
+        await GameProfileSession.SeedProfileConfigAsync(_paths, pack.Slug, token);
         var instance = _paths.Instance(pack.Slug);
         string Target(string relative)
         {
-            var target = repair ? RepairTargetPath(instance, relative) : SafeTargetPath(instance, relative);
+            var target = PackTargetPath(pack.Slug, relative, repair);
             InstallationDataService.RejectLinks(target);
             return target;
         }
@@ -233,6 +243,11 @@ public sealed class GitHubPackUpdater
             _ = RepairTargetPath(instance, "destiny-installed.json", metadata: true);
         }
         Directory.CreateDirectory(instance);
+        var requiredDownloadBytes = update.ChangedFiles.Sum(file => file.Size);
+        var requiredBackupBytes = update.ChangedFiles.Select(file => file.Path).Concat(update.RemovedFiles)
+            .Distinct(FileSystemPathPolicy.Comparer).Select(Target).Where(File.Exists).Sum(path => new FileInfo(path).Length);
+        StorageSpaceGuard.RequireBytes(_paths.Temp, checked(requiredDownloadBytes + requiredBackupBytes));
+        StorageSpaceGuard.RequireBytes(instance, requiredDownloadBytes);
         var workspace = Path.Combine(_paths.Temp, $"manifest-{pack.Slug}-{Guid.NewGuid():N}");
         var downloads = Path.Combine(workspace, "downloads");
         var backups = Path.Combine(workspace, "backups");
@@ -242,7 +257,7 @@ public sealed class GitHubPackUpdater
         InstallationDataService.RejectLinks(oldStatePath);
         InstallationDataService.RejectLinks(oldStatePath + ".next");
         var oldState = ReadState(oldStatePath, pack.Slug);
-        var oldManaged = (oldState?.Files ?? []).Select(x => NormalizePath(x.Path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var oldManaged = (oldState?.Files ?? []).Select(x => NormalizePath(x.Path)).ToHashSet(FileSystemPathPolicy.Comparer);
         var keepBackups = false;
 
         try
@@ -251,6 +266,8 @@ public sealed class GitHubPackUpdater
             long downloadedBytes = 0;
             var totalDownloadBytes = update.ChangedFiles.Sum(file => file.Size);
             var downloadLabel = update.FloatingOnly ? "Descargando mods" : "Descargando modpack";
+            // One buffer for the transaction, below the large-object heap threshold.
+            var buffer = update.ChangedFiles.Count > 0 ? new byte[64 * 1024] : [];
             foreach (var file in update.ChangedFiles)
             {
                 token.ThrowIfCancellationRequested();
@@ -269,9 +286,8 @@ public sealed class GitHubPackUpdater
 
                 using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
                 await using (var input = await response.Content.ReadAsStreamAsync(token))
-                await using (var output = new FileStream(staged, FileMode.CreateNew, FileAccess.Write, FileShare.None, 131072, true))
+                await using (var output = new FileStream(staged, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, true))
                 {
-                    var buffer = new byte[131072];
                     long received = 0;
                     var lastProgress = Environment.TickCount64;
                     int count;
@@ -299,8 +315,9 @@ public sealed class GitHubPackUpdater
                 progress?.Report(($"{downloadLabel} · {downloadedBytes}/{totalDownloadBytes} bytes", .4 + .48 * downloadNumber / Math.Max(1, update.ChangedFiles.Count)));
             }
 
-            var affected = update.Manifest.Files.Select(x => NormalizePath(x.Path)).Where(x => update.ChangedFiles.Any(f => NormalizePath(f.Path).Equals(x, StringComparison.OrdinalIgnoreCase)))
-                .Concat(update.RemovedFiles).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            var changedPaths = update.ChangedFiles.Select(f => NormalizePath(f.Path)).ToHashSet(FileSystemPathPolicy.Comparer);
+            var affected = update.Manifest.Files.Select(x => NormalizePath(x.Path)).Where(changedPaths.Contains)
+                .Concat(update.RemovedFiles).Distinct(FileSystemPathPolicy.Comparer).ToArray();
             var backedUp = new List<(string relative, string backup, bool existed)>();
             try
             {
@@ -339,7 +356,7 @@ public sealed class GitHubPackUpdater
                 }).ToList();
                 if (update.FloatingOnly && oldState is not null)
                 {
-                    var floating = update.Manifest.Files.Where(GitHubModResolver.IsLatest).Select(f => NormalizePath(f.Path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    var floating = update.Manifest.Files.Where(GitHubModResolver.IsLatest).Select(f => NormalizePath(f.Path)).ToHashSet(FileSystemPathPolicy.Comparer);
                     nextFiles = oldState.Files.Where(f => !floating.Contains(f.Path)).Concat(nextFiles.Where(f => floating.Contains(f.Path))).ToList();
                 }
                 var nextState = new ManagedPackState
@@ -401,7 +418,7 @@ public sealed class GitHubPackUpdater
         if (string.IsNullOrWhiteSpace(manifest.MinecraftVersion) || string.IsNullOrWhiteSpace(manifest.FabricLoaderVersion)) throw new InvalidDataException("Faltan las versiones de Minecraft o Fabric en el manifiesto.");
         if (manifest.JavaVersion is < 17 or > 99) throw new InvalidDataException("La versión de Java del manifiesto no es válida.");
         if (manifest.Files is null) throw new InvalidDataException("El manifiesto no contiene una lista de archivos.");
-        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var paths = new HashSet<string>(FileSystemPathPolicy.Comparer);
         foreach (var file in manifest.Files)
         {
             ValidateFile(file);
@@ -441,18 +458,24 @@ public sealed class GitHubPackUpdater
             }
             catch (FileNotFoundException) { }
             catch (DirectoryNotFoundException) { }
-            if (current.Equals(normalizedRoot, StringComparison.OrdinalIgnoreCase)) break;
+            if (current.Equals(normalizedRoot, FileSystemPathPolicy.Comparison)) break;
         }
         return target;
     }
 
     private static string NormalizePath(string path) => path.Replace('\\', '/');
 
+    private string PackTargetPath(string slug, string relative, bool repair = false)
+    {
+        var root = LauncherPaths.IsProfileConfigPath(relative) ? _paths.ProfileConfigDirectory(slug) : _paths.Instance(slug);
+        return repair ? RepairTargetPath(root, relative) : SafeTargetPath(root, relative);
+    }
+
     private static string SafeTargetPath(string root, string relative)
     {
         var normalizedRoot = Path.GetFullPath(root) + Path.DirectorySeparatorChar;
         var target = Path.GetFullPath(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar)));
-        if (!target.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Una ruta del manifiesto sale del directorio de la instancia.");
+        if (!target.StartsWith(normalizedRoot, FileSystemPathPolicy.Comparison)) throw new InvalidDataException("Una ruta del manifiesto sale del directorio de la instancia.");
         return target;
     }
 
@@ -469,7 +492,7 @@ public sealed class GitHubPackUpdater
 
     private static async Task<string> HashFileAsync(string path, CancellationToken token)
     {
-        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 131072, true);
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
         var hash = await SHA256.HashDataAsync(stream, token);
         return Convert.ToHexString(hash);
     }

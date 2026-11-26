@@ -7,9 +7,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <Version>1.0.5</Version>
-    <AssemblyVersion>1.0.5.0</AssemblyVersion>
-    <FileVersion>1.0.5.0</FileVersion>
+    <Version>1.2.0</Version>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
     <Product>Destiny Launcher</Product>
     <Company>Destiny Dynasty</Company>
     <Description>Launcher de Minecraft para Destiny Dynasty</Description>
@@ -21,11 +21,36 @@
   <PropertyGroup Condition="'$(SisuExperiment)' == 'true'">
     <DefineConstants>$(DefineConstants);SISU_EXPERIMENT</DefineConstants>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(PortableTest)' == 'true'">
+    <DefineConstants>$(DefineConstants);PORTABLE_TEST</DefineConstants>
+  </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CmlLib.Core" Version="4.0.6" />
     <PackageReference Include="CmlLib.Core.Auth.Microsoft" Version="3.4.0" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3537.50" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Services\AppLogger.cs" />
+    <Compile Remove="Models\LauncherModels.cs" />
+    <Compile Remove="Models\PackManifest.cs" />
+    <Compile Remove="Services\ConfigService.cs" />
+    <Compile Remove="Services\GitHubModResolver.cs" />
+    <Compile Remove="Services\GitHubPackUpdater.cs" />
+    <Compile Remove="Services\InstallationDataService.cs" />
+    <Compile Remove="Services\FileSystemPathPolicy.cs" />
+    <Compile Remove="Services\GameOptionsFile.cs" />
+    <Compile Remove="Services\GameProfileSession.cs" />
+    <Compile Remove="Services\SharedGameDataMigration.cs" />
+    <Compile Remove="Services\SharedGameDirectoryLock.cs" />
+    <Compile Remove="Services\JavaArguments.cs" />
+    <Compile Remove="Services\JavaRuntimeService.cs" />
+    <Compile Remove="Services\LauncherPaths.cs" />
+    <Compile Remove="Services\MemoryPolicy.cs" />
+    <Compile Remove="Services\MinecraftGameSession.cs" />
+    <Compile Remove="Services\MinecraftService.cs" />
+    <Compile Remove="Services\MicrosoftAccountService.cs" />
+    <ProjectReference Include="..\DestinyLauncher.Core\DestinyLauncher.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="..\THIRD_PARTY_NOTICES.md" LogicalName="DestinyLauncher.THIRD_PARTY_NOTICES.md" />

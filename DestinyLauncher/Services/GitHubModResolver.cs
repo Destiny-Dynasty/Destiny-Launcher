@@ -24,7 +24,7 @@ internal sealed class GitHubModResolver(LauncherPaths paths, AppLogger log, Http
             || source.Release != "latest" || string.IsNullOrWhiteSpace(source.Asset) || source.Asset.Length > 200
             || source.Asset.IndexOfAny(['/', '\\', ':', '\0']) >= 0
             || (source.Channel is not null && !Regex.IsMatch(source.Channel, "^[a-z0-9][a-z0-9-]{0,63}$"))
-            || !file.Path.Replace('\\', '/').StartsWith("mods/", StringComparison.OrdinalIgnoreCase)
+            || !file.Path.Replace('\\', '/').StartsWith("mods/", FileSystemPathPolicy.Comparison)
             || !file.Path.EndsWith(".jar", StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException($"Origen GitHub inválido para «{file.Path}». Las releases fijas deben resolverse al publicar.");
     }
@@ -51,9 +51,9 @@ internal sealed class GitHubModResolver(LauncherPaths paths, AppLogger log, Http
                 // An offline/rate-limited check must never roll a floating mod back to
                 // the older publishing snapshot. Prefer its last committed resolution.
                 var previous = installed.FirstOrDefault(f => f.SourceKey == SourceKey(file));
-                files.Add(previous is not null && Uri.TryCreate(previous.Url, UriKind.Absolute, out var url) && url.Scheme == "https"
-                    ? new PackManifestFile { Path = file.Path, Url = previous.Url, Size = previous.Size, Sha256 = previous.Sha256, GitHub = file.GitHub }
-                    : file);
+                if (previous is null || !Uri.TryCreate(previous.Url, UriKind.Absolute, out var url) || url.Scheme != "https")
+                    throw new HttpRequestException($"No se pudo comprobar la versión actual de «{file.Path}». Revisa la conexión e inténtalo de nuevo.");
+                files.Add(new PackManifestFile { Path = file.Path, Url = previous.Url, Size = previous.Size, Sha256 = previous.Sha256, GitHub = file.GitHub });
                 continue;
             }
             var body = release.Value;

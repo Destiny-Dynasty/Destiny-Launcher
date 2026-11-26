@@ -43,12 +43,16 @@ internal static partial class Program
         {
             try
             {
-                if (args.Contains("--accounts-only")) await AuditAccountFlow();
+                if (args.Contains("--memory-only")) await AuditMemory();
+                else if (args.Contains("--resources-only")) await AuditClosedWindows();
+                else if (args.Contains("--parity-reference")) await AuditParityReference();
+                else if (args.Contains("--accounts-only")) await AuditAccountFlow();
                 else if (args.Contains("--microsoft-ui-only")) await AuditMicrosoftProfile();
                 else if (args.Contains("--microsoft-webview-only")) await AuditMicrosoftWebView();
                 else if (args.Contains("--discord-only")) await AuditDiscord();
                 else if (args.Contains("--update-only")) await AuditUpdateWindow();
                 else if (args.Contains("--uninstall-only")) await AuditUninstall();
+                else if (args.Contains("--progress-only")) await AuditDownloadProgress();
                 else if (args.Contains("--intro-only")) await AuditIntro();
                 else if (args.Contains("--video-only")) await AuditVideo();
                 else if (args.Contains("--headless")) await AuditHeadless();
@@ -222,6 +226,15 @@ internal static partial class Program
         var cancelTask = cancel.PlayAsync();
         cancel.Close();
         Assert(!await cancelTask && !cancel.IsPlaying, "Closing the startup window cancels startup without a lingering renderer");
+
+        var streamed = await IntroWindow.CreateAsync();
+        streamed.ShowActivated = false; streamed.WindowStartupLocation = WindowStartupLocation.Manual; streamed.Left = streamed.Top = -32000;
+        clock.Restart();
+        Assert(await streamed.PlayAsync().WaitAsync(TimeSpan.FromSeconds(8)), "Bounded background intro decoding completes naturally");
+        Assert(clock.Elapsed.TotalSeconds >= 3 && clock.Elapsed.TotalSeconds < 6 && !streamed.IsPlaying,
+            "Streaming intro preserves duration and stops its rendering subscription");
+        streamed.Close();
+        Assert(streamed.Content is null, "Streaming intro releases its frame buffer on close");
     }
 
     private static async Task Audit()
@@ -254,7 +267,7 @@ internal static partial class Program
         preview.SetAuditState("", playerName: "");
         var openedLinks = new List<Uri>();
         preview.OpenExternalLink = openedLinks.Add;
-        foreach (var (name, address) in new[] { ("DiscordLink", "https://dsc.gg/destiny-dynasty-mc"), ("YouTubeLink", "https://www.youtube.com/@destiny_dynasty"), ("XLink", "https://x.com/DestinyDynasty_"), ("TatnikHostLink", "https://tatnikhost.net/l/crC7CrzY") })
+        foreach (var (name, address) in new[] { ("WebsiteLink", "https://destinydynasty.site/"), ("DiscordLink", "https://dsc.gg/destiny-dynasty-mc"), ("YouTubeLink", "https://www.youtube.com/@destiny_dynasty"), ("XLink", "https://x.com/DestinyDynasty_"), ("TatnikHostLink", "https://tatnikhost.net/l/crC7CrzY") })
         {
             var button = Get<Button>(preview, name);
             Assert(button.IsVisible && button.Focusable && button.ToolTip is string && button.MinHeight >= 36, $"{name} is visible, keyboard accessible and labelled");
@@ -334,7 +347,7 @@ internal static partial class Program
         Capture(preview, "installation-first-run");
         Get<RadioButton>(preview, "LiteButton").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         await Idle();
-        Assert(Get<TextBlock>(preview, "InstallationPathText").Text.EndsWith("-Lite", StringComparison.Ordinal), "Installation details follow the selected edition path");
+        Assert(Get<TextBlock>(preview, "InstallationPathText").Text == preview.DataPaths.GameDirectory, "Installation details show the game directory shared by editions");
         Capture(preview, "installation-lite");
         Get<Button>(preview, "HomeNav").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         preview.SetAuditState("", playerName: "");
@@ -533,6 +546,22 @@ internal static partial class Program
         await AuditGameLifetime();
     }
 
+    private static Task AuditDownloadProgress()
+    {
+        var window = new MainWindow(previewMode: true, dataRoot: Path.Combine(_output, "isolated-data", Guid.NewGuid().ToString("N")));
+        using var cancel = new CancellationTokenSource();
+        typeof(MainWindow).GetField("_packCancellation", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(window, cancel);
+        window.SetAuditProgress("Descargando modpack · 10485760/20971520 bytes", .5);
+        var bar = Get<ProgressBar>(window, "Progress");
+        var button = Get<Button>(window, "CancelDownloadButton");
+        Assert(!bar.IsIndeterminate && button.Visibility == Visibility.Visible, "Download shows determinate progress and a cancel button");
+        Assert(Get<TextBlock>(window, "StatusText").Text.Contains("10 MB de 20 MB"), "Download status is formatted in MB");
+        button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(cancel.IsCancellationRequested && !button.IsEnabled, "Cancel requests cancellation once");
+        window.EndAuditProgress(); window.Close();
+        return Task.CompletedTask;
+    }
+
     private static Task AuditUninstall()
     {
         var paths = new LauncherPaths(Path.Combine(_output, "isolated-uninstall-data")); paths.Ensure();
@@ -571,6 +600,15 @@ internal static partial class Program
         Assert(File.ReadAllText(paths.ConfigFile) == "test profile - keep" && File.Exists(Path.Combine(instance, "world.fixture")), "Selection and rendering never delete player files");
         Assert(!dialog.IsVisible && PresentationSource.FromVisual(root) is null, "Uninstaller preview does not open a window or capture desktop input");
         dialog.Close();
+        var farewell = new FarewellWindow();
+        var farewellRoot = (FrameworkElement)farewell.Content; farewell.Content = null;
+        farewellRoot.Measure(new Size(600, 390)); farewellRoot.Arrange(new Rect(0, 0, 600, 390)); farewellRoot.UpdateLayout();
+        var image = new RenderTargetBitmap(600, 390, 96, 96, PixelFormats.Pbgra32); image.Render(farewellRoot);
+        var farewellEncoder = new PngBitmapEncoder(); farewellEncoder.Frames.Add(BitmapFrame.Create(image));
+        using (var file = File.Create(Path.Combine(_output, "uninstall-farewell.png"))) farewellEncoder.Save(file);
+        Assert(Descendants<TextBlock>(farewellRoot).Any(t => t.Text == "Hasta pronto"), "Farewell includes the goodbye message");
+        Assert(Descendants<Button>(farewellRoot).Any(b => Equals(b.Content, "CERRAR") && b.IsDefault), "Farewell has an accessible close action");
+        farewell.Close();
         return Task.CompletedTask;
     }
 
@@ -629,7 +667,7 @@ internal static partial class Program
         var gameOptions = Get<Button>(window, "GameOptionsButton");
         var gameMenu = gameOptions.ContextMenu;
         var gameItems = gameMenu.Items.OfType<MenuItem>().ToArray();
-        Assert(gameItems.Select(i => i.Header?.ToString()).SequenceEqual(new[] { "Ajustes del juego", "Crear acceso directo en el escritorio", "Ver capturas", "Buscar actualizaciones", "Reparar modpack" }),
+        Assert(gameItems.Select(i => i.Header?.ToString()).SequenceEqual(new[] { "Ajustes del juego", "Crear acceso directo en el escritorio", "Ver capturas", "Buscar actualizaciones", "Reparar modpack", "Abrir configuración de este perfil" }),
             "Game menu includes settings, shortcut, screenshots, manual update check and repair");
         gameMenu.Measure(new Size(300, 340)); gameMenu.Arrange(new Rect(0, 0, 300, gameMenu.DesiredSize.Height)); gameMenu.UpdateLayout();
         var gameBitmap = new RenderTargetBitmap(300, (int)Math.Ceiling(gameMenu.ActualHeight), 96, 96, PixelFormats.Pbgra32); gameBitmap.Render(gameMenu);
@@ -643,8 +681,8 @@ internal static partial class Program
         Assert(shortcutEdition == PackEdition.Destiny, "Shortcut action selects the current pack without creating a desktop file during UI tests");
         var screenshotFolders = new List<string>(); window.OpenDirectory = screenshotFolders.Add;
         gameItems[2].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
-        Assert(screenshotFolders.Single() == Path.Combine(window.DataPaths.Instance("destiny"), "screenshots") && Directory.Exists(screenshotFolders.Single()),
-            "Screenshots opens the selected instance's screenshots directory using the injected Explorer action");
+        Assert(screenshotFolders.Single() == Path.Combine(window.DataPaths.GameDirectory, "screenshots") && Directory.Exists(screenshotFolders.Single()),
+            "Screenshots opens the shared game's screenshots directory using the injected Explorer action");
         window.SetAuditProgress("Comprobando archivos · 1/2", .2);
         Assert(!gameOptions.IsEnabled, "Busy game operations disable the contextual menu"); window.EndAuditProgress();
         window.SetAuditState("", edition: PackEdition.DestinyLite);
@@ -671,11 +709,11 @@ internal static partial class Program
         var folderButton = Get<Button>(window, "OpenInstallationFolderButton");
         Assert(folderButton.IsEnabled, "Existing installation exposes Open folder");
         folderButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        Assert(openedFolders.Single() == window.DataPaths.Instance("destiny"), "Open folder targets the selected installation without launching Explorer in the test");
+        Assert(openedFolders.Single() == window.DataPaths.GameDirectory, "Open folder targets the shared game directory without launching Explorer in the test");
         window.SetAuditState("", edition: PackEdition.DestinyLite); Layout();
-        Assert(!folderButton.IsEnabled, "Uncreated Lite folder cannot be opened or created by the button");
+        Assert(folderButton.IsEnabled, "Lite can open the existing shared game directory before its own profile is installed");
         folderButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        Assert(openedFolders.Count == 1 && !Directory.Exists(window.DataPaths.Instance("destiny-lite")), "Opening an absent folder never creates a new installation");
+        Assert(openedFolders.Count == 2 && openedFolders[1] == window.DataPaths.GameDirectory && !Directory.Exists(window.DataPaths.Instance("destiny-lite")), "Opening the shared folder never creates an absent Lite installation");
         window.SetAuditState("1.4.7", Check("1.4.7", false)); Layout();
         CaptureContent("installation");
         Layout(680, 480);
@@ -695,9 +733,10 @@ internal static partial class Program
         Assert(!gameWidth.IsEnabled && !gameHeight.IsEnabled, "Maximized mode uses the desktop area instead of a conflicting custom window size");
         gameModes.Single(c => Equals(c.Content, "Ventana")).IsChecked = true;
         gameWidth.Text = "1600"; gameHeight.Text = "900";
-        Assert(autoJoin.IsChecked == true, "Settings expose enabled automatic server entry by default");
-        autoJoin.IsChecked = false;
+        Assert(autoJoin.IsChecked == false, "Settings leave automatic server entry disabled by default");
+        autoJoin.IsChecked = true;
         Assert(settings.HasChanges, "Changing automatic server entry participates in unsaved settings tracking");
+        autoJoin.IsChecked = false;
         Assert(multi.IsChecked == false && Get<Button>(window, "ProfileButton").ContextMenu is null, "Multicuentas is opt-in and leaves the single-profile control unchanged");
         var baseInput = Descendants<TextBox>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "InstallDirectoryInput");
         var javaInput = Descendants<TextBox>(settings).Single(t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "JavaArgumentsInput");

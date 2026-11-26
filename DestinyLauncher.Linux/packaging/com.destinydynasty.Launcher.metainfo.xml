@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.destinydynasty.Launcher</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Destiny Launcher</name>
+  <summary>Launcher de Minecraft para Destiny Dynasty</summary>
+  <summary xml:lang="en">Minecraft launcher for Destiny Dynasty</summary>
+  <description>
+    <p>Instala y actualiza los modpacks de Destiny Dynasty y prepara Minecraft para jugar.</p>
+    <p xml:lang="en">Install and update Destiny Dynasty modpacks and prepare Minecraft for play.</p>
+  </description>
+  <developer id="com.destinydynasty">
+    <name>Destiny Dynasty</name>
+  </developer>
+  <launchable type="desktop-id">destiny-launcher.desktop</launchable>
+  <url type="homepage">https://github.com/Destiny-Dynasty/Destiny-Launcher</url>
+  <url type="bugtracker">https://github.com/Destiny-Dynasty/Destiny-Launcher/issues</url>
+  <categories><category>Game</category></categories>
+</component>

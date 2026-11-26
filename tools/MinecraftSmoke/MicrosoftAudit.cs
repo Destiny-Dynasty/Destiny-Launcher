@@ -25,7 +25,7 @@ internal static class MicrosoftAudit
         }
         var paths = new LauncherPaths(Path.Combine(root, Guid.NewGuid().ToString("N"))); paths.Ensure();
         using var handler = new AuthHandler(); using var http = new HttpClient(handler);
-        var service = new MicrosoftAccountService(paths, http); var web = new FixtureWeb();
+        var service = new MicrosoftAccountService(paths, file => new ProtectedMicrosoftStorage(file), http); var web = new FixtureWeb();
         var session = await service.SignInAsync(web, null, CancellationToken.None);
         Check(session.UserType == "msa" && session.UUID == AuthHandler.Uuid && session.Username == "Premium_Fixture", "The real SDK returns the Minecraft identity");
         Check(handler.SisuCalls == 1 && handler.SisuClient == "00000000402b5328", "SISU uses the explicit Minecraft client ID");
@@ -34,7 +34,7 @@ internal static class MicrosoftAudit
         Check(handler.ProfileCalls == 1 && handler.OwnershipCalls == 1, "Sign in validates the Java profile and game ownership");
         var encrypted = Path.Combine(paths.Root, "microsoft-accounts.bin");
         Check(File.Exists(encrypted) && !Encoding.UTF8.GetString(File.ReadAllBytes(encrypted)).Contains("fixture-refresh"), "Refresh token is not stored in plaintext");
-        var restored = new MicrosoftAccountService(paths, http);
+        var restored = new MicrosoftAccountService(paths, file => new ProtectedMicrosoftStorage(file), http);
         Check(restored.Profiles().Single() == new MicrosoftProfile(AuthHandler.Uuid, "Premium_Fixture"), "DPAPI accounts restore across service restarts");
         var renewed = await restored.RefreshAsync(AuthHandler.Uuid, null, CancellationToken.None);
         Check(renewed.UUID == session.UUID && handler.RefreshCalls == 1 && handler.SisuCalls == 2, "Play refreshes silently with SISU");
@@ -52,14 +52,14 @@ internal static class MicrosoftAudit
         var offline = MinecraftService.CreateLaunchOptions(config).Session!;
         Check(offline.AccessToken != "fixture-minecraft-access" && offline.UUID != AuthHandler.Uuid, "Explicit offline selection still creates an offline session");
         restored.Forget(AuthHandler.Uuid);
-        Check(new MicrosoftAccountService(paths, http).Profiles().Count == 0, "Local sign out removes the stored identity");
+        Check(new MicrosoftAccountService(paths, file => new ProtectedMicrosoftStorage(file), http).Profiles().Count == 0, "Local sign out removes the stored identity");
 
         handler.NoLicense = true;
         var deniedPaths = new LauncherPaths(Path.Combine(root, "no-license-" + Guid.NewGuid().ToString("N"))); deniedPaths.Ensure();
-        await Rejected<JEAuthException>(() => new MicrosoftAccountService(deniedPaths, http).SignInAsync(web, null, CancellationToken.None), "Account without Java accepted");
+        await Rejected<JEAuthException>(() => new MicrosoftAccountService(deniedPaths, file => new ProtectedMicrosoftStorage(file), http).SignInAsync(web, null, CancellationToken.None), "Account without Java accepted");
         Check(!File.Exists(Path.Combine(deniedPaths.Root, "microsoft-accounts.bin")), "Failed ownership check saves no account material");
         handler.NoLicense = false; handler.DenyMinecraft = true;
-        var denied = new MicrosoftAccountService(deniedPaths, http);
+        var denied = new MicrosoftAccountService(deniedPaths, file => new ProtectedMicrosoftStorage(file), http);
         try { await denied.SignInAsync(web, null, CancellationToken.None); throw new Exception("403 accepted"); }
         catch (JEAuthException ex)
         {

@@ -19,7 +19,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           dotnet build DestinyLauncher/DestinyLauncher.csproj -c Release
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          foreach ($project in @('MemorySmoke','InstallationSmoke','MinecraftSmoke','PackUpdaterSmoke','NewsFeedSmoke','DiscordLinkSmoke')) {
+          foreach ($project in @('StorageSmoke','MemorySmoke','InstallationSmoke','MinecraftSmoke','PackUpdaterSmoke','NewsFeedSmoke','DiscordLinkSmoke')) {
             dotnet run --project "tools/$project/$project.csproj" -c Release -- "artifacts/ci/$project"
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           }
@@ -63,4 +63,6 @@ jobs:
       - name: Shared memory and modpack behavior on Linux
         run: |
           dotnet run --project tools/MemorySmoke -c Release
+          dotnet run --project tools/StorageSmoke -c Release -- artifacts/ci/linux-storage
           dotnet run --project tools/PackUpdaterSmoke -c Release -- artifacts/ci/linux-packs
+          dotnet build DestinyLauncher.Linux/DestinyLauncher.Linux.csproj -c Release

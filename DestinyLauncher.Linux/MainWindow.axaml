@@ -1,0 +1,141 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:DestinyLauncher.Linux"
+        x:Class="DestinyLauncher.Linux.MainWindow" Title="Destiny Launcher" Icon="avares://DestinyLauncher.Linux/Assets/destiny-launcher.ico" Width="1000" Height="620" MinWidth="760" MinHeight="500"
+        WindowStartupLocation="CenterScreen" WindowDecorations="None" CanResize="False" TransparencyLevelHint="Transparent" Background="Transparent"
+        Foreground="#F2EBDD" FontFamily="Segoe UI, Noto Sans, Liberation Sans, DejaVu Sans" UseLayoutRounding="True" RenderOptions.BitmapInterpolationMode="HighQuality">
+  <Border x:Name="WindowFrame" Background="#10100F" CornerRadius="18" ClipToBounds="True">
+    <Grid RowDefinitions="40,*">
+      <Border Background="#121310" BorderBrush="#302B22" BorderThickness="0,0,0,1" PointerPressed="TitleBar_PointerPressed">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0" Spacing="9">
+            <Image x:Name="TitleEmblem" Width="28" Height="28"/>
+            <TextBlock Text="Destiny Launcher" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <TextBlock x:Name="TestModeText" Text="DATOS AISLADOS" Foreground="#C6A362" FontSize="9" Margin="7,0,0,0" VerticalAlignment="Center" IsVisible="False"/>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal">
+            <Button Classes="chrome" Click="Minimize_Click" ToolTip.Tip="Minimizar"><Line StartPoint="0,5.5" EndPoint="11,5.5" Width="11" Height="11" Stroke="#B3AC9E" StrokeThickness="1"/></Button>
+            <Button Classes="chrome close" Click="Close_Click" ToolTip.Tip="Cerrar"><Path Data="M6 6l12 12 M18 6 6 18" Width="12" Height="12" Stretch="Uniform" Stroke="#B3AC9E" StrokeThickness="1.2"/></Button>
+          </StackPanel>
+        </Grid>
+      </Border>
+      <Grid x:Name="ShellGrid" Grid.Row="1" ColumnDefinitions="80,*">
+        <Border Background="#131410" BorderBrush="#302D23" BorderThickness="0,0,1,0">
+          <Grid RowDefinitions="Auto,*,Auto,Auto">
+            <StackPanel Margin="0,18,0,0">
+              <Button x:Name="HomeNav" Classes="nav selected" Click="Home_Click" ToolTip.Tip="Inicio"><StackPanel Spacing="6"><Path Data="{x:Static local:LinuxIconGlyphs.Home}" Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/><TextBlock Text="Inicio" FontSize="10" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center"/></StackPanel></Button>
+              <Button x:Name="InstallationNav" Classes="nav" Click="Installation_Click" ToolTip.Tip="Administrar instalación"><StackPanel Spacing="6"><Path Data="{x:Static local:LinuxIconGlyphs.Cube}" Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/><TextBlock Text="Instalación" FontSize="9" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center"/></StackPanel></Button>
+              <Button x:Name="SettingsNav" Classes="nav" Click="Settings_Click" ToolTip.Tip="Ajustes"><StackPanel Spacing="6"><Path Data="{x:Static local:LinuxIconGlyphs.Settings}" Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/><TextBlock Text="Ajustes" FontSize="10" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center"/></StackPanel></Button>
+            </StackPanel>
+            <StackPanel Grid.Row="2" Margin="0,4,0,12">
+              <Border Height="1" Background="#35332C" Margin="24,0,24,8"/>
+              <Button x:Name="WebsiteLink" Classes="social" Click="Social_Click" Tag="https://destinydynasty.site" ToolTip.Tip="Web oficial · Destiny Dynasty" AutomationProperties.Name="Abrir web oficial de Destiny Dynasty"><Path Data="{x:Static local:LinuxIconGlyphs.Globe}" Width="20" Height="20" Stretch="Uniform" StrokeThickness="1.5" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/></Button>
+              <Button Classes="social" Click="Social_Click" Tag="https://dsc.gg/destiny-dynasty-mc" ToolTip.Tip="Discord · Comunidad de Destiny Dynasty"><Path Data="{x:Static local:LinuxIconGlyphs.Discord}" Width="21" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/></Button>
+              <Button Classes="social" Click="Social_Click" Tag="https://www.youtube.com/@destiny_dynasty" ToolTip.Tip="YouTube · Canal de Destiny Dynasty"><Path Data="{x:Static local:LinuxIconGlyphs.YouTube}" Width="21" Height="17" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/></Button>
+              <Button Classes="social" Click="Social_Click" Tag="https://x.com/DestinyDynasty_" ToolTip.Tip="X · Novedades de Destiny Dynasty"><Path Data="{x:Static local:LinuxIconGlyphs.X}" Width="17" Height="17" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/></Button>
+              <Button Classes="social" Click="Social_Click" Tag="https://tatnikhost.net/l/crC7CrzY" ToolTip.Tip="Tatnik Host · Hosting del servidor"><Path Data="{x:Static local:LinuxIconGlyphs.TatnikHost}" Width="21" Height="21" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/></Button>
+            </StackPanel>
+            <StackPanel Grid.Row="3" Margin="0,0,0,12" IsHitTestVisible="False">
+              <Image x:Name="SidebarEmblem" Width="40" Height="40" Opacity=".85"/>
+              <TextBlock x:Name="LauncherVersionText" FontSize="9" Foreground="#A19A8C" Opacity=".55" HorizontalAlignment="Center" Margin="0,7,0,0"/>
+            </StackPanel>
+          </Grid>
+        </Border>
+        <Grid Grid.Column="1" RowDefinitions="*,Auto">
+          <Image Grid.RowSpan="2" Source="avares://DestinyLauncher.Linux/Assets/experiment/obsidian-gold-v1/obsidian-texture.png" Stretch="UniformToFill" Opacity=".045" IsHitTestVisible="False"/>
+          <Grid x:Name="HomeView" RowDefinitions="*,Auto">
+            <Grid x:Name="HeroRegion" ClipToBounds="True" MinHeight="280">
+              <Image x:Name="HeroPosterImage" Stretch="UniformToFill" VerticalAlignment="Top"/>
+              <Image x:Name="HeroVideoImage" Stretch="UniformToFill" VerticalAlignment="Top" IsVisible="False" IsHitTestVisible="False"/>
+              <Rectangle IsHitTestVisible="False"><Rectangle.Fill><LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%"><GradientStop Color="#B510100F"/><GradientStop Color="#2010100F" Offset=".6"/><GradientStop Color="#3810100F" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
+              <Rectangle IsHitTestVisible="False"><Rectangle.Fill><LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%"><GradientStop Color="#1810100F"/><GradientStop Color="#0010100F" Offset=".4"/><GradientStop Color="#C510100F" Offset=".9"/><GradientStop Color="#FF10100F" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
+              <Image x:Name="HeroMark" Source="avares://DestinyLauncher.Linux/Assets/experiment/obsidian-gold-v1/Combination-Mark-Destiny.png" Width="250" Height="178" Margin="28,22,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Stretch="Uniform"/>
+              <Border x:Name="NewsCard" Focusable="True" Cursor="Hand" KeyDown="News_KeyDown" PointerReleased="News_Released" Width="350" Height="156" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="28,0,0,22" CornerRadius="8" ClipToBounds="True" PointerEntered="News_Entered" PointerExited="News_Exited">
+                <Grid><Image x:Name="NewsPreviousImage" Stretch="UniformToFill"/><Image x:Name="NewsImage" Stretch="UniformToFill"/>
+                  <Border x:Name="NewsCaptionSurface" VerticalAlignment="Bottom" Padding="13,22,13,27" Opacity="0" IsHitTestVisible="False"><Border.Background><LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%"><GradientStop Color="#0010100F"/><GradientStop Color="#ED10100F" Offset=".45"/><GradientStop Color="#F710100F" Offset="1"/></LinearGradientBrush></Border.Background><TextBlock x:Name="NewsCaption" FontSize="12" TextTrimming="CharacterEllipsis"/></Border>
+                  <Grid x:Name="NewsHoverControls" Opacity="0" IsHitTestVisible="False"><Button Classes="carousel" x:Name="NewsPrevious" Width="28" Height="30" MinHeight="0" Padding="0" Content="‹" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,12" Click="NewsPrevious_Click"/><Button Classes="carousel" x:Name="NewsNext" Width="28" Height="30" MinHeight="0" Padding="0" Content="›" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,12" Click="NewsNext_Click"/></Grid>
+                  <Border VerticalAlignment="Bottom" Height="26" IsHitTestVisible="False"><Border.Background><LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%"><GradientStop Color="#0010100F"/><GradientStop Color="#8C10100F" Offset="1"/></LinearGradientBrush></Border.Background></Border>
+                  <StackPanel x:Name="NewsDots" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,1"/>
+                  <Border CornerRadius="8" BorderBrush="#8A8A7148" BorderThickness="1" IsHitTestVisible="False"/>
+                </Grid>
+              </Border>
+              <Button x:Name="ProfileButton" Width="234" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,22" MinHeight="78" Padding="13,12" HorizontalContentAlignment="Stretch" Background="#ED181916" BorderBrush="#625239" Click="Profile_Click" ToolTip.Tip="Editar tu nombre de jugador">
+                <Grid ColumnDefinitions="48,*,16">
+                  <Border Width="44" Height="48" Background="#29271E" BorderBrush="#665232" BorderThickness="1" CornerRadius="5" VerticalAlignment="Center"><Grid Margin="4"><TextBlock x:Name="PlayerInitial" Text="D" FontFamily="Georgia, Liberation Serif, DejaVu Serif" FontSize="23" Foreground="#E2C58B" VerticalAlignment="Center" HorizontalAlignment="Center"/><Image x:Name="PlayerHead" Stretch="Uniform" IsVisible="False"/></Grid></Border>
+                  <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center"><TextBlock x:Name="ProfileLabel" Text="Añadir nombre" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><StackPanel x:Name="AccountType" Orientation="Horizontal" Margin="0,4,0,0" IsVisible="False"/></StackPanel>
+                  <Path x:Name="ProfileActionGlyph" Grid.Column="2" Data="{x:Static local:LinuxIconGlyphs.Edit}" Width="13" Height="13" Stretch="Uniform" Stroke="#C6A362" StrokeThickness="1.3" VerticalAlignment="Center"/>
+                </Grid>
+              </Button>
+              <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,20,28,0" Background="#B5151612" BorderBrush="#4A4130" BorderThickness="1" CornerRadius="4" Padding="10,5"><TextBlock x:Name="VersionText" Text="Minecraft 1.20.1 · Fabric" Foreground="#D6CDBB" FontSize="10"/></Border>
+            </Grid>
+            <Border x:Name="LaunchPanel" Grid.Row="1" BorderBrush="#49402F" BorderThickness="0,1,0,0" Margin="28,0,28,18" Padding="0,16,0,0">
+              <Grid x:Name="LaunchLayout" ColumnDefinitions="*,290">
+                <StackPanel Margin="0,0,20,0" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal"><TextBlock x:Name="EditionText" Text="Destiny" Classes="section"/><Border Margin="12,0,0,0" Padding="7,3" Background="#23251F" CornerRadius="4" VerticalAlignment="Center"><TextBlock x:Name="PackStateText" Text="Sin instalar" FontSize="10" Foreground="#B3AC9E"/></Border></StackPanel>
+                  <WrapPanel Margin="0,9,0,0"><TextBlock Text="Instalada  " Foreground="#B3AC9E" FontSize="11"/><TextBlock x:Name="PackInstalledVersionText" Text="No instalado" FontSize="11" Margin="0,0,20,0" MaxWidth="140" TextTrimming="CharacterEllipsis"/><TextBlock Text="Disponible  " Foreground="#B3AC9E" FontSize="11"/><TextBlock x:Name="PackLatestVersionText" Text="Consultando…" FontSize="11" MaxWidth="140" TextTrimming="CharacterEllipsis"/></WrapPanel>
+                  <Button Classes="quiet" Content="Administrar instalación →" HorizontalAlignment="Left" Foreground="#E2C58B" BorderThickness="0" Padding="0,5" MinHeight="28" Margin="0,5,0,0" FontSize="11" Click="Installation_Click"/>
+                </StackPanel>
+                <Grid Grid.Column="1" VerticalAlignment="Center" ColumnDefinitions="*,48" ColumnSpacing="8">
+                  <Button x:Name="PrimaryButton" Classes="gold" Height="54" Click="Install_Click"><StackPanel Orientation="Horizontal" Spacing="12"><TextBlock x:Name="PrimaryLabel" Text="INSTALAR" FontSize="14" FontWeight="Bold" Foreground="#211A0E"/><Path Data="{x:Static local:LinuxIconGlyphs.Arrow}" Width="15" Height="15" Stretch="Uniform" Stroke="#4A3519" StrokeThickness="1.5"/></StackPanel></Button>
+                  <Button x:Name="GameOptionsButton" Grid.Column="1" Width="48" Height="54" Padding="0" Click="GameOptions_Click" ToolTip.Tip="Opciones del juego"><Path Data="M3 6h18 M3 12h18 M3 18h18" Width="18" Height="14" Stretch="Fill" Stroke="#E2C58B" StrokeThickness="1.6"/></Button>
+                </Grid>
+              </Grid>
+            </Border>
+          </Grid>
+          <Grid x:Name="InstallationView" IsVisible="False" Margin="28,24,28,20" RowDefinitions="Auto,*,Auto">
+            <Grid Margin="0,0,0,20"><TextBlock Text="Instalación" Height="32.8" FontFamily="Georgia, Liberation Serif, DejaVu Serif" FontSize="28"/><StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="18"><Button x:Name="ManageInstallations" Classes="quiet" FontSize="12" Foreground="#E2C58B" Padding="0" MinHeight="0" Click="ManageInstallations_Click"><TextBlock Text="Gestionar instalaciones" TextDecorations="Underline"/></Button><Button Classes="quiet" FontWeight="Normal" FontSize="12" Foreground="#B3AC9E" Padding="0" MinHeight="0" Click="InstallationOptions_Click"><TextBlock Text="Más opciones" TextDecorations="Underline" FontSize="12" Foreground="#B3AC9E"/></Button></StackPanel></Grid>
+            <Grid x:Name="InstallationContent" Grid.Row="1" RowDefinitions="*,Auto">
+              <Grid x:Name="EditionGrid" MaxHeight="310" Width="508" HorizontalAlignment="Center" ColumnDefinitions="*,16,*,0,0">
+                <Button Classes="edition selected" x:Name="DestinyButton" Click="Destiny_Click"><Grid ClipToBounds="True">
+                  <Image x:Name="DestinyArtwork" Source="avares://DestinyLauncher.Linux/Assets/Modpacks/destiny-v1.jpg" Stretch="UniformToFill"/>
+                  <Rectangle><Rectangle.Fill><LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%"><GradientStop Color="#120A0A08"/><GradientStop Color="#000A0A08" Offset=".35"/><GradientStop Color="#400B0B09" Offset=".6"/><GradientStop Color="#EE0D0E0B" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
+                  <StackPanel VerticalAlignment="Bottom" Margin="20"><TextBlock x:Name="DestinyTitle" Text="Destiny" FontFamily="Georgia, Liberation Serif, DejaVu Serif" FontSize="26"/><TextBlock x:Name="DestinyState" Text="Seleccionada" Foreground="#E2C58B" FontSize="11" Margin="0,8,0,0"/></StackPanel>
+                  <Border x:Name="DestinyRing" Width="23" Height="23" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="14" CornerRadius="12" Background="#E2C58B" BorderBrush="#E2C58B" BorderThickness="1"><Path x:Name="DestinyTick" Data="M3,7 L6,10 L12,3" Width="12" Height="11" Stretch="Uniform" Stroke="#17170F" StrokeThickness="1.7"/></Border><Border x:Name="DestinyAccent" Height="2" Background="#C6A362" Margin="18,0,18,0" VerticalAlignment="Bottom"/>
+                </Grid></Button>
+                <Button Grid.Column="2" Classes="edition" x:Name="LiteButton" Click="Lite_Click"><Grid ClipToBounds="True">
+                  <Image x:Name="LiteArtwork" Source="avares://DestinyLauncher.Linux/Assets/Modpacks/lite-v1.jpg" Stretch="UniformToFill"/>
+                  <Rectangle><Rectangle.Fill><LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%"><GradientStop Color="#120A0A08"/><GradientStop Color="#000A0A08" Offset=".35"/><GradientStop Color="#400B0B09" Offset=".6"/><GradientStop Color="#EE0D0E0B" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
+                  <StackPanel VerticalAlignment="Bottom" Margin="20"><TextBlock x:Name="LiteTitle" Text="Destiny Lite" FontFamily="Georgia, Liberation Serif, DejaVu Serif" FontSize="26"/><TextBlock x:Name="LiteState" Text="Sin instalar" Foreground="#CFC8B8" FontSize="11" Margin="0,8,0,0"/></StackPanel>
+                  <Border x:Name="LiteRing" Width="23" Height="23" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="14" CornerRadius="12" Background="#A010110E" BorderBrush="#B0C6B68E" BorderThickness="1"><Path x:Name="LiteTick" Data="M3,7 L6,10 L12,3" Width="12" Height="11" Stretch="Uniform" Stroke="#17170F" StrokeThickness="1.7" IsVisible="False"/></Border><Border x:Name="LiteAccent" Height="2" Background="#C6A362" Margin="18,0,18,0" VerticalAlignment="Bottom" IsVisible="False"/>
+                </Grid></Button>
+                <Button Grid.Column="4" Classes="edition" x:Name="StaffButton" Click="Staff_Click" IsVisible="False"><Grid ClipToBounds="True">
+                  <Image x:Name="StaffArtwork" Source="avares://DestinyLauncher.Linux/Assets/Modpacks/staff-v1.jpg" Stretch="UniformToFill"/>
+                  <Rectangle><Rectangle.Fill><LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%"><GradientStop Color="#120A0A08"/><GradientStop Color="#000A0A08" Offset=".35"/><GradientStop Color="#400B0B09" Offset=".6"/><GradientStop Color="#EE0D0E0B" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
+                  <StackPanel VerticalAlignment="Bottom" Margin="20"><TextBlock x:Name="StaffTitle" Text="Destiny Staff" FontFamily="Georgia, Liberation Serif, DejaVu Serif" FontSize="26"/><TextBlock x:Name="StaffState" Text="Sin instalar" Foreground="#B3AC9E" FontSize="11" Margin="0,8,0,0"/></StackPanel>
+                  <Border x:Name="StaffRing" Width="23" Height="23" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="14" CornerRadius="12" Background="#A010110E" BorderBrush="#B0C6B68E" BorderThickness="1"><Path x:Name="StaffTick" Data="M3,7 L6,10 L12,3" Width="12" Height="11" Stretch="Uniform" Stroke="#17170F" StrokeThickness="1.7" IsVisible="False"/></Border><Border x:Name="StaffAccent" Height="2" Background="#C6A362" Margin="18,0,18,0" VerticalAlignment="Bottom" IsVisible="False"/>
+                </Grid></Button>
+              </Grid>
+              <Border x:Name="InstallDetailsPanel" Height="65.6" VerticalAlignment="Bottom" Grid.Row="1" Background="#191917" BorderBrush="#35332C" BorderThickness="1" CornerRadius="7" Padding="14,12" Margin="0,14,0,0">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"><WrapPanel><TextBlock x:Name="InstallEdition" Text="Destiny" FontSize="12" FontWeight="SemiBold" Margin="0,0,18,0"/><TextBlock Text="Instalada  " FontSize="11" Foreground="#B3AC9E"/><TextBlock x:Name="InstallInstalledVersion" FontSize="11" Margin="0,0,18,0"/><TextBlock Text="Disponible  " FontSize="11" Foreground="#B3AC9E"/><TextBlock x:Name="InstallLatestVersion" FontSize="11"/></WrapPanel><TextBlock x:Name="InstallationPathText" Grid.Row="1" TextTrimming="CharacterEllipsis" Foreground="#B3AC9E" FontSize="11" Margin="0,4,14,0" VerticalAlignment="Center"/><Button x:Name="OpenInstallationFolderButton" Grid.Column="1" Grid.RowSpan="2" Padding="10,8" Click="OpenInstallationFolder_Click"><StackPanel Orientation="Horizontal" Spacing="8"><Path Data="{x:Static local:LinuxIconGlyphs.Folder}" Width="17" Height="17" Stretch="Uniform" Fill="#F2EBDD"/><TextBlock Text="Abrir carpeta" FontSize="12" VerticalAlignment="Center"/></StackPanel></Button></Grid>
+              </Border>
+            </Grid>
+            <Grid x:Name="InstallationActions" Grid.Row="2" Margin="0,18,0,0" ColumnDefinitions="*,Auto"><Button Content="Volver a Inicio" HorizontalAlignment="Left" Click="Home_Click"/><Button x:Name="InstallPrimaryButton" Grid.Column="1" Classes="gold" MinWidth="210" Height="46" Click="Install_Click"><TextBlock x:Name="InstallPrimaryLabel" Text="INSTALAR" Foreground="#211A0E" FontWeight="Bold" FontSize="13"/></Button></Grid>
+          </Grid>
+          <Grid x:Name="SettingsView" IsVisible="False" Margin="28,24,28,20" RowDefinitions="Auto,*,Auto">
+            <Grid Margin="0,0,0,20" ColumnDefinitions="*,Auto"><TextBlock Text="Ajustes" Height="32.8" FontFamily="Georgia, Liberation Serif, DejaVu Serif" FontSize="28"/><StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="10"><TextBlock Text="Multicuentas" Foreground="#B3AC9E" FontSize="12" VerticalAlignment="Center"/><CheckBox x:Name="MultiAccountToggle" Classes="toggle"/></StackPanel></Grid>
+            <ScrollViewer x:Name="SettingsScroll" Grid.Row="1" AllowAutoHide="False" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled" Padding="0,0,7,0">
+              <StackPanel>
+                <Border Classes="card" Margin="0,0,0,14"><Grid ColumnDefinitions="*,Auto"><StackPanel><TextBlock Classes="cardtitle" Text="Discord"/><TextBlock x:Name="DiscordStatusText" Text="Sin vincular" Classes="help" Margin="0,7,12,0"/></StackPanel><Button x:Name="DiscordSettingsButton" Grid.Column="1" Classes="dialog" Content="Vincular Discord" VerticalAlignment="Center" Click="DiscordSettings_Click"/></Grid></Border>
+                <Border Classes="card"><StackPanel><TextBlock Classes="cardtitle" Text="Carpeta de instalación"/><Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,16,0,0"><TextBox x:Name="InstallDirectory"/><TextBlock x:Name="InstallDirectorySuffix" Grid.Column="1" Classes="help" VerticalAlignment="Center"/><Button Grid.Column="2" Width="42" Height="40" Padding="0" Click="BrowseInstallDirectory_Click"><Path Data="{x:Static local:LinuxIconGlyphs.Folder}" Width="20" Height="20" Stretch="Uniform" Fill="#E2C58B"/></Button></Grid></StackPanel></Border>
+                <Border Classes="card" Margin="0,14,0,0"><StackPanel><TextBlock Classes="cardtitle" Text="Juego"/><StackPanel Orientation="Horizontal" Margin="0,14,0,0" Spacing="8"><Button x:Name="WindowedMode" Classes="mode selected" Content="Ventana" Tag="Windowed" Click="WindowMode_Click"/><Button x:Name="MaximizedMode" Classes="mode" Content="Maximizada" Tag="Maximized" Click="WindowMode_Click"/><Button x:Name="FullscreenMode" Classes="mode" Content="Pantalla completa" Tag="Fullscreen" Click="WindowMode_Click"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="10" Margin="0,14,0,0"><TextBlock Text="Resolución en ventana" Classes="help" Margin="0,0,6,0" VerticalAlignment="Center"/><TextBox x:Name="GameWidth" Width="86" TextAlignment="Center" MaxLength="4"/><TextBlock Text="×" Classes="help" VerticalAlignment="Center"/><TextBox x:Name="GameHeight" Width="86" TextAlignment="Center" MaxLength="4"/></StackPanel><Grid ColumnDefinitions="*,Auto" Margin="0,18,0,0"><TextBlock Text="Entrar automáticamente al servidor" VerticalAlignment="Center"/><CheckBox Grid.Column="1" x:Name="AutoJoinToggle" Classes="toggle"/></Grid></StackPanel></Border>
+                <Border Classes="card" Margin="0,14,0,0"><StackPanel><TextBlock Classes="cardtitle" Text="Memoria del juego"/><Grid ColumnDefinitions="*,Auto" Margin="0,14,0,0"><Slider x:Name="RamSlider" Minimum="1" Maximum="8" Value="3" TickFrequency="1" IsSnapToTickEnabled="True" ValueChanged="RamSlider_Changed" Margin="0,0,24,0" VerticalAlignment="Center"/><Border Grid.Column="1" Height="40" Background="#10100F" BorderBrush="#35332C" BorderThickness="1" CornerRadius="6"><StackPanel Orientation="Horizontal" Margin="2,0,12,0"><TextBox x:Name="RamValue" Width="60" TextAlignment="Center" FontSize="16" FontWeight="SemiBold" BorderThickness="0" Background="Transparent" Padding="6,5,2,5" TextChanged="RamValue_Changed"/><TextBlock Text="GB" Classes="help" FontSize="11" VerticalAlignment="Center"/></StackPanel></Border></Grid></StackPanel></Border>
+                <Border Classes="card" Margin="0,14,0,0"><StackPanel><Grid ColumnDefinitions="*,Auto"><TextBlock Classes="cardtitle" Text="Argumentos de Java" VerticalAlignment="Center"/><Button Grid.Column="1" Content="Restablecer" Height="30" MinHeight="30" Padding="12,4" FontSize="11" Click="ResetJava_Click"/></Grid><TextBox x:Name="JavaArguments" Margin="0,12,0,0" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="74" MaxHeight="120" FontFamily="Consolas" FontSize="12" MaxLength="8192"/></StackPanel></Border>
+              </StackPanel>
+            </ScrollViewer>
+            <StackPanel Grid.Row="2" Margin="0,16,7,0"><TextBlock x:Name="SettingsValidation" Foreground="#E0A396" FontSize="12" TextWrapping="Wrap" IsVisible="False" Margin="0,0,0,10"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10"><Button Classes="dialog" Content="Volver" MinWidth="108" Height="40" Click="Home_Click"/><Button Classes="gold" Content="Guardar ajustes" MinWidth="144" Height="40" Click="SaveSettings_Click"/></StackPanel></StackPanel>
+          </Grid>
+          <Border x:Name="StatusFooter" Grid.Row="1" Background="#161713" BorderBrush="#302D24" BorderThickness="0,1,0,0">
+            <Grid><ProgressBar x:Name="Progress" Foreground="#C6A362" Background="#27251D" VerticalAlignment="Top" Height="3" Minimum="0" Maximum="1" Value="0" IsVisible="False"/><Grid Margin="26,14,26,15" ColumnDefinitions="20,*,Auto"><Ellipse x:Name="StatusDot" Width="5" Height="5" Fill="#C6A362" VerticalAlignment="Top" Margin="0,6,0,0"/><StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock x:Name="StatusText" Text="Preparando launcher" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="StatusDetail" FontSize="11" Foreground="#B3AC9E" TextWrapping="Wrap" Margin="0,4,0,0"/></StackPanel><Button x:Name="RetryCheckButton" Grid.Column="2" Content="Comprobar" Click="Refresh_Click" IsVisible="False"/><Button x:Name="CancelDownloadButton" Grid.Column="2" Content="Cancelar" Click="CancelDownload_Click" IsVisible="False"/></Grid></Grid>
+          </Border>
+        </Grid>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>
+
+
+
+
+
+
+
+
+

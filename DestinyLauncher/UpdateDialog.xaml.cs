@@ -26,7 +26,7 @@ internal partial class UpdateDialog : Window
         ChangelogItems.ItemsSource = release.Changelog ?? [];
         ChangelogSection.Visibility = release.Changelog is { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
         Loaded += (_, _) => UpdateButton.Focus();
-        Closed += (_, _) => { _closed = true; _cancel.Cancel(); };
+        Closed += (_, _) => { _closed = true; _cancel.Cancel(); _cancel.Dispose(); };
     }
 
     internal bool? ShowStandalone(Window launcher)

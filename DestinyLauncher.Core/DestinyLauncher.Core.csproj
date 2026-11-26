@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CmlLib.Core" Version="4.0.6" />
+    <PackageReference Include="CmlLib.Core.Auth.Microsoft" Version="3.4.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\DestinyLauncher\Services\AppLogger.cs" Link="Services\AppLogger.cs" />
+    <Compile Include="..\DestinyLauncher\Services\FileSystemPathPolicy.cs" Link="Services\FileSystemPathPolicy.cs" />
+    <Compile Include="..\DestinyLauncher\Models\LauncherModels.cs" Link="Models\LauncherModels.cs" />
+    <Compile Include="..\DestinyLauncher\Models\PackManifest.cs" Link="Models\PackManifest.cs" />
+    <Compile Include="..\DestinyLauncher\Services\ConfigService.cs" Link="Services\ConfigService.cs" />
+    <Compile Include="..\DestinyLauncher\Services\GameOptionsFile.cs" Link="Services\GameOptionsFile.cs" />
+    <Compile Include="..\DestinyLauncher\Services\GameProfileSession.cs" Link="Services\GameProfileSession.cs" />
+    <Compile Include="..\DestinyLauncher\Services\SharedGameDataMigration.cs" Link="Services\SharedGameDataMigration.cs" />
+    <Compile Include="..\DestinyLauncher\Services\SharedGameDirectoryLock.cs" Link="Services\SharedGameDirectoryLock.cs" />
+    <Compile Include="..\DestinyLauncher\Services\GitHubModResolver.cs" Link="Services\GitHubModResolver.cs" />
+    <Compile Include="..\DestinyLauncher\Services\GitHubPackUpdater.cs" Link="Services\GitHubPackUpdater.cs" />
+    <Compile Include="..\DestinyLauncher\Services\InstallationDataService.cs" Link="Services\InstallationDataService.cs" />
+    <Compile Include="..\DestinyLauncher\Services\JavaArguments.cs" Link="Services\JavaArguments.cs" />
+    <Compile Include="..\DestinyLauncher\Services\JavaRuntimeService.cs" Link="Services\JavaRuntimeService.cs" />
+    <Compile Include="..\DestinyLauncher\Services\LauncherPaths.cs" Link="Services\LauncherPaths.cs" />
+    <Compile Include="..\DestinyLauncher\Services\MemoryPolicy.cs" Link="Services\MemoryPolicy.cs" />
+    <Compile Include="..\DestinyLauncher\Services\MicrosoftAccountService.cs" Link="Services\MicrosoftAccountService.cs" />
+    <Compile Include="..\DestinyLauncher\Services\MinecraftGameSession.cs" Link="Services\MinecraftGameSession.cs" />
+    <Compile Include="..\DestinyLauncher\Services\MinecraftService.cs" Link="Services\MinecraftService.cs" />
+  </ItemGroup>
+</Project>

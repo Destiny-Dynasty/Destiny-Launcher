@@ -26,6 +26,6 @@ internal sealed class DiscordLinkDialog : Window
             catch (Exception error) { if (!_cancel.IsCancellationRequested) { status.Text = DiscordLinkService.FriendlyError(error); status.Foreground = ProfileDialog.ResourceBrush("Error"); retry.Visibility = Visibility.Visible; } }
         }
         Loaded += async (_, _) => await Link(); retry.Click += async (_, _) => await Link();
-        Closed += (_, _) => _cancel.Cancel();
+        Closed += (_, _) => { _cancel.Cancel(); _cancel.Dispose(); };
     }
 }

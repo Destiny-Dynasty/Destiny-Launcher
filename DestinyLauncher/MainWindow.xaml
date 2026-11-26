@@ -56,6 +56,9 @@
                         </StackPanel>
                         <StackPanel x:Name="SocialLinks" Grid.Row="2" Margin="0,4,0,12">
                             <Border Height="1" Background="{StaticResource Line}" Margin="24,0,24,8"/>
+                            <Button x:Name="WebsiteLink" Style="{StaticResource SocialButton}" Tag="https://destinydynasty.site" Click="SocialLink_Click" ToolTip="Web oficial · Destiny Dynasty" AutomationProperties.Name="Abrir web oficial de Destiny Dynasty">
+                                <Path Data="{x:Static local:IconGlyphs.Globe}" Width="20" Height="20" Stretch="Uniform" StrokeThickness="1.5" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
                             <Button x:Name="DiscordLink" Style="{StaticResource SocialButton}" Tag="https://dsc.gg/destiny-dynasty-mc" Click="SocialLink_Click" ToolTip="Discord · Comunidad de Destiny Dynasty" AutomationProperties.Name="Abrir Discord de Destiny Dynasty">
                                 <Path Data="{x:Static local:IconGlyphs.Discord}" Width="21" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
@@ -134,6 +137,7 @@
                         <Grid Margin="0,0,0,20">
                             <TextBlock Text="Instalación" FontFamily="{StaticResource DisplayFont}" FontSize="28"/>
                             <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="12">
+                                <Hyperlink x:Name="ManageInstallations" Click="ManageInstallations_Click" Foreground="{StaticResource GoldBright}" AutomationProperties.Name="Gestionar instalaciones">Gestionar instalaciones</Hyperlink><Run Text="    "/>
                                 <Hyperlink x:Name="MoreInstallationOptions" Click="MoreInstallationOptions_Click" Foreground="{StaticResource Muted}" AutomationProperties.Name="Más opciones de instalación">Más opciones</Hyperlink>
                             </TextBlock>
                         </Grid>
@@ -183,6 +187,7 @@
                                 <Ellipse x:Name="StatusDot" Width="5" Height="5" Fill="{StaticResource Gold}" VerticalAlignment="Top" Margin="0,6,0,0"/>
                                 <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock x:Name="StatusText" Text="Preparando launcher" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/><TextBlock x:Name="StatusDetail" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0"/></StackPanel>
                                 <Button x:Name="RetryCheckButton" Grid.Column="2" Content="Comprobar" Click="RetryCheck_Click" Style="{StaticResource QuietButton}" VerticalAlignment="Center" Visibility="Collapsed"/>
+                                <Button x:Name="CancelDownloadButton" Grid.Column="2" Content="Cancelar" Click="CancelDownload_Click" Style="{StaticResource QuietButton}" VerticalAlignment="Center" Visibility="Collapsed"/>
                             </Grid>
                         </Grid>
                     </Border>

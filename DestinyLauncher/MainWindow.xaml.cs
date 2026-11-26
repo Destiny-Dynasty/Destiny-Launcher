@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource _optionalActivity = new();
     private CancellationTokenSource? _manifestCancellation;
+    private CancellationTokenSource? _packCancellation;
     private readonly Dictionary<PackEdition, PackUpdateCheck> _editionChecks = [];
     private LauncherConfig _config;
     private PackUpdateCheck? _manifestCheck;
@@ -62,7 +63,7 @@ public partial class MainWindow : Window
         _playerHeadService = new PlayerHeadService(_paths);
         _newsFeed = new NewsFeedService(_paths);
         _discord = new DiscordLinkService(_paths);
-        _microsoft = SisuExperiment.Enabled ? new MicrosoftAccountService(_paths) : null;
+        _microsoft = SisuExperiment.Enabled ? new MicrosoftAccountService(_paths, file => new ProtectedMicrosoftStorage(file)) : null;
         var exists = File.Exists(_paths.ConfigFile);
         _config = previewMode ? new LauncherConfig { PlayerName = loadRemoteSkinInPreview ? "Shady935" : "", InstallDirectory = _paths.InstallDirectory } : _configService.Load();
         if (dataRoot is not null && !exists) _config.InstallDirectory = _paths.InstallDirectory;
@@ -260,7 +261,7 @@ public partial class MainWindow : Window
         DestinyState.Foreground = Brush(_config.SelectedEdition == PackEdition.Destiny ? "GoldBright" : "Muted");
         LiteState.Foreground = Brush(_config.SelectedEdition == PackEdition.DestinyLite ? "GoldBright" : "Muted");
         var installed = Installed(Pack);
-        InstallationPathText.Text = _paths.Instance(Pack.Slug);
+        InstallationPathText.Text = _paths.GameDirectory;
         InstallationPathText.ToolTip = InstallationPathText.Text;
         OpenInstallationFolderButton.IsEnabled = !_busy && Directory.Exists(InstallationPathText.Text);
         OpenInstallationFolderButton.ToolTip = OpenInstallationFolderButton.IsEnabled ? "Abrir carpeta del juego" : "Carpeta aún no creada";
@@ -392,19 +393,24 @@ public partial class MainWindow : Window
             try { CreateDesktopShortcut(_config.SelectedEdition); SetNotice("Acceso directo creado", "", "Success"); }
             catch (Exception ex) { _log.Error("Could not create desktop shortcut", ex); SetNotice("No se pudo crear el acceso directo", GetFriendlyError(ex), "Error"); }
         });
-        Add("Ver capturas", (_, _) => OpenScreenshots(), Directory.Exists(_paths.Instance(Pack.Slug)));
+        Add("Ver capturas", (_, _) => OpenScreenshots(), Directory.Exists(_paths.GameDirectory));
         Add("Buscar actualizaciones", async (_, _) => await RefreshManifestAsync(manual: true), !_checkingManifest);
         menu.Items.Add(new Separator { Background = Brush("Line"), Margin = new Thickness(8, 4, 8, 4) });
         Add("Reparar modpack", Repair_Click, !_checkingManifest && Directory.Exists(_paths.Instance(Pack.Slug)));
+        Add("Abrir configuración de este perfil", (_, _) =>
+        {
+            try { OpenDirectory(_paths.ProfileConfigDirectory(Pack.Slug)); }
+            catch (Exception ex) { SetNotice("No se pudo abrir la configuración", GetFriendlyError(ex), "Error"); }
+        }, Directory.Exists(_paths.ProfileConfigDirectory(Pack.Slug)));
         GameOptionsButton.ContextMenu = menu;
     }
 
     private void OpenScreenshots()
     {
-        if (_busy || !Directory.Exists(_paths.Instance(Pack.Slug))) return;
+        if (_busy || !Directory.Exists(_paths.GameDirectory)) return;
         try
         {
-            var screenshots = Path.Combine(_paths.Instance(Pack.Slug), "screenshots");
+            var screenshots = Path.Combine(_paths.GameDirectory, "screenshots");
             Directory.CreateDirectory(screenshots); OpenDirectory(screenshots);
         }
         catch (Exception ex) { SetNotice("No se pudieron abrir las capturas", GetFriendlyError(ex), "Error"); }
@@ -424,9 +430,15 @@ public partial class MainWindow : Window
             var pack = Pack;
             var initialInstall = string.IsNullOrEmpty(Installed(pack));
             var manifest = await _manifestUpdater.ReadManifestAsync(pack, _lifetime.Token);
-            await _manifestUpdater.RepairAsync(pack, manifest, dialog.Prompt.RemoveThirdPartyMods.IsChecked == true,
-                new Progress<(string status, double value)>(SetProgress), _lifetime.Token);
-            if (initialInstall) await MinecraftService.InitializeNewInstanceAsync(_paths.Instance(pack.Slug), _lifetime.Token);
+            using (var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token))
+            {
+                _packCancellation = cancellation;
+                CancelDownloadButton.IsEnabled = true;
+                try { await _manifestUpdater.RepairAsync(pack, manifest, dialog.Prompt.RemoveThirdPartyMods.IsChecked == true,
+                    new Progress<(string status, double value)>(SetProgress), cancellation.Token); }
+                finally { _packCancellation = null; CancelDownloadButton.Visibility = Visibility.Collapsed; }
+            }
+            if (initialInstall) await MinecraftService.InitializeNewInstanceAsync(_paths.GameDirectory, _lifetime.Token);
             _configService.SaveInstalled(pack.Slug, manifest.Version, manifest.JavaVersion);
             RegisterCurrentInstances();
             _config.MinecraftVersion = manifest.MinecraftVersion; _config.FabricLoaderVersion = manifest.FabricLoaderVersion; pack.JavaVersion = manifest.JavaVersion;
@@ -434,6 +446,7 @@ public partial class MainWindow : Window
             _editionChecks[_config.SelectedEdition] = _manifestCheck; _manifestError = null;
             _configService.Save(_config); success = true;
         }
+        catch (OperationCanceledException) when (!_lifetime.IsCancellationRequested) { error = "La descarga se canceló. Puedes volver a intentarlo."; }
         catch (Exception ex) { error = ex is InvalidDataException ? ex.Message : GetFriendlyError(ex); _log.Error("Pack repair failed", ex); }
         finally
         {
@@ -484,9 +497,15 @@ public partial class MainWindow : Window
                 manifestCheck = await _manifestUpdater.PrepareForPlayAsync(pack, manifestCheck.Manifest, installedVersion, progress, _lifetime.Token);
                 if (installedVersion != manifestCheck.Manifest.Version || manifestCheck.HasChanges)
                 {
-                    await _manifestUpdater.ApplyAsync(pack, manifestCheck, progress, _lifetime.Token);
+                    using (var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token))
+                    {
+                        _packCancellation = cancellation;
+                        CancelDownloadButton.IsEnabled = true;
+                        try { await _manifestUpdater.ApplyAsync(pack, manifestCheck, progress, cancellation.Token); }
+                        finally { _packCancellation = null; CancelDownloadButton.Visibility = Visibility.Collapsed; }
+                    }
                     if (string.IsNullOrWhiteSpace(installedVersion))
-                        await MinecraftService.InitializeNewInstanceAsync(_paths.Instance(pack.Slug), _lifetime.Token);
+                        await MinecraftService.InitializeNewInstanceAsync(_paths.GameDirectory, _lifetime.Token);
                     _configService.SaveInstalled(pack.Slug, manifestCheck.Manifest.Version, manifestCheck.Manifest.JavaVersion);
                     RegisterCurrentInstances();
                     // A completed update must not keep the old 'changes pending' presentation.
@@ -518,7 +537,9 @@ public partial class MainWindow : Window
             // A settings write failure after a successful start must never abandon the game
             // handle or leave the launcher visible for the rest of the session.
             TrySaveConfig();
-            var exitCode = await FollowGameProcessAsync(session.Process);
+            int exitCode;
+            try { exitCode = await FollowGameProcessAsync(session.Process); }
+            finally { await session.CompleteAsync(); }
             if (exitCode != 0)
             {
                 _operationFailed = true;
@@ -533,6 +554,11 @@ public partial class MainWindow : Window
                     finalDetail += " Se guardó el detalle de Java en los registros del launcher.";
                 }
             }
+        }
+        catch (OperationCanceledException) when (!_lifetime.IsCancellationRequested)
+        {
+            finalStatus = "Descarga cancelada";
+            finalDetail = "Puedes volver a intentarlo cuando quieras.";
         }
         catch (Exception ex)
         {
@@ -603,6 +629,8 @@ public partial class MainWindow : Window
 
     internal static string GetFriendlyError(Exception ex) => ex switch
     {
+        ProfileConfigurationConflictException => ex.Message,
+        InsufficientStorageException => ex.Message,
         JavaRuntimeException => ex.Message,
         HttpRequestException { StatusCode: System.Net.HttpStatusCode.NotFound } => "El modpack no está disponible en el servidor. Vuelve a comprobarlo más tarde.",
         HttpRequestException => "No se pudo conectar con el servidor. Revisa tu conexión y vuelve a intentarlo.",
@@ -632,7 +660,7 @@ public partial class MainWindow : Window
         RetryCheckButton.Visibility = Visibility.Collapsed;
         Progress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         Progress.IsIndeterminate = true;
-        OpenInstallationFolderButton.IsEnabled = !busy && Directory.Exists(_paths.Instance(Pack.Slug));
+        OpenInstallationFolderButton.IsEnabled = !busy && Directory.Exists(_paths.GameDirectory);
         GameOptionsButton.IsEnabled = !busy && !_checkingManifest;
         if (busy)
         {
@@ -645,6 +673,9 @@ public partial class MainWindow : Window
     private void SetProgress((string status, double value) update)
     {
         if (_closed || _gameRunning || (!_busy && !_checkingManifest)) return;
+        if (_packCancellation?.IsCancellationRequested == true) return;
+        var downloading = update.status.StartsWith("Descargando modpack ·", StringComparison.Ordinal) || update.status.StartsWith("Descargando mods ·", StringComparison.Ordinal);
+        CancelDownloadButton.Visibility = downloading && _packCancellation is { IsCancellationRequested: false } ? Visibility.Visible : Visibility.Collapsed;
         SetNotice(LauncherPresentation.ProgressStatus(update.status), "", "Gold");
         // Backend values combine different phases. Only show determinate progress when a real
         // file count or Minecraft byte ratio is available; never present a fabricated overall %.
@@ -652,6 +683,13 @@ public partial class MainWindow : Window
         Progress.IsIndeterminate = progress is null;
         if (progress is double value) UiMotion.UpdateProgress(Progress, value);
         if (_busy) PrimaryLabel.Text = LauncherPresentation.ProgressAction(update.status);
+    }
+
+    private void CancelDownload_Click(object sender, RoutedEventArgs e)
+    {
+        CancelDownloadButton.IsEnabled = false;
+        _packCancellation?.Cancel();
+        SetNotice("Cancelando descarga…", "", "Gold");
     }
 
     private Brush Brush(string key) => (Brush)FindResource(key);
@@ -817,7 +855,7 @@ public partial class MainWindow : Window
     private void OpenInstallationFolder_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
-        var folder = _paths.Instance(Pack.Slug);
+        var folder = _paths.GameDirectory;
         if (!Directory.Exists(folder)) { Refresh(); return; }
         try { OpenDirectory(folder); }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
@@ -957,6 +995,10 @@ public partial class MainWindow : Window
         _playerHeadService.Dispose();
         _newsFeed.Dispose();
         _launcherUpdates?.Dispose();
+        PlayerHead.Source = null;
+        _playerHeadLoadTask = null;
+        News.SetSlides([]);
+        _editionChecks.Clear(); _manifestCheck = null;
         base.OnClosed(e);
     }
 

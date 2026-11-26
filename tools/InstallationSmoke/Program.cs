@@ -69,6 +69,61 @@ void Check(bool value, string label) { if (!value) throw new Exception(label); c
 void Reject(Action action, string label) { try { action(); } catch (Exception ex) when (ex is InvalidDataException or IOException) { checks.Add(label); return; } throw new Exception(label); }
 async Task RejectAsync(Func<Task> action, string label) { try { await action(); } catch (Exception ex) when (ex is InvalidDataException or HttpRequestException or OperationCanceledException) { checks.Add(label); return; } throw new Exception(label); }
 
+{
+    var paths = new LauncherPaths(Path.Combine(root, "individual")); paths.Ensure();
+    var data = new InstallationDataService(paths);
+    var full = Path.Combine(paths.Root, "packs", "Destiny");
+    var lite = Path.Combine(paths.Root, "packs", "Destiny-Lite");
+    foreach (var path in new[] { full, lite }) { Directory.CreateDirectory(path); File.WriteAllText(Path.Combine(path, "destiny-installed.json"), "{}"); File.WriteAllText(Path.Combine(path, "world.txt"), "fixture"); data.Register(path); }
+    File.WriteAllText(paths.ConfigFile, "keep settings");
+    data.RemoveInstance(lite);
+    Check(!Directory.Exists(lite) && File.Exists(Path.Combine(full, "world.txt")), "Removing one modpack preserves the other instance");
+    Check(File.ReadAllText(paths.ConfigFile) == "keep settings" && data.PlanGameRemoval().SequenceEqual(new[] { full }), "Individual removal preserves settings and updates ownership records");
+    var unowned = Path.Combine(paths.Root, "unowned"); Directory.CreateDirectory(unowned); File.WriteAllText(Path.Combine(unowned, "keep.txt"), "keep");
+    try { data.RemoveInstance(unowned); throw new Exception("Unregistered folder was accepted"); }
+    catch (InvalidOperationException) { Check(File.Exists(Path.Combine(unowned, "keep.txt")), "Individual removal rejects unowned folders"); }
+    var nested = Path.Combine(full, "nested"); Directory.CreateDirectory(nested); File.WriteAllText(Path.Combine(nested, "destiny-installed.json"), "{}"); data.Register(nested);
+    Reject(() => data.RemoveInstance(full), "Individual removal rejects overlapping owned folders");
+    Check(File.Exists(Path.Combine(nested, "destiny-installed.json")), "Overlap rejection leaves both installations intact");
+}
+{
+    var paths = new LauncherPaths(Path.Combine(root, "shared-game-removal"));
+    paths.SetInstallDirectory(Path.Combine(root, "shared-game-removal", "game"));
+    Directory.CreateDirectory(Path.Combine(paths.GameDirectory, "mods"));
+    Directory.CreateDirectory(Path.Combine(paths.GameDirectory, "saves", "SharedWorld"));
+    Directory.CreateDirectory(Path.Combine(paths.GameDirectory, "screenshots"));
+    Directory.CreateDirectory(Path.Combine(paths.ProfileConfigDirectory("destiny"), "config"));
+    File.WriteAllText(Path.Combine(paths.GameDirectory, "mods", "normal.jar"), "managed normal mod");
+    File.WriteAllText(Path.Combine(paths.GameDirectory, "saves", "SharedWorld", "level.dat"), "shared world");
+    File.WriteAllText(Path.Combine(paths.GameDirectory, "screenshots", "photo.png"), "shared screenshot");
+    File.WriteAllText(Path.Combine(paths.ProfileConfigDirectory("destiny"), "config", "custom.toml"), "profile config");
+    File.WriteAllText(Path.Combine(paths.GameDirectory, "destiny-installed.json"), "{}");
+    var data = new InstallationDataService(paths); data.Register(paths.GameDirectory);
+    data.RemoveInstance(paths.GameDirectory);
+    Check(Directory.Exists(paths.GameDirectory) && !Directory.Exists(Path.Combine(paths.GameDirectory, "mods"))
+        && !File.Exists(Path.Combine(paths.GameDirectory, "destiny-installed.json")),
+        "Removing Destiny clears its modpack marker and mods without deleting the shared game root");
+    Check(File.Exists(Path.Combine(paths.GameDirectory, "saves", "SharedWorld", "level.dat"))
+        && File.Exists(Path.Combine(paths.GameDirectory, "screenshots", "photo.png"))
+        && !Directory.Exists(paths.ProfileConfigDirectory("destiny")),
+        "Removing Destiny preserves shared worlds and screenshots while removing only its saved configs");
+}
+{
+    var paths = new LauncherPaths(Path.Combine(root, "shared-lite-removal"));
+    paths.SetInstallDirectory(Path.Combine(root, "shared-lite-removal", "game"));
+    var lite = paths.Instance("destiny-lite");
+    Directory.CreateDirectory(Path.Combine(lite, "mods"));
+    Directory.CreateDirectory(Path.Combine(lite, "config"));
+    Directory.CreateDirectory(Path.Combine(paths.GameDirectory, "saves", "SharedWorld"));
+    File.WriteAllText(Path.Combine(lite, "mods", "lite.jar"), "lite mod");
+    File.WriteAllText(Path.Combine(lite, "config", "custom.toml"), "lite config");
+    File.WriteAllText(Path.Combine(lite, "destiny-installed.json"), "{}");
+    File.WriteAllText(Path.Combine(paths.GameDirectory, "saves", "SharedWorld", "level.dat"), "shared world");
+    var data = new InstallationDataService(paths); data.Register(lite); data.RemoveInstance(lite);
+    Check(!Directory.Exists(lite) && File.Exists(Path.Combine(paths.GameDirectory, "saves", "SharedWorld", "level.dat")),
+        "Removing Lite deletes its mods and profile configs but retains data in the shared game directory");
+}
+
 foreach (var (profiles, games) in new[] { (false, false), (true, false), (false, true), (true, true) })
 {
     var paths = new LauncherPaths(Path.Combine(root, $"remove-{profiles}-{games}")); paths.Ensure();

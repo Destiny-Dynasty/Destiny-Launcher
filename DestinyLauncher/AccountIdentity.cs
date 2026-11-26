@@ -49,7 +49,7 @@ internal sealed class AccountIdentity : Grid
             if (IsLoaded) await LoadHeadAsync();
         };
         Loaded += async (_, _) => await LoadHeadAsync();
-        Unloaded += (_, _) => CancelRequest();
+        Unloaded += (_, _) => { CancelRequest(); _head.Source = null; };
     }
     internal async Task LoadHeadAsync()
     {

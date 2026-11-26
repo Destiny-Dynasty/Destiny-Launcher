@@ -36,3 +36,4 @@ try
 }
 finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
 Console.WriteLine(JsonSerializer.Serialize(new { assertions, systemBytes = MemoryPolicy.System.TotalBytes, defaultGb = MemoryPolicy.System.DefaultGb, maximumGb = MemoryPolicy.System.MaximumGb }));
+await IntroBufferAudit.Run();

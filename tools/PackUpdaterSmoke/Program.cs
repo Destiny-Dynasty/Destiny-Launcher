@@ -62,6 +62,17 @@ try
     var initial = await updater.CheckAsync(pack, null, token);
     Require(fixture.LastManifestUri?.AbsoluteUri == "https://raw.githubusercontent.com/Destiny-Dynasty/Modpack/main/manifests/destiny.json", "The full pack must keep its existing repository.");
     Require(initial.ChangedFiles.Count == 2, "Initial installation must download two fixture files.");
+    using (var stop = new CancellationTokenSource())
+    {
+        var events = 0;
+        var progress = new InlineProgress<(string status, double value)>(value =>
+        {
+            if (value.status.StartsWith("Descargando modpack", StringComparison.Ordinal) && ++events == 2) stop.Cancel();
+        });
+        await Reject<OperationCanceledException>(() => updater.ApplyAsync(pack, initial, progress, stop.Token));
+        Require(!File.Exists(Path.Combine(paths.Instance(pack.Slug), "mods", "alpha.txt")), "Canceled staged download must not install partial mods.");
+        Require(!Directory.Exists(paths.Temp) || !Directory.EnumerateDirectories(paths.Temp, "manifest-*").Any(), "Canceled download must remove its temporary workspace.");
+    }
     await updater.ApplyAsync(pack, initial, null, token);
     Require(!(await updater.CheckAsync(pack, null, token)).HasChanges, "Rechecking must be a no-op.");
     var instance = paths.Instance(pack.Slug);
@@ -263,6 +274,33 @@ try
         Console.WriteLine("PASS: cleanup skips external links and official repair refuses linked targets.");
     }
     else Console.WriteLine("SKIP: external-link test could not create either a symlink or junction.");
+
+    var staff = new PackDefinition { Name = "Destiny Staff", Slug = "destiny-staff" };
+    var legacyConfig = Path.Combine(paths.Instance(staff.Slug), "config", "custom-local.toml");
+    Directory.CreateDirectory(Path.GetDirectoryName(legacyConfig)!);
+    await File.WriteAllTextAsync(legacyConfig, "player setting from the existing Staff folder", token);
+    fixture.IncludeProfileConfig = true;
+    fixture.ProfileConfigVersion = 1;
+    fixture.Version = 8;
+    fixture.KeptVersion = 8;
+    var profileInstall = await updater.CheckAsync(staff, null, token);
+    Require(profileInstall.ChangedFiles.Any(file => file.Path == "config/profile.toml"), "The profile configuration manifest entry participates in the normal update plan.");
+    await updater.ApplyAsync(staff, profileInstall, null, token);
+    var profileConfig = Path.Combine(paths.ProfileConfigDirectory(staff.Slug), "config", "profile.toml");
+    Require(await File.ReadAllTextAsync(Path.Combine(paths.ProfileConfigDirectory(staff.Slug), "config", "custom-local.toml"), token)
+        == "player setting from the existing Staff folder" && File.Exists(profileConfig)
+        && !File.Exists(Path.Combine(paths.GameDirectory, "config", "profile.toml")),
+        "Legacy custom configs migrate to isolated profile storage and managed configs never go into the active shared folder.");
+    await File.WriteAllTextAsync(profileConfig, "player edited pack configuration", token);
+    fixture.ProfileConfigVersion = 2;
+    var configUpdate = await updater.CheckAsync(staff, null, token);
+    Require(configUpdate.PreservedOverrides.Contains("config/profile.toml")
+        && !configUpdate.ChangedFiles.Any(file => file.Path == "config/profile.toml"),
+        "A player's edited profile config remains an override when the upstream pack changes it.");
+    await updater.ApplyAsync(staff, configUpdate, null, token);
+    Require(await File.ReadAllTextAsync(profileConfig, token) == "player edited pack configuration",
+        "Applying an update preserves the player's edited profile config bytes.");
+    Console.WriteLine("PASS: profile configs are installed per edition, seeded from old installs and preserved when edited.");
     return 0;
 }
 catch (Exception ex) { Console.Error.WriteLine($"FAIL: {ex}"); return 1; }
@@ -285,25 +323,36 @@ sealed class FixtureHandler : HttpMessageHandler
     public bool LiteUnavailable { get; set; }
     public bool RemoveKept { get; set; }
     public int KeptVersion { get; set; } = 1;
+    public bool IncludeProfileConfig { get; set; }
+    public int ProfileConfigVersion { get; set; } = 1;
     public Uri? LastManifestUri { get; private set; }
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         var alpha = Encoding.UTF8.GetBytes($"alpha fixture version {Version}");
         var kept = Encoding.UTF8.GetBytes($"kept fixture version {KeptVersion}");
+        var profileConfig = Encoding.UTF8.GetBytes($"profile config version {ProfileConfigVersion}");
         var path = request.RequestUri!.AbsolutePath;
         byte[] bytes;
         if (path.EndsWith(".json", StringComparison.Ordinal))
         {
             LastManifestUri = request.RequestUri;
             var isLite = path.EndsWith("/destiny-lite.json", StringComparison.Ordinal);
+            var isStaff = path.EndsWith("/destiny-staff.json", StringComparison.Ordinal);
             if (isLite && LiteUnavailable) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
-            var manifest = new PackManifest { PackId = isLite ? "destiny-lite" : "destiny", Version = $"1.0.{Version}", Files = [File(BadPath ?? "mods/alpha.txt", alpha), File("mods/kept.txt", kept)] };
+            var files = new List<PackManifestFile> { File(BadPath ?? "mods/alpha.txt", alpha), File("mods/kept.txt", kept) };
+            if (IncludeProfileConfig) files.Add(File("config/profile.toml", profileConfig));
+            var manifest = new PackManifest { PackId = isLite ? "destiny-lite" : isStaff ? "destiny-staff" : "destiny", Version = $"1.0.{Version}", Files = files };
             if (RemoveKept) manifest.Files.RemoveAt(1);
             bytes = JsonSerializer.SerializeToUtf8Bytes(manifest);
         }
-        else bytes = path.EndsWith("alpha.txt", StringComparison.Ordinal) ? (CorruptDownload ? Enumerable.Repeat((byte)'x', alpha.Length).ToArray() : alpha) : kept;
+        else bytes = path.EndsWith("profile.toml", StringComparison.Ordinal) ? profileConfig
+            : path.EndsWith("alpha.txt", StringComparison.Ordinal) ? (CorruptDownload ? Enumerable.Repeat((byte)'x', alpha.Length).ToArray() : alpha) : kept;
         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
     }
     private static PackManifestFile File(string path, byte[] data) => new() { Path = path, Url = $"https://fixture.invalid/{path}", Sha256 = Convert.ToHexString(SHA256.HashData(data)), Size = data.Length };
+}
+sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+{
+    public void Report(T value) => report(value);
 }

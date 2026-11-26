@@ -7,6 +7,8 @@ El código original del launcher, instalador, scripts y pruebas se distribuye ba
 | CmlLib.Core | 4.0.6 | MIT · Copyright AlphaBs · https://github.com/CmlLib/CmlLib.Core |
 | CmlLib.Core.Commons | 4.0.0 | MIT · https://github.com/CmlLib/CmlLib.Core.Commons |
 | CmlLib.Core.Auth.Microsoft | 3.4.0 | MIT · Copyright AlphaBs · https://github.com/CmlLib/CmlLib.Core.Auth.Microsoft |
+| Avalonia, Avalonia.Desktop, Avalonia.Themes.Fluent | 12.1.4 | MIT · https://github.com/AvaloniaUI/Avalonia |
+| LibVLCSharp, LibVLCSharp.Avalonia | 3.10.1 | LGPL-2.1 · enlaces dinámicos con LibVLC del sistema en Linux · https://github.com/videolan/libvlcsharp |
 | XboxAuthNet.Game | 1.5.0 | MIT · Copyright AlphaBs · https://github.com/CmlLib/CmlLib.Core.Auth.Microsoft |
 | XboxAuthNet | 3.1.0 | MIT; incluye componentes derivados de MSAL.NET bajo MIT · https://github.com/AlphaBs/XboxAuthNet |
 | Microsoft.Web.WebView2 SDK | 1.0.3537.50 | BSD-3-Clause · Copyright Microsoft Corporation · texto conservado en `licenses/Microsoft.Web.WebView2-LICENSE.txt`; utiliza el runtime de WebView2 instalado en Windows, sin incluir un navegador completo · https://www.nuget.org/packages/Microsoft.Web.WebView2/1.0.3537.50 |

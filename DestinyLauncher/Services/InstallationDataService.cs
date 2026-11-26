@@ -6,26 +6,26 @@ internal sealed record OwnedInstance(string Path, string Owner);
 
 // A separate ownership marker and a history of exact instance roots make uninstall
 // independent of the current settings, without treating .minecraft as our property.
-internal sealed class InstallationDataService
+public sealed class InstallationDataService
 {
     private readonly LauncherPaths _paths;
     private string Index => Path.Combine(_paths.Root, "installations.json");
     private const string Marker = ".destiny-instance.json";
-    internal InstallationDataService(LauncherPaths paths) => _paths = paths;
+    public InstallationDataService(LauncherPaths paths) => _paths = paths;
     internal IReadOnlyList<OwnedInstance> Read()
     {
         if (!File.Exists(Index)) return [];
         RejectLinks(Index);
         return JsonSerializer.Deserialize<List<OwnedInstance>>(File.ReadAllText(Index)) ?? throw new InvalidDataException("Registro de instalaciones inválido.");
     }
-    internal void Register(string directory)
+    public void Register(string directory)
     {
         directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
         if (!File.Exists(Path.Combine(directory, "destiny-installed.json"))) return;
         ValidateRoot(directory);
         RejectLinks(directory);
         var entries = Read().ToList();
-        var known = entries.FirstOrDefault(p => p.Path.Equals(directory, StringComparison.OrdinalIgnoreCase));
+        var known = entries.FirstOrDefault(p => p.Path.Equals(directory, FileSystemPathPolicy.Comparison));
         if (known is not null) { Validate(known); return; }
         var markerFile = Path.Combine(directory, Marker);
         // Do not take ownership of another launcher's instance.
@@ -37,42 +37,96 @@ internal sealed class InstallationDataService
         try { WriteAtomic(Index, JsonSerializer.Serialize(entries)); }
         catch { File.Delete(markerFile); throw; }
     }
-    internal void RegisterConfigured(string directory)
+    public void RegisterConfigured(string directory)
     {
         Register(directory);
         Register(directory + "-Lite");
         Register(directory + "-Staff");
     }
-    internal IReadOnlyList<string> PlanGameRemoval()
+    public IReadOnlyList<string> PlanGameRemoval()
     {
         var entries = Read();
         foreach (var item in entries.Where(p => Directory.Exists(p.Path))) Validate(item);
-        return entries.Where(p => Directory.Exists(p.Path)).Select(p => p.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return entries.Where(p => Directory.Exists(p.Path)).Select(p => p.Path).Distinct(FileSystemPathPolicy.Comparer).ToArray();
     }
-    internal void RemoveSelected(bool profiles, bool gameFiles)
+    public void RemoveInstance(string directory)
     {
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
+        var entries = Read().ToList();
+        var entry = entries.SingleOrDefault(item => Path.TrimEndingDirectorySeparator(Path.GetFullPath(item.Path)).Equals(full, FileSystemPathPolicy.Comparison))
+            ?? throw new InvalidOperationException("Esta instalación no está registrada como propiedad del launcher.");
+        Validate(entry);
+        foreach (var other in entries.Where(item => item != entry))
+        {
+            var path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(other.Path));
+            if (path.StartsWith(full + Path.DirectorySeparatorChar, FileSystemPathPolicy.Comparison) ||
+                full.StartsWith(path + Path.DirectorySeparatorChar, FileSystemPathPolicy.Comparison))
+                throw new InvalidDataException("La carpeta se superpone con otra instalación registrada.");
+        }
+        using var gameLock = SharedGameDirectoryLock.Acquire(_paths, "Cierra Minecraft antes de desinstalar este perfil.");
+        if (full.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(_paths.GameDirectory)), FileSystemPathPolicy.Comparison))
+        {
+            var mods = Path.Combine(full, "mods");
+            if (Directory.Exists(mods)) DeleteTree(mods);
+            foreach (var fileName in new[] { "destiny-installed.json", ".destiny-managed-files.json", ".destiny-instance.json" })
+            {
+                var file = Path.Combine(full, fileName);
+                if (File.Exists(file)) { RejectLinks(file); File.Delete(file); }
+            }
+            var profileConfig = _paths.ProfileConfigDirectory("destiny");
+            if (Directory.Exists(profileConfig)) DeleteTree(profileConfig);
+        }
+        else
+        {
+            DeleteTree(full);
+            foreach (var slug in new[] { "destiny-lite", "destiny-staff" })
+            {
+                if (!_paths.Instance(slug).Equals(full, FileSystemPathPolicy.Comparison)) continue;
+                var profileConfig = _paths.ProfileConfigDirectory(slug);
+                if (Directory.Exists(profileConfig)) DeleteTree(profileConfig);
+                break;
+            }
+        }
+        entries.Remove(entry);
+        WriteAtomic(Index, JsonSerializer.Serialize(entries));
+    }
+
+    public void RemoveSelected(bool profiles, bool gameFiles)
+    {
+        GameProfileSession.EnsureNoRunningGame(_paths);
         // Validate the complete plan before deleting anything, including profile data.
         var instances = gameFiles ? PlanGameRemoval() : [];
-        RejectLinks(_paths.Root);
-        var retained = Read().Where(p => Directory.Exists(p.Path)).Select(p => Path.GetFullPath(p.Path)).ToArray();
-        var profileFolders = profiles ? new[] { "cache", "logs", "temp", "updates" }.Select(name => Path.Combine(_paths.Root, name))
-            .Where(path => !retained.Any(game => game.Equals(path, StringComparison.OrdinalIgnoreCase)
-                || game.StartsWith(path + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))).Where(Directory.Exists).ToArray() : [];
-        foreach (var path in profileFolders) RejectLinks(path);
-        if (profiles) { RejectLinks(_paths.ConfigFile); RejectLinks(Path.Combine(_paths.Root, "discord-session.bin")); RejectLinks(Path.Combine(_paths.Root, "microsoft-accounts.bin")); }
-        foreach (var directory in instances) DeleteTree(directory);
-        if (gameFiles && File.Exists(Index)) File.Delete(Index);
-        if (profiles)
+        var locks = new List<FileStream>();
+        try
         {
-            // Keep ownership records if installations are intentionally retained.
-            // Never recursively delete the data root: a customized game may live inside it.
-            foreach (var file in new[] { "launcher.json", "discord-session.bin", "microsoft-accounts.bin" })
+            foreach (var instance in instances.Append(_paths.GameDirectory).Where(Directory.Exists).Distinct(FileSystemPathPolicy.Comparer).Order(FileSystemPathPolicy.Comparer))
             {
-                var path = Path.Combine(_paths.Root, file);
-                if (File.Exists(path)) { RejectLinks(path); File.Delete(path); }
+                var instancePaths = new LauncherPaths(_paths.Root);
+                instancePaths.SetInstallDirectory(instance);
+                locks.Add(SharedGameDirectoryLock.Acquire(instancePaths, "Cierra Minecraft antes de eliminar los datos del launcher."));
             }
-            foreach (var path in profileFolders) if (Directory.Exists(path)) DeleteTree(path);
+            RejectLinks(_paths.Root);
+            var retained = Read().Where(p => Directory.Exists(p.Path)).Select(p => Path.GetFullPath(p.Path)).ToArray();
+            var profileFolders = profiles ? new[] { _paths.Cache, _paths.Logs, _paths.Temp, Path.Combine(_paths.Root, "updates") }.Distinct(FileSystemPathPolicy.Comparer)
+                .Where(path => !retained.Any(game => game.Equals(path, FileSystemPathPolicy.Comparison)
+                    || game.StartsWith(path + Path.DirectorySeparatorChar, FileSystemPathPolicy.Comparison))).Where(Directory.Exists).ToArray() : [];
+            foreach (var path in profileFolders) RejectLinks(path);
+            if (profiles) { RejectLinks(_paths.ConfigFile); RejectLinks(Path.Combine(_paths.Root, "discord-session.bin")); RejectLinks(Path.Combine(_paths.Root, "microsoft-accounts.bin")); }
+            foreach (var directory in instances) DeleteTree(directory);
+            if (gameFiles && File.Exists(Index)) File.Delete(Index);
+            if (profiles)
+            {
+                // Keep ownership records if installations are intentionally retained.
+                // Never recursively delete the data root: a customized game may live inside it.
+                foreach (var file in new[] { "launcher.json", "discord-session.bin", "microsoft-accounts.bin" })
+                {
+                    var path = file == "launcher.json" ? _paths.ConfigFile : Path.Combine(_paths.Root, file);
+                    if (File.Exists(path)) { RejectLinks(path); File.Delete(path); }
+                }
+                foreach (var path in profileFolders) if (Directory.Exists(path)) DeleteTree(path);
+            }
         }
+        finally { foreach (var fileLock in locks) fileLock.Dispose(); }
     }
     private void Validate(OwnedInstance item)
     {
@@ -85,23 +139,33 @@ internal sealed class InstallationDataService
     {
         if (!Path.IsPathFullyQualified(path) || path.Contains(".." + Path.DirectorySeparatorChar)) throw new InvalidDataException("Ruta de instalación insegura.");
         var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        var minecraftRoot = OperatingSystem.IsWindows()
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft")
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".minecraft");
         var protectedRoots = new[] { Path.GetPathRoot(full)!, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
             Environment.GetFolderPath(Environment.SpecialFolder.Windows), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), Path.GetFullPath(_paths.Root), AppContext.BaseDirectory,
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "versions") };
+            minecraftRoot,
+            Path.Combine(minecraftRoot, "versions") };
         if (protectedRoots.Where(p => !string.IsNullOrWhiteSpace(p)).Any(p =>
-            Path.TrimEndingDirectorySeparator(Path.GetFullPath(p)).Equals(full, StringComparison.OrdinalIgnoreCase)
-            || Path.GetFullPath(p).StartsWith(full + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(p)).Equals(full, FileSystemPathPolicy.Comparison)
+            || Path.GetFullPath(p).StartsWith(full + Path.DirectorySeparatorChar, FileSystemPathPolicy.Comparison)))
             throw new InvalidDataException("No se puede borrar una carpeta compartida: " + full);
     }
-    internal static void RejectLinks(string path)
+    public static void RejectLinks(string path)
     {
         for (var current = Path.GetFullPath(path); !string.IsNullOrEmpty(current); current = Path.GetDirectoryName(current))
-            if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-                throw new InvalidDataException("La ruta contiene un enlace: " + path);
+        {
+            try
+            {
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidDataException("La ruta contiene un enlace: " + path);
+            }
+            catch (FileNotFoundException) { }
+            catch (DirectoryNotFoundException) { }
+        }
     }
     private static void DeleteTree(string directory)
     {

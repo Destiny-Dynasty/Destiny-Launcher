@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Destiny Launcher
+Comment=Launcher de Minecraft para Destiny Dynasty
+Exec=destiny-launcher
+Icon=destiny-launcher
+Terminal=false
+Categories=Game;
+StartupNotify=true
+StartupWMClass=destiny-launcher

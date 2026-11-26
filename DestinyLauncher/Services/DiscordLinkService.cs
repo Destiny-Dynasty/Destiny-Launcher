@@ -12,9 +12,10 @@ public sealed record DiscordAccess(string Username, bool Staff);
 
 public sealed class DiscordLinkService
 {
+    private static readonly HttpClient DefaultClient = new() { Timeout = TimeSpan.FromSeconds(8), MaxResponseContentBufferSize = 16384 };
     // Stable public hostname: moving the bot only requires updating its DNS/backend.
     // No Discord secret or bot token is ever distributed with the application.
-    public const string DefaultEndpoint = "https://destiny-dynasty-bot.tatnikhost.net/";
+    public const string DefaultEndpoint = "https://bot.destinydynasty.site/";
     private readonly HttpClient _http;
     private readonly Uri _endpoint;
     private readonly string _credentialFile;
@@ -24,7 +25,7 @@ public sealed class DiscordLinkService
     public DiscordLinkService(LauncherPaths paths, HttpClient? http = null, Uri? endpoint = null)
     {
         _credentialFile = Path.Combine(paths.Root, "discord-session.bin");
-        _http = http ?? new HttpClient { Timeout = TimeSpan.FromSeconds(8), MaxResponseContentBufferSize = 16384 };
+        _http = http ?? DefaultClient;
         _endpoint = endpoint ?? new Uri(DefaultEndpoint);
     }
     private async Task<HttpResponseMessage> Send(HttpMethod method, string path, object? body, string? token, CancellationToken cancel)

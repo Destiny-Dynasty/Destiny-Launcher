@@ -108,6 +108,7 @@ Type: files; Name: "{app}\launcher-installation.json"
 var
   UpdateHandoffReady: Boolean;
   InstallationFinished: Boolean;
+  FarewellExecutable: String;
 function OpenProcess(Access: LongWord; InheritHandle: Boolean; ProcessId: LongWord): THandle;
   external 'OpenProcess@kernel32.dll stdcall';
 function WaitForSingleObject(Handle: THandle; Milliseconds: LongWord): LongWord;
@@ -220,6 +221,11 @@ var
   Root: String;
   Confirmed: Boolean;
 begin
+  if (Step = usPostUninstall) and (ExpandConstant('{param:DESTINYUI|0}') = '1') then begin
+    if (FarewellExecutable <> '') and FileExists(FarewellExecutable) then
+      Exec(FarewellExecutable, '--uninstall-complete', ExpandConstant('{tmp}'), SW_SHOWNORMAL, ewWaitUntilTerminated, Code);
+    exit;
+  end;
   // Only the interactive handoff shows Destiny's dialog. Administrative silent
   // uninstall keeps all personal data and never opens UI. Abort still stops the
   // engine before any program files are removed when our dialog is cancelled.
@@ -230,6 +236,9 @@ begin
     Confirmed := Exec(ExpandConstant('{app}\DestinyLauncher.exe'), '--uninstall --data-root "' + Root + '"',
       ExpandConstant('{app}'), SW_SHOWNORMAL, ewWaitUntilTerminated, Code);
     if not Confirmed or (Code <> 0) then Abort;
+    FarewellExecutable := ExpandConstant('{tmp}\DestinyLauncherFarewell.exe');
+    if not CopyFile(ExpandConstant('{app}\DestinyLauncher.exe'), FarewellExecutable, False) then
+      FarewellExecutable := '';
   end else
     MsgBox('No se encontró el launcher. Se conservarán los datos del juego.', mbInformation, MB_OK);
 end;

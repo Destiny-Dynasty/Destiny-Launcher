@@ -1,6 +1,6 @@
 # Desarrollo 1.1.0
 
-Rama: `1.1.0`. El propietario autorizó publicar estos cambios para Windows como **1.0.5**, el 24 de octubre de 2026. Linux sigue aplazado. No crear tags ni publicar releases sin indicación del propietario. `main`, la release `v1.0.0`, el instalador del escritorio y sus assets públicos se conservan.
+Rama: `1.1.0`. El propietario autorizó publicar estos cambios para Windows como **1.0.5**, el 24 de octubre de 2026. El port de Linux se desarrolla aparte en `linux-port`; no crear tags ni publicar releases sin indicación del propietario. `main`, la release `v1.0.0`, el instalador del escritorio y sus assets públicos se conservan.
 
 ## Instalador público fijo
 
@@ -38,6 +38,10 @@ Primeros objetivos: Ubuntu 22.04/24.04 y Mint 21/22 x86_64. Después Debian/Fedo
 La CI añade Ubuntu para ejecutar el backend compartido de modpacks y el presupuesto de RAM. Esas pruebas no arrancan Minecraft ni validan una UI Linux. En la máquina de desarrollo hay WSL pero no una distribución instalada; falta un escritorio Linux de prueba para la validación visual y de juego.
 
 Fuentes: [Microsoft: WPF solo en Windows](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/overview/), [Avalonia: Linux](https://docs.avaloniaui.net/docs/platform-specific-guides/linux).
+
+### Progreso de la rama Linux
+
+La rama `linux-port` añade `DestinyLauncher.Core` para compartir modelos, configuración, rutas, presupuesto de memoria y sincronización segura del modpack, y `DestinyLauncher.Linux` como cliente de Avalonia. En Linux usa XDG para datos, configuración, caché y registros; mantiene `~/.minecraft/versions` como destino predeterminado del juego. La app consulta manifiestos de Destiny y Lite, instala/actualiza archivos administrados, descarga Java Temurin para Linux x64/ARM64, y ofrece autenticación Microsoft en el navegador del sistema con callback loopback y credenciales en Secret Service. También prepara e inicia Minecraft con la sesión verificada o con un perfil offline que no entra al servidor. Se añadieron una entrada `.desktop` y un script para generar paquetes `.deb` autocontenidos; aún faltan compilar e instalar el paquete, validar la autenticación, la app y el juego en la VM y preparar una matriz de dependencias. El login de navegador usa un redirect URI local estándar de app nativa, pero su aceptación por el client ID Xbox/Minecraft usado por XboxAuthNet también debe confirmarse con una cuenta real. Esta vista previa no se ha compilado ni distribuido; el equipo anfitrión solo dispone de SDK .NET 8 y el proyecto requiere .NET 10.
 
 ## Investigación Microsoft / XboxAuthNet
 

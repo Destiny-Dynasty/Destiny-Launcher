@@ -17,6 +17,27 @@ public partial class App : Application
     private Mutex? _instance;
     private async void Application_Startup(object sender, StartupEventArgs e)
     {
+        if (e.Args.Length == 2 && e.Args[0] == "--uninstall-handoff" && int.TryParse(e.Args[1], out var parentId))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            try
+            {
+                try { using var parent = System.Diagnostics.Process.GetProcessById(parentId); await parent.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30)); }
+                catch (ArgumentException) { }
+                var executable = DestinyLauncher.MainWindow.FindInstalledUninstaller();
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(executable) { UseShellExecute = true, WorkingDirectory = AppContext.BaseDirectory });
+            }
+            catch (Exception ex) { MessageBox.Show("No se pudo abrir el desinstalador: " + ex.Message, "Destiny Launcher"); }
+            Shutdown();
+            return;
+        }
+        if (e.Args.Length == 1 && e.Args[0] == "--uninstall-complete")
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            new FarewellWindow().ShowDialog();
+            Shutdown();
+            return;
+        }
         if (e.Args.Length == 2 && e.Args[0].Equals("--render-preview", StringComparison.OrdinalIgnoreCase))
         {
             await RenderPreviewAsync(e.Args[1], includePlayerSkin: false);
@@ -55,6 +76,9 @@ public partial class App : Application
         if (!LauncherStartupOptions.TryParse(uninstall ? e.Args.Skip(1).ToArray() : e.Args, out var startup)) { Shutdown(2); return; }
         var installation = LauncherInstallation.Read(AppContext.BaseDirectory);
         var dataRoot = startup.DataRoot ?? installation?.DataRoot;
+#if PORTABLE_TEST
+        dataRoot = startup.DataRoot ?? Path.Combine(AppContext.BaseDirectory, "datos-prueba");
+#endif
         if (SisuExperiment.UsesIsolatedData && dataRoot is null)
             dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DestinyLauncher-SisuExperiment");
         // Installed sessions use the same mutex even when shortcuts specify the default data root.
@@ -85,7 +109,7 @@ public partial class App : Application
         {
             if (SystemParameters.ClientAreaAnimation)
             {
-                try { intro = new IntroWindow(await IntroWindow.LoadFramesAsync()); }
+                try { intro = await IntroWindow.CreateAsync(); }
                 catch (Exception ex) { System.Diagnostics.Trace.WriteLine($"Intro omitida: {ex}"); }
             }
 

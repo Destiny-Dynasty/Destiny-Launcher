@@ -38,37 +38,43 @@ internal sealed record MicrosoftProfile(string Id, string Username);
 // encrypted with this Windows user's DPAPI key. No default cml_accounts.json file.
 internal sealed class MicrosoftAccountService
 {
+    private static readonly HttpClient DefaultClient = new() { Timeout = TimeSpan.FromSeconds(25) };
     private readonly string _file;
     private readonly HttpClient _http;
+    private readonly Func<string, IJsonStorage> _storageFactory;
     private readonly SemaphoreSlim _gate = new(1, 1);
-    internal MicrosoftAccountService(LauncherPaths paths, HttpClient? http = null)
+    internal MicrosoftAccountService(LauncherPaths paths, Func<string, IJsonStorage> storageFactory, HttpClient? http = null)
     {
         _file = Path.Combine(paths.Root, "microsoft-accounts.bin");
-        _http = http ?? new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
+        _storageFactory = storageFactory;
+        _http = http ?? DefaultClient;
     }
-    private static JsonXboxGameAccountManager Manager(ProtectedMicrosoftStorage storage) => new(storage,
+    private static JsonXboxGameAccountManager Manager(IJsonStorage storage) => new(storage,
         JEGameAccount.FromSessionStorage, new JsonSerializerOptions(JsonXboxGameAccountManager.DefaultSerializerOption)
         {
             TypeInfoResolver = JsonTypeInfoResolver.Combine(MicrosoftAuthJsonContext.Default, XboxGameJsonContext.Default)
         });
     internal IReadOnlyList<MicrosoftProfile> Profiles()
     {
-        return Manager(new ProtectedMicrosoftStorage(_file)).GetAccounts().OfType<JEGameAccount>()
+        return Manager(_storageFactory(_file)).GetAccounts().OfType<JEGameAccount>()
             .Where(a => a.Profile is not null).Select(a => new MicrosoftProfile(a.Identifier!, a.Profile!.Username!)).ToArray();
     }
     internal Task<MSession> SignInAsync(IWebUI web, IProgress<string>? progress, CancellationToken cancel)
-        => AuthenticateAsync(null, web, progress, cancel);
+        => AuthenticateAsync(null, web, null, progress, cancel);
+    internal Task<MSession> SignInAsync(IWebUI web, string redirectUri, IProgress<string>? progress, CancellationToken cancel)
+        => AuthenticateAsync(null, web, redirectUri, progress, cancel);
     internal Task<MSession> RefreshAsync(string id, IProgress<string>? progress, CancellationToken cancel)
-        => AuthenticateAsync(id, null, progress, cancel);
+        => AuthenticateAsync(id, null, null, progress, cancel);
 
-    private async Task<MSession> AuthenticateAsync(string? id, IWebUI? web, IProgress<string>? progress, CancellationToken cancel)
+    private async Task<MSession> AuthenticateAsync(string? id, IWebUI? web, string? redirectUri, IProgress<string>? progress, CancellationToken cancel)
     {
         await _gate.WaitAsync(cancel);
         try
         {
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancel);
             deadline.CancelAfter(TimeSpan.FromMinutes(8));
-            var storage = new ProtectedMicrosoftStorage(_file);
+            var storage = _storageFactory(_file) as ITransactionalJsonStorage
+                ?? throw new InvalidOperationException("El almacén de cuentas no permite guardar transacciones seguras.");
             var manager = Manager(storage);
             if (id is null && manager.GetAccounts().Count >= 20) throw new InvalidOperationException("Elimina una cuenta de Microsoft antes de añadir otra.");
             var handler = new JELoginHandlerBuilder().WithAccountManager(manager).WithHttpClient(_http).Build();
@@ -77,7 +83,7 @@ internal sealed class MicrosoftAccountService
             progress?.Report(web is not null ? "Inicia sesión con Microsoft…" : "Renovando sesión de Microsoft…");
             if (web is not null)
                 auth.AddForceMicrosoftOAuthForJE(oauth => oauth.Interactive(builder => builder.WithWebUI(web),
-                    new CodeFlowAuthorizationParameter { Prompt = "select_account", State = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)) }));
+                    new CodeFlowAuthorizationParameter { Prompt = "select_account", State = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), RedirectUri = redirectUri }));
             else
                 auth.AddForceMicrosoftOAuthForJE(oauth => oauth.Silent());
             // Explicit SISU: never silently fall back to Basic, offline or a custom client ID.
@@ -106,7 +112,8 @@ internal sealed class MicrosoftAccountService
     internal void Forget(string id) => ForgetMany([id]);
     internal void ForgetMany(IEnumerable<string> ids)
     {
-        var storage = new ProtectedMicrosoftStorage(_file);
+        var storage = _storageFactory(_file) as ITransactionalJsonStorage
+            ?? throw new InvalidOperationException("El almacén de cuentas no permite guardar transacciones seguras.");
         var node = storage.ReadAsJsonNode() as JsonObject;
         if (node is null) return;
         var requested = ids.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -125,38 +132,11 @@ internal sealed class MicrosoftAccountService
                 _ => "No se pudo verificar Minecraft Java. Comprueba que la cuenta tenga el juego y un perfil creado."
             };
         if (error is HttpRequestException or TimeoutException) return "Microsoft o Xbox no respondieron. Vuelve a intentarlo.";
-        if (error is CryptographicException) return "No se pudieron leer las credenciales guardadas en este usuario de Windows.";
+        if (error is CryptographicException) return OperatingSystem.IsWindows()
+            ? "No se pudieron leer las credenciales guardadas en este usuario de Windows."
+            : "No se pudo acceder al almacén seguro de cuentas de Linux. Comprueba que Secret Service esté disponible.";
         if (error is KeyNotFoundException) return "La sesión guardada ya no está disponible. Inicia sesión de nuevo.";
         // Never display raw SDK messages or response bodies: they may contain tokens.
-        return "No se pudo completar el inicio de sesión. Reintenta o comprueba que Microsoft Edge WebView2 esté instalado.";
-    }
-}
-
-internal sealed class ProtectedMicrosoftStorage(string file) : IJsonStorage
-{
-    private JsonNode? _pending;
-    public JsonNode? ReadAsJsonNode()
-    {
-        InstallationDataService.RejectLinks(file);
-        if (!File.Exists(file)) return null;
-        if (new FileInfo(file).Length > 2 * 1024 * 1024) throw new InvalidDataException("Almacén de cuentas inválido.");
-        var bytes = ProtectedData.Unprotect(File.ReadAllBytes(file), null, DataProtectionScope.CurrentUser);
-        try { return JsonNode.Parse(bytes); }
-        finally { CryptographicOperations.ZeroMemory(bytes); }
-    }
-    public void Write(JsonNode node, JsonSerializerOptions? serializerOptions) => _pending = node.DeepClone();
-    internal void Commit()
-    {
-        if (_pending is null) throw new InvalidOperationException("No hay una sesión verificada para guardar.");
-        InstallationDataService.RejectLinks(file);
-        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-        var plain = JsonSerializer.SerializeToUtf8Bytes(_pending);
-        var temporary = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            File.WriteAllBytes(temporary, ProtectedData.Protect(plain, null, DataProtectionScope.CurrentUser));
-            File.Move(temporary, file, true); _pending = null;
-        }
-        finally { CryptographicOperations.ZeroMemory(plain); if (File.Exists(temporary)) File.Delete(temporary); }
+        return "No se pudo completar el inicio de sesión. Comprueba la conexión e inténtalo de nuevo.";
     }
 }

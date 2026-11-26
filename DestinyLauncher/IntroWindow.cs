@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using DestinyLauncher.Services;
 
 namespace DestinyLauncher;
 
@@ -16,6 +17,7 @@ internal sealed class IntroWindow : Window
     internal const double FramesPerSecond = 24;
     private readonly Image _image;
     private BitmapSource[] _frames;
+    private IntroFrameBuffer<BitmapSource>? _streamFrames;
     private readonly Stopwatch _clock = new();
     private readonly TaskCompletionSource<bool> _completion = new();
     private int _frame = -1;
@@ -38,7 +40,22 @@ internal sealed class IntroWindow : Window
         ContentRendered += StartPlayback;
         MouseLeftButtonDown += (_, _) => Finish(true);
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { e.Handled = true; Finish(true); } };
-        Closed += (_, _) => { Finish(false); _image.Source = null; _frames = []; Content = null; };
+        Closed += (_, _) => { Finish(false); _image.Source = null; _frames = []; _streamFrames?.Dispose(); _streamFrames = null; Content = null; };
+    }
+
+    internal static async Task<IntroWindow> CreateAsync()
+    {
+        var frames = await IntroFrameBuffer<BitmapSource>.OpenAsync(
+            () => typeof(IntroWindow).Assembly.GetManifestResourceStream("DestinyLauncher.Assets.Intro.emblem.zip")
+                ?? throw new FileNotFoundException("No se encontró la animación de inicio."),
+            stream =>
+            {
+                var frame = BitmapDecoder.Create(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad).Frames[0];
+                frame.Freeze();
+                return frame;
+            });
+        try { return new IntroWindow([frames.Current]) { _streamFrames = frames, _frames = [] }; }
+        catch { frames.Dispose(); throw; }
     }
 
     internal static Task<BitmapSource[]> LoadFramesAsync() => Task.Run(() =>
@@ -81,7 +98,12 @@ internal sealed class IntroWindow : Window
     {
         var elapsed = _clock.Elapsed.TotalSeconds;
         var index = (int)(elapsed * FramesPerSecond);
-        if (index >= _frames.Length) { Finish(true); return; }
+        if (index >= (_streamFrames is not null ? FrameCount : _frames.Length)) { Finish(true); return; }
+        if (_streamFrames is not null)
+        {
+            _streamFrames.Advance(index, frame => _image.Source = frame);
+            return;
+        }
         if (index == _frame) return;
         _frame = index;
         _image.Source = _frames[index];

@@ -20,7 +20,7 @@ Check(browser?.AbsoluteUri == "http://127.0.0.1:24431/launcher/authorize?id=" + 
 Check(access.Staff && access.Username == "Destiny Test", "Staff session is received after proof-bound polling");
 var credential = Path.Combine(root, "discord-session.bin");
 Check(service.IsLinked && !Encoding.UTF8.GetString(File.ReadAllBytes(credential)).Contains(new string('c', 64)), "Saved credential is protected with Windows DPAPI, separate from launcher.json");
-var migrated = new DiscordLinkService(paths, http, new Uri("https://destiny-dynasty-bot.tatnikhost.net/"));
+var migrated = new DiscordLinkService(paths, http);
 var callsBeforeMigration = handler.Calls;
 Check(!migrated.IsLinked && await migrated.RefreshAsync(CancellationToken.None) is null && handler.Calls == callsBeforeMigration,
     "Moving to the HTTPS origin offers a fresh link and never sends an old-origin credential to the new server");
@@ -39,15 +39,35 @@ Check(!service.IsLinked && service.Access is null && handler.Revoked, "Unlink re
 using var cancel = new CancellationTokenSource(); cancel.Cancel();
 try { await service.LinkAsync(_ => throw new Exception("Canceled flow opened browser"), null, cancel.Token); throw new Exception("Expected cancellation"); }
 catch (OperationCanceledException) { Check(!service.IsLinked, "Cancellation leaves no local credential"); }
+var defaultHandler = new Fixture();
+using var defaultHttp = new HttpClient(defaultHandler);
+var defaultService = new DiscordLinkService(new LauncherPaths(Path.Combine(root, "default-origin")), defaultHttp);
+Uri? defaultBrowser = null;
+Check((await defaultService.LinkAsync(url => defaultBrowser = url, null, CancellationToken.None)).Staff,
+    "Default-domain linking still verifies Staff access");
+Check(defaultBrowser?.AbsoluteUri == "https://bot.destinydynasty.site/launcher/authorize?id=" + new string('b', 64),
+    "Default browser authorization uses the new domain and preserves its route and pairing ID");
+await defaultService.RefreshAsync(CancellationToken.None);
+await defaultService.UnlinkAsync(CancellationToken.None);
+Check(defaultHandler.Requests.SequenceEqual(new[]
+{
+    "GET https://bot.destinydynasty.site/launcher/health",
+    "POST https://bot.destinydynasty.site/launcher/link",
+    "POST https://bot.destinydynasty.site/launcher/poll",
+    "GET https://bot.destinydynasty.site/launcher/session",
+    "DELETE https://bot.destinydynasty.site/launcher/session"
+}), "Default-domain health, pairing, polling, validation and unlink keep their HTTP methods and paths");
 File.WriteAllText(Path.Combine(root, "results.json"), JsonSerializer.Serialize(new { passed = checks.Count, checks }, new JsonSerializerOptions { WriteIndented = true }));
 Console.WriteLine($"PASS: {checks.Count} Discord launcher assertions; {root}");
 
 sealed class Fixture : HttpMessageHandler
 {
     public int Calls; public bool Offline, Unauthorized, Revoked, Staff = true; private string? _challenge;
+    public List<string> Requests { get; } = [];
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
     {
         token.ThrowIfCancellationRequested(); Calls++;
+        Requests.Add(request.Method + " " + request.RequestUri!.AbsoluteUri);
         if (Offline) throw new HttpRequestException("Offline fixture");
         HttpResponseMessage Json(object data) => new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(data), Encoding.UTF8, "application/json") };
         var route = request.RequestUri!.AbsolutePath;

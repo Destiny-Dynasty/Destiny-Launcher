@@ -1,0 +1,5 @@
+- El launcher ya está disponible para Linux.
+- Menor consumo de memoria y mejoras de estabilidad.
+- Mundos, capturas y recursos compartidos entre perfiles.
+- Nuevas opciones para cancelar descargas y gestionar instalaciones.
+- Vinculación de Discord actualizada y acceso a la web oficial.

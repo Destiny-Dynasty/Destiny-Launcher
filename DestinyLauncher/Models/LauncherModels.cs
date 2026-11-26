@@ -28,7 +28,7 @@ public sealed class LauncherConfig
     public string PlayerName { get; set; } = "";
     public string MicrosoftAccountId { get; set; } = "";
     public bool MultiAccountEnabled { get; set; }
-    public bool AutoJoinServer { get; set; } = true;
+    public bool AutoJoinServer { get; set; } = false;
     public GameWindowMode WindowMode { get; set; } = GameWindowMode.Windowed;
     public int GameWidth { get; set; } = 1280;
     public int GameHeight { get; set; } = 720;
@@ -45,7 +45,7 @@ public sealed class LauncherConfig
     [JsonIgnore]
     public bool RamWasAdjusted { get; set; }
     public string JavaArguments { get; set; } = DefaultJavaArguments;
-    public string InstallDirectory { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "versions", "DestinyDynasty");
+    public string InstallDirectory { get; set; } = DestinyLauncher.Services.LauncherPaths.DefaultInstallDirectory;
     [JsonIgnore]
     public string MinecraftVersion { get; set; } = "1.20.1";
     [JsonIgnore]

@@ -19,6 +19,7 @@ internal sealed class LauncherUpdateService : IDisposable
     private readonly string _cache;
     private readonly Version _current;
     private readonly string _currentExecutable;
+    private readonly string _platform;
     internal Version CurrentVersion => _current;
     internal static string PublicKey()
     {
@@ -28,9 +29,11 @@ internal sealed class LauncherUpdateService : IDisposable
     }
     internal LauncherUpdateService(LauncherPaths paths) : this(paths, new HttpClient(), PublicKey(),
         typeof(LauncherUpdateService).Assembly.GetName().Version!, Environment.ProcessPath!) { }
-    internal LauncherUpdateService(LauncherPaths paths, HttpClient client, string publicKey, Version current, string executable)
+    internal LauncherUpdateService(LauncherPaths paths, HttpClient client, string publicKey, Version current, string executable, string platform = "win-x64")
     {
         _http = client; _publicKey = publicKey; _current = current; _currentExecutable = executable;
+        _platform = platform;
+        if (platform is not ("win-x64" or "linux-x64" or "linux-arm64")) throw new ArgumentException("Plataforma no admitida.");
         _cache = Path.Combine(paths.Root, "updates");
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("DestinyLauncher/" + current.ToString(3));
     }
@@ -48,23 +51,24 @@ internal sealed class LauncherUpdateService : IDisposable
         if (!Version.TryParse(tag.TrimStart('v'), out var version) || Normalize(version) <= Normalize(_current)) return null;
         var assets = root.GetProperty("assets").EnumerateArray().ToArray();
         string Asset(string name) => assets.Single(a => a.GetProperty("name").GetString() == name).GetProperty("browser_download_url").GetString()!;
-        var manifestUrl = Asset("launcher-update.json"); var signatureUrl = Asset("launcher-update.sig");
-        ValidateAssetUri(manifestUrl, tag, "launcher-update.json"); ValidateAssetUri(signatureUrl, tag, "launcher-update.sig");
+        var prefix = _platform == "win-x64" ? "launcher-update" : "launcher-update-" + _platform;
+        var manifestUrl = Asset(prefix + ".json"); var signatureUrl = Asset(prefix + ".sig");
+        ValidateAssetUri(manifestUrl, tag, prefix + ".json"); ValidateAssetUri(signatureUrl, tag, prefix + ".sig");
         var manifest = await GetLimitedAsync(manifestUrl, 16384, timeout.Token);
         var signature = await GetLimitedAsync(signatureUrl, 1024, timeout.Token);
-        var release = VerifyManifest(manifest, signature, _publicKey);
+        var release = VerifyManifest(manifest, signature, _publicKey, _platform);
         if (Normalize(Version.Parse(release.Version)) != Normalize(version)) throw new InvalidDataException("La versión publicada no coincide con su firma.");
-        ValidateAssetUri(release.InstallerUrl, tag, "DestinyLauncherSetup.exe");
+        ValidateAssetUri(release.InstallerUrl, tag, AssetName(release.Version, _platform));
         return release;
     }
-    internal static LauncherRelease VerifyManifest(byte[] manifest, byte[] signature, string publicKey)
+    internal static LauncherRelease VerifyManifest(byte[] manifest, byte[] signature, string publicKey, string platform = "win-x64")
     {
         using var rsa = RSA.Create(); rsa.ImportFromPem(publicKey);
         if (!rsa.VerifyData(manifest, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss))
             throw new InvalidDataException("La firma de la actualización no es válida.");
         var release = JsonSerializer.Deserialize<LauncherRelease>(manifest, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
             ?? throw new InvalidDataException("Actualización vacía.");
-        if (release.Schema != 1 || release.Platform != "win-x64" || !Version.TryParse(release.Version, out _)
+        if (release.Schema != 1 || release.Platform != platform || !Version.TryParse(release.Version, out _)
             || release.Size is < 1 or > 536870912 || release.Sha256 is null || !System.Text.RegularExpressions.Regex.IsMatch(release.Sha256, "^[A-Fa-f0-9]{64}$"))
             throw new InvalidDataException("Manifiesto de actualización inválido.");
         if (release.Changelog is { } notes && (notes.Length > 8 || notes.Any(note => string.IsNullOrWhiteSpace(note) || note.Length > 240 || note.Any(char.IsControl))))
@@ -75,10 +79,12 @@ internal sealed class LauncherUpdateService : IDisposable
     {
         if (Normalize(Version.Parse(release.Version)) <= Normalize(_current)) throw new InvalidDataException("Se rechazó una versión anterior.");
         var uri = new Uri(release.InstallerUrl);
-        ValidateAssetUri(uri.AbsoluteUri, "v" + release.Version, "DestinyLauncherSetup.exe");
+        if (release.Platform != _platform) throw new InvalidDataException("La actualización no corresponde a esta plataforma.");
+        var assetName = AssetName(release.Version, _platform);
+        ValidateAssetUri(uri.AbsoluteUri, "v" + release.Version, assetName);
         InstallationDataService.RejectLinks(_cache);
         Directory.CreateDirectory(_cache);
-        var final = Path.Combine(_cache, "DestinyLauncherSetup-" + release.Version + ".exe");
+        var final = Path.Combine(_cache, assetName);
         var temporary = final + "." + Guid.NewGuid().ToString("N") + ".part";
         try
         {
@@ -88,23 +94,28 @@ internal sealed class LauncherUpdateService : IDisposable
             response.EnsureSuccessStatusCode();
             if (response.Content.Headers.ContentLength is long length && length != release.Size) throw new InvalidDataException("El tamaño de la actualización no coincide.");
             await using (var source = await response.Content.ReadAsStreamAsync(timeout.Token))
-            await using (var target = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true))
+            await using (var target = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, true))
             using (var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256))
             {
-                var buffer = new byte[81920]; long total = 0; int read;
+                var buffer = new byte[64 * 1024]; long total = 0; int read;
+                var lastProgress = Environment.TickCount64;
                 while ((read = await source.ReadAsync(buffer, timeout.Token)) > 0)
                 {
                     total += read;
                     if (total > release.Size) throw new InvalidDataException("La descarga supera el tamaño firmado.");
                     hash.AppendData(buffer, 0, read); await target.WriteAsync(buffer.AsMemory(0, read), timeout.Token);
-                    progress.Report((double)total / release.Size);
+                    if (total == release.Size || Environment.TickCount64 - lastProgress >= 120)
+                    {
+                        progress.Report((double)total / release.Size);
+                        lastProgress = Environment.TickCount64;
+                    }
                 }
                 if (total != release.Size || !Convert.ToHexString(hash.GetHashAndReset()).Equals(release.Sha256, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("La actualización está incompleta o fue modificada.");
             }
             // Once the installed launcher has a trusted Windows signature, upgrades
             // must preserve its publisher as well as the mandatory release-key signature.
-            var currentPublisher = Authenticode.CertificateSubject(_currentExecutable);
+            var currentPublisher = OperatingSystem.IsWindows() && _platform == "win-x64" ? Authenticode.CertificateSubject(_currentExecutable) : null;
             if (currentPublisher is not null && (Authenticode.TrustedPublisher(_currentExecutable) != currentPublisher
                 || Authenticode.TrustedPublisher(temporary) != currentPublisher))
                 throw new InvalidDataException("El editor de la actualización no coincide con el launcher instalado.");
@@ -114,6 +125,13 @@ internal sealed class LauncherUpdateService : IDisposable
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
+    private static string AssetName(string version, string platform) => platform switch
+    {
+        "win-x64" => "DestinyLauncherSetup.exe",
+        "linux-x64" => $"destiny-launcher_{version}_amd64.deb",
+        "linux-arm64" => $"destiny-launcher_{version}_arm64.deb",
+        _ => throw new InvalidDataException("Plataforma no admitida.")
+    };
     internal static ProcessStartInfo InstallCommand(string setup, string installDirectory)
     {
         var start = new ProcessStartInfo(setup) { UseShellExecute = false };

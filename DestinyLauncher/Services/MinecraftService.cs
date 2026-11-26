@@ -20,42 +20,61 @@ public sealed class MinecraftService
         MemoryPolicy.System.Validate(config.RamGb);
         JavaArguments.ValidateMemoryOverrides(config.JavaArguments);
         var preparation = Stopwatch.StartNew();
-        var options = CreateLaunchOptions(config, authenticatedSession);
+        var modFolder = Path.Combine(_paths.Instance(pack.Slug), "mods");
+        InstallationDataService.RejectLinks(modFolder);
+        Directory.CreateDirectory(modFolder);
+        var options = CreateLaunchOptions(config, authenticatedSession, modFolder);
+        await new SharedGameDataMigration(_paths).MigrateAsync(token);
         try { options.JavaPath = await new JavaRuntimeService(_paths, _log).EnsureAsync(pack.JavaVersion, progress, token); }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (Exception ex) { throw new JavaRuntimeException($"No se pudo preparar Java {pack.JavaVersion}. Comprueba la conexión y el espacio disponible y vuelve a intentarlo.", ex); }
         _log.Info($"Using managed Java {pack.JavaVersion}: {options.JavaPath}");
-        var instance = new MinecraftPath(_paths.Instance(pack.Slug));
-        progress.Report(("Consultando Fabric estable para Minecraft " + config.MinecraftVersion, .7));
-        config.FabricLoaderVersion = await GetLatestStableFabricAsync(config.MinecraftVersion, config.FabricLoaderVersion, token);
-        _log.Info($"Using Fabric Loader {config.FabricLoaderVersion} for Minecraft {config.MinecraftVersion}.");
-        var parameters = MinecraftLauncherParameters.CreateDefault(instance);
-        UseManagedRuntime(parameters);
-        // Complete local metadata needs no Mojang version-list download on every launch.
-        if (HasLocalProfile(instance, config.MinecraftVersion, null)
-            && HasLocalProfile(instance, FabricProfile(config.MinecraftVersion, config.FabricLoaderVersion), config.MinecraftVersion))
-            parameters.VersionLoader = new LocalJsonVersionLoader(instance);
-        var launcher = new MinecraftLauncher(parameters);
-        launcher.ByteProgressChanged += (_, e) => { if (e.TotalBytes > 0) progress.Report(("Preparando Minecraft", .05 + (double)e.ProgressedBytes / e.TotalBytes * .55)); };
-        progress.Report(("Instalando Fabric " + config.FabricLoaderVersion, .74));
-        using var fabricClient = new HttpClient();
-        var fabric = new FabricInstaller(fabricClient);
-        var profile = await PrepareFabricAsync(launcher, fabric, instance, config.MinecraftVersion, config.FabricLoaderVersion, progress, token);
-        await GameOptionsFile.SetFullscreenAsync(instance.BasePath, config.WindowMode == GameWindowMode.Fullscreen, token);
-        var process = await launcher.BuildProcessAsync(profile, options, token);
-        JavaArguments.CorrectWindowsQuoting(process.StartInfo, options.ExtraJvmArguments.SelectMany(a => a.Values));
-        _log.Info($"Minecraft preparation completed in {preparation.Elapsed.TotalSeconds:F2}s.");
+        var profileContext = await GameProfileSession.BeginAsync(_paths, pack.Slug, token);
+        GameProfileSession? profileSession = profileContext;
+        Process? startedProcess = null;
         try
         {
+            var instance = new MinecraftPath(_paths.GameDirectory);
+            progress.Report(("Consultando Fabric estable para Minecraft " + config.MinecraftVersion, .7));
+            config.FabricLoaderVersion = await GetLatestStableFabricAsync(config.MinecraftVersion, config.FabricLoaderVersion, token);
+            _log.Info($"Using Fabric Loader {config.FabricLoaderVersion} for Minecraft {config.MinecraftVersion}.");
+            var parameters = MinecraftLauncherParameters.CreateDefault(instance);
+            UseManagedRuntime(parameters);
+            // Complete local metadata needs no Mojang version-list download on every launch.
+            if (HasLocalProfile(instance, config.MinecraftVersion, null)
+                && HasLocalProfile(instance, FabricProfile(config.MinecraftVersion, config.FabricLoaderVersion), config.MinecraftVersion))
+                parameters.VersionLoader = new LocalJsonVersionLoader(instance);
+            var launcher = new MinecraftLauncher(parameters);
+            launcher.ByteProgressChanged += (_, e) => { if (e.TotalBytes > 0) progress.Report(("Preparando Minecraft", .05 + (double)e.ProgressedBytes / e.TotalBytes * .55)); };
+            progress.Report(("Instalando Fabric " + config.FabricLoaderVersion, .74));
+            using var fabricClient = new HttpClient();
+            var fabric = new FabricInstaller(fabricClient);
+            var profile = await PrepareFabricAsync(launcher, fabric, instance, config.MinecraftVersion, config.FabricLoaderVersion, progress, token);
+            await GameOptionsFile.SetFullscreenAsync(instance.BasePath, config.WindowMode == GameWindowMode.Fullscreen, token);
+            var process = await launcher.BuildProcessAsync(profile, options, token);
+            if (OperatingSystem.IsWindows())
+                JavaArguments.CorrectWindowsQuoting(process.StartInfo, options.ExtraJvmArguments.SelectMany(a => a.Values));
+            _log.Info($"Minecraft preparation completed in {preparation.Elapsed.TotalSeconds:F2}s.");
             token.ThrowIfCancellationRequested();
             _log.Info($"Starting Minecraft: {config.PlayerName}, {profile}, {pack.Name}, {config.WindowMode}, {config.GameWidth}x{config.GameHeight}");
-            var session = MinecraftGameSession.Start(process);
+            var session = MinecraftGameSession.Start(process, profileContext);
+            startedProcess = session.Process;
+            await profileContext.AttachProcessAsync(session.Process, CancellationToken.None);
+            profileSession = null;
             return session;
         }
-        catch { process.Dispose(); throw; }
+        catch
+        {
+            if (startedProcess is not null)
+            {
+                try { if (!startedProcess.HasExited) { startedProcess.Kill(); await startedProcess.WaitForExitAsync(); } } catch { }
+            }
+            if (profileSession is not null) await profileSession.CompleteAsync();
+            throw;
+        }
     }
 
-    internal static MLaunchOption CreateLaunchOptions(LauncherConfig config, MSession? authenticatedSession = null) => new()
+    internal static MLaunchOption CreateLaunchOptions(LauncherConfig config, MSession? authenticatedSession = null, string? modsFolder = null) => new()
     {
         Session = ResolveSession(config, authenticatedSession),
         MaximumRamMb = checked(config.RamGb * 1024),
@@ -65,14 +84,23 @@ public sealed class MinecraftService
         FullScreen = config.WindowMode == GameWindowMode.Fullscreen,
         // Explicitly replace CmlLib's extra tuning defaults. Mandatory profile/platform
         // arguments remain intact; empty user text deliberately means no extra JVM flags.
-        ExtraJvmArguments = [new MArgument(JavaArguments.Parse(config.JavaArguments))]
+        ExtraJvmArguments = [new MArgument(CreateExtraJvmArguments(config.JavaArguments, modsFolder))]
     };
+
+    internal static string[] CreateExtraJvmArguments(string? userArguments, string? modsFolder)
+    {
+        var parsed = JavaArguments.Parse(userArguments);
+        if (modsFolder is null) return parsed;
+        if (parsed.Any(argument => argument.StartsWith("-Dfabric.modsFolder=", StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("La carpeta de mods la controla el perfil seleccionado; quita fabric.modsFolder de los argumentos Java personalizados.");
+        return ["-Dfabric.modsFolder=" + Path.GetFullPath(modsFolder), .. parsed];
+    }
 
     internal static MSession ResolveSession(LauncherConfig config, MSession? session)
     {
         if (string.IsNullOrEmpty(config.MicrosoftAccountId)) return MSession.CreateOfflineSession(config.PlayerName);
         if (session is null) throw new InvalidOperationException("Inicia sesión con Microsoft para jugar con esta cuenta.");
-        MicrosoftAccountService.ValidateSession(session);
+        MinecraftSessionValidator.Validate(session);
         if (!string.Equals(session.UUID, config.MicrosoftAccountId, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("La sesión no corresponde a la cuenta seleccionada.");
         return session;

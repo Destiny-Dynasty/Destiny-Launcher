@@ -42,7 +42,7 @@ internal sealed class MicrosoftSignInDialog : Window
             }
         }
         Loaded += async (_, _) => await Link(); retry.Click += async (_, _) => await Link();
-        Closed += (_, _) => _cancel.Cancel();
+        Closed += (_, _) => { _cancel.Cancel(); _cancel.Dispose(); };
     }
 }
 

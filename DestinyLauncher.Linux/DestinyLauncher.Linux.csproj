@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <AssemblyName>DestinyLauncher.Linux</AssemblyName>
+    <Product>Destiny Launcher</Product>
+    <Company>Destiny Dynasty</Company>
+    <Version>1.2.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="..\DestinyLauncher\Assets\destiny-launcher.ico" Link="Assets\destiny-launcher.ico" />
+    <Content Include="..\DestinyLauncher\Assets\experiment\obsidian-gold-v1\destiny-emblem.png" Link="Assets\destiny-emblem.png" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="LibVLCSharp" Version="3.10.1" />
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(LocalTestBuild)' == 'true'">
+    <DefineConstants>$(DefineConstants);LOCAL_TEST_BUILD</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DestinyLauncher.Core\DestinyLauncher.Core.csproj" />
+    <Compile Include="..\DestinyLauncher\Models\LauncherPresentation.cs" Link="Models\LauncherPresentation.cs" />
+    <Compile Include="..\DestinyLauncher\Services\LauncherUpdateService.cs" Link="Services\LauncherUpdateService.cs" />
+    <EmbeddedResource Include="..\DestinyLauncher\Assets\Signing\launcher-update-public.pem" LogicalName="DestinyLauncher.Assets.Signing.launcher-update-public.pem" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\DestinyLauncher\Assets\Intro\emblem.zip" LogicalName="DestinyLauncher.Intro.emblem.zip" />
+    <AvaloniaResource Include="..\DestinyLauncher\Assets\Video\reino-poster.jpg" Link="Assets\Video\reino-poster.jpg" />
+    <AvaloniaResource Include="..\DestinyLauncher\Assets\News\*.jpg" Link="Assets\News\%(Filename)%(Extension)" />
+    <AvaloniaResource Include="..\DestinyLauncher\Assets\Modpacks\*.jpg" Link="Assets\Modpacks\%(Filename)%(Extension)" />
+    <AvaloniaResource Include="..\DestinyLauncher\Assets\experiment\obsidian-gold-v1\destiny-emblem.png" Link="Assets\experiment\obsidian-gold-v1\destiny-emblem.png" />
+    <AvaloniaResource Include="..\DestinyLauncher\Assets\experiment\obsidian-gold-v1\Combination-Mark-Destiny.png" Link="Assets\experiment\obsidian-gold-v1\Combination-Mark-Destiny.png" />
+    <AvaloniaResource Include="..\DestinyLauncher\Assets\experiment\obsidian-gold-v1\obsidian-texture.png" Link="Assets\experiment\obsidian-gold-v1\obsidian-texture.png" />
+    <Content Include="..\DestinyLauncher\Assets\Video\reino-rayos-v6.mp4" Link="Assets\Video\reino-rayos-v6.mp4" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

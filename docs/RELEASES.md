@@ -52,7 +52,17 @@ Admite hasta ocho notas de 240 caracteres. Los manifiestos antiguos siguen siend
 compatibles y ocultan la sección si no contienen notas. El workflow de release ofrece
 el campo `changelog`, con una nota por línea.
 
-## Compatibilidad con la futura distribución Linux
+## Distribución Windows y Linux desde 1.2.0
+
+La versión 1.2.0 publica Windows y Linux en una misma release estable, por indicación
+del propietario. Se conserva el contrato de actualización Windows: `launcher-update.json`,
+`launcher-update.sig` y `DestinyLauncherSetup.exe`. Linux utiliza manifiestos y firmas
+por plataforma (`launcher-update-linux-x64` y `launcher-update-linux-arm64`) y paquetes
+Debian separados. El código fuente de la etiqueta corresponde a los paquetes publicados.
+Las notas históricas siguientes describen el plan anterior y quedan sustituidas por
+esta distribución conjunta.
+
+## Plan histórico de compatibilidad Linux
 
 La versión Windows puede publicarse antes del port Linux sin necesitar otra
 actualización para incorporar ese port. Se mantiene su contrato actual: este

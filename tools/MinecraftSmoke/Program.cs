@@ -50,9 +50,122 @@ Assert(launchOptions.MaximumRamMb == 1024, "RAM setting still controls the norma
 Assert(launchOptions.ScreenWidth == 1280 && launchOptions.ScreenHeight == 720 && !launchOptions.FullScreen, "Default windowed launch uses the configured 1280x720 resolution");
 var fullOptions = MinecraftService.CreateLaunchOptions(new LauncherConfig { PlayerName = "Fixture", WindowMode = GameWindowMode.Fullscreen, GameWidth = 1920, GameHeight = 1080 });
 Assert(fullOptions.FullScreen && fullOptions.ScreenWidth == 1920 && fullOptions.ScreenHeight == 1080, "Fullscreen mode reaches the supported CmlLib launch options");
-Assert(launchOptions.ServerIp == "destinydynasty.tatnikhost.net", "Automatic server entry stays enabled by default for compatibility");
-var manualLaunch = MinecraftService.CreateLaunchOptions(new LauncherConfig { PlayerName = "Fixture", AutoJoinServer = false });
-Assert(string.IsNullOrEmpty(manualLaunch.ServerIp), "Disabling automatic entry omits the server from launch options");
+Assert(string.IsNullOrEmpty(launchOptions.ServerIp), "Automatic server entry stays disabled by default");
+var autoJoinLaunch = MinecraftService.CreateLaunchOptions(new LauncherConfig { PlayerName = "Fixture", AutoJoinServer = true });
+Assert(autoJoinLaunch.ServerIp == "destinydynasty.tatnikhost.net", "Explicit automatic entry includes the configured server in launch options");
+var profileMods = Path.Combine(root, "Portable Game", "Profiles", "Lite Mods");
+var profileArguments = MinecraftService.CreateExtraJvmArguments("-Dcustom.flag=works", profileMods);
+Assert(profileArguments.SequenceEqual(["-Dfabric.modsFolder=" + Path.GetFullPath(profileMods), "-Dcustom.flag=works"]),
+    "Fabric receives only the selected profile's mods directory while retaining player Java flags");
+try { MinecraftService.CreateExtraJvmArguments("-Dfabric.modsFolder=override", profileMods); throw new Exception("Profile mods folder override accepted"); }
+catch (InvalidOperationException) { Assert(true, "Custom Java arguments cannot bypass the selected profile's mods directory"); }
+
+var sharedPaths = new LauncherPaths(Path.Combine(root, "shared-profile-fixture"));
+sharedPaths.SetInstallDirectory(Path.Combine(root, "shared-profile-fixture", "shared-game"));
+Directory.CreateDirectory(sharedPaths.GameDirectory);
+var sharedLite = sharedPaths.Instance("destiny-lite");
+Directory.CreateDirectory(Path.Combine(sharedPaths.GameDirectory, "saves", "SharedWorld"));
+Directory.CreateDirectory(Path.Combine(sharedLite, "saves", "SharedWorld"));
+Directory.CreateDirectory(Path.Combine(sharedLite, "saves", "LiteWorld"));
+await File.WriteAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "saves", "SharedWorld", "level.dat"), "destiny world");
+await File.WriteAllTextAsync(Path.Combine(sharedLite, "saves", "SharedWorld", "level.dat"), "lite world");
+await File.WriteAllTextAsync(Path.Combine(sharedLite, "saves", "LiteWorld", "level.dat"), "lite unique world");
+Directory.CreateDirectory(Path.Combine(sharedPaths.GameDirectory, "Distant_Horizons_server_data", "Destiny Server"));
+Directory.CreateDirectory(Path.Combine(sharedLite, "Distant_Horizons_server_data", "Destiny Server"));
+await File.WriteAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "Distant_Horizons_server_data", "Destiny Server", "lod.sqlite"), "destiny LOD");
+await File.WriteAllTextAsync(Path.Combine(sharedLite, "Distant_Horizons_server_data", "Destiny Server", "lod.sqlite"), "lite LOD");
+Directory.CreateDirectory(Path.Combine(sharedPaths.GameDirectory, "assets", "objects"));
+Directory.CreateDirectory(Path.Combine(sharedLite, "assets", "objects"));
+await File.WriteAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "assets", "objects", "same.bin"), "same asset");
+await File.WriteAllTextAsync(Path.Combine(sharedLite, "assets", "objects", "same.bin"), "same asset");
+await File.WriteAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "assets", "objects", "different.bin"), "normal asset");
+await File.WriteAllTextAsync(Path.Combine(sharedLite, "assets", "objects", "different.bin"), "lite asset");
+await new SharedGameDataMigration(sharedPaths).MigrateAsync(CancellationToken.None);
+Assert(File.Exists(Path.Combine(sharedPaths.GameDirectory, "saves", "LiteWorld", "level.dat"))
+    && File.Exists(Path.Combine(sharedPaths.GameDirectory, "saves", "SharedWorld (Lite)", "level.dat")),
+    "Worlds migrate into the shared game directory, preserving same-name worlds under an edition suffix");
+Assert(File.Exists(Path.Combine(sharedPaths.GameDirectory, "Distant_Horizons_server_data", "Destiny Server (Lite)", "lod.sqlite")),
+    "Conflicting Distant Horizons server databases remain intact as separate data sets");
+Assert(!File.Exists(Path.Combine(sharedLite, "assets", "objects", "same.bin"))
+    && File.Exists(Path.Combine(sharedPaths.GameDirectory, "assets", "objects", "different (Lite).bin")),
+    "Identical reusable game assets deduplicate while differing files are preserved");
+
+var initialLightPaths = new LauncherPaths(Path.Combine(root, "initial-light-profile"));
+initialLightPaths.SetInstallDirectory(Path.Combine(root, "initial-light-profile", "shared-game"));
+Directory.CreateDirectory(Path.Combine(initialLightPaths.GameDirectory, "config"));
+await File.WriteAllTextAsync(Path.Combine(initialLightPaths.GameDirectory, "config", "destiny-before-first-launch.toml"), "existing normal profile");
+Directory.CreateDirectory(Path.Combine(initialLightPaths.Instance("destiny-lite"), "config"));
+await File.WriteAllTextAsync(Path.Combine(initialLightPaths.Instance("destiny-lite"), "config", "lite.toml"), "existing lite profile");
+var firstLight = await GameProfileSession.BeginAsync(initialLightPaths, "destiny-lite", CancellationToken.None);
+Assert(File.Exists(Path.Combine(initialLightPaths.GameDirectory, "config", "lite.toml"))
+    && await File.ReadAllTextAsync(Path.Combine(initialLightPaths.ProfileConfigDirectory("destiny"), "config", "destiny-before-first-launch.toml")) == "existing normal profile",
+    "The first launch into Lite saves the pre-existing Destiny configs before replacing the common config folder");
+await firstLight.AttachProcessAsync(Process.GetCurrentProcess(), CancellationToken.None);
+await firstLight.CompleteAsync();
+
+var partialSwitchPaths = new LauncherPaths(Path.Combine(root, "partial-profile-switch"));
+partialSwitchPaths.SetInstallDirectory(Path.Combine(root, "partial-profile-switch", "shared-game"));
+var partialConfig = Path.Combine(partialSwitchPaths.GameDirectory, "config");
+Directory.CreateDirectory(partialConfig);
+await File.WriteAllTextAsync(Path.Combine(partialConfig, "custom.toml"), "partially applied config");
+var backupRoot = Path.Combine(partialSwitchPaths.GameDirectory, ".destiny-profile-backup");
+Directory.CreateDirectory(Path.Combine(backupRoot, "config"));
+await File.WriteAllTextAsync(Path.Combine(backupRoot, "config", "custom.toml"), "config before the interrupted switch");
+await File.WriteAllTextAsync(Path.Combine(backupRoot, "existing-roots.json"), "[\"config\"]");
+await File.WriteAllTextAsync(Path.Combine(partialSwitchPaths.GameDirectory, ".destiny-profile-session.json"),
+    JsonSerializer.Serialize(new { Slug = "destiny-lite", Phase = "preparing", ProcessId = 0, ProcessStartUtcTicks = 0L }));
+var recoveredPartial = await GameProfileSession.BeginAsync(partialSwitchPaths, "destiny", CancellationToken.None);
+Assert(await File.ReadAllTextAsync(Path.Combine(partialConfig, "custom.toml")) == "config before the interrupted switch",
+    "An interrupted directory swap restores its backup before preparing the selected profile");
+await recoveredPartial.AttachProcessAsync(Process.GetCurrentProcess(), CancellationToken.None);
+await recoveredPartial.CompleteAsync();
+
+Directory.CreateDirectory(Path.Combine(sharedPaths.GameDirectory, "config"));
+await File.WriteAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "config", "destiny.toml"), "destiny-default");
+Directory.CreateDirectory(Path.Combine(sharedLite, "config"));
+await File.WriteAllTextAsync(Path.Combine(sharedLite, "config", "lite.toml"), "lite-default");
+var destinyProfile = await GameProfileSession.BeginAsync(sharedPaths, "destiny", CancellationToken.None);
+Assert(await File.ReadAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "config", "destiny.toml")) == "destiny-default",
+    "The shared config directory is initialized from the original Destiny profile");
+try { await GameProfileSession.BeginAsync(sharedPaths, "destiny-lite", CancellationToken.None); throw new Exception("Concurrent profile switch accepted"); }
+catch (InvalidOperationException) { Assert(true, "The shared profile lock prevents overlapping game sessions"); }
+await destinyProfile.AttachProcessAsync(Process.GetCurrentProcess(), CancellationToken.None);
+await File.WriteAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "config", "destiny.toml"), "player-customized-destiny");
+await File.WriteAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "config", "player-added.toml"), "custom file");
+await destinyProfile.CompleteAsync();
+
+var liteProfile = await GameProfileSession.BeginAsync(sharedPaths, "destiny-lite", CancellationToken.None);
+Assert(File.Exists(Path.Combine(sharedPaths.GameDirectory, "config", "lite.toml"))
+    && !File.Exists(Path.Combine(sharedPaths.GameDirectory, "config", "destiny.toml")),
+    "Switching to Lite replaces the active config tree and does not leak Destiny-only files");
+await liteProfile.AttachProcessAsync(Process.GetCurrentProcess(), CancellationToken.None);
+await File.WriteAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "config", "lite.toml"), "player-customized-lite");
+await liteProfile.CompleteAsync();
+var destinyAgain = await GameProfileSession.BeginAsync(sharedPaths, "destiny", CancellationToken.None);
+Assert(await File.ReadAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "config", "destiny.toml")) == "player-customized-destiny"
+    && await File.ReadAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "config", "player-added.toml")) == "custom file",
+    "Manual edits and new custom config files survive switching away from and back to Destiny");
+await destinyAgain.AttachProcessAsync(Process.GetCurrentProcess(), CancellationToken.None);
+await destinyAgain.CompleteAsync();
+
+var journalPath = Path.Combine(sharedPaths.GameDirectory, ".destiny-profile-session.json");
+Directory.Delete(Path.Combine(sharedPaths.GameDirectory, "config"), true);
+Directory.CreateDirectory(Path.Combine(sharedPaths.GameDirectory, "config"));
+File.Copy(Path.Combine(sharedPaths.ProfileConfigDirectory("destiny-lite"), "config", "lite.toml"),
+    Path.Combine(sharedPaths.GameDirectory, "config", "lite.toml"));
+await File.WriteAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "config", "lite.toml"), "crash-recovered-lite");
+await File.WriteAllTextAsync(journalPath, JsonSerializer.Serialize(new { Slug = "destiny-lite", Phase = "active", ProcessId = int.MaxValue, ProcessStartUtcTicks = DateTime.UtcNow.Ticks }));
+var afterCrash = await GameProfileSession.BeginAsync(sharedPaths, "destiny", CancellationToken.None);
+Assert(await File.ReadAllTextAsync(Path.Combine(sharedPaths.ProfileConfigDirectory("destiny-lite"), "config", "lite.toml")) == "crash-recovered-lite"
+    && await File.ReadAllTextAsync(Path.Combine(sharedPaths.GameDirectory, "config", "destiny.toml")) == "player-customized-destiny",
+    "A stale session journal saves interrupted profile edits before applying the next profile");
+await afterCrash.AttachProcessAsync(Process.GetCurrentProcess(), CancellationToken.None);
+await afterCrash.CompleteAsync();
+
+await File.WriteAllTextAsync(journalPath, JsonSerializer.Serialize(new { Slug = "destiny-lite", Phase = "active", ProcessId = Environment.ProcessId, ProcessStartUtcTicks = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks }));
+try { await GameProfileSession.BeginAsync(sharedPaths, "destiny", CancellationToken.None); throw new Exception("A live Minecraft session was overwritten"); }
+catch (InvalidOperationException) { Assert(File.Exists(journalPath), "A live process journal blocks switching and remains available for later recovery"); }
+File.Delete(journalPath);
 
 var freshInstance = Path.Combine(root, "spanish-first-install", Guid.NewGuid().ToString("N"));
 await MinecraftService.InitializeNewInstanceAsync(freshInstance, CancellationToken.None);
@@ -95,7 +208,7 @@ var configStore = new ConfigService(configPaths);
 var savedLocation = Path.Combine(root, "Existing Custom Instance");
 File.WriteAllText(configPaths.ConfigFile, JsonSerializer.Serialize(new { PlayerName = "Fixture", RamGb = 4, InstallDirectory = savedLocation }));
 var legacyConfig = configStore.Load();
-Assert(legacyConfig.InstallDirectory == savedLocation && legacyConfig.JavaArguments == LauncherConfig.DefaultJavaArguments && legacyConfig.AutoJoinServer,
+Assert(legacyConfig.InstallDirectory == savedLocation && legacyConfig.JavaArguments == LauncherConfig.DefaultJavaArguments && !legacyConfig.AutoJoinServer,
     "Old configuration gains default JVM flags without moving or renaming its installation");
 legacyConfig.JavaArguments = quotedFlags;
 legacyConfig.GameWidth = 1600; legacyConfig.GameHeight = 900; legacyConfig.WindowMode = GameWindowMode.Maximized;
@@ -181,14 +294,17 @@ if (args.Contains("--live-fabric"))
 
 // Reproduce the exact observed early failure without touching the real installation:
 // Java cannot reach KnotClient when the loader jar is absent, and no game log is created.
-var java = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "versions", "DestinyDynasty", "runtime", "windows-x64", "java-runtime-gamma", "bin", "java.exe");
+var java = Environment.GetEnvironmentVariable("DESTINY_TEST_JAVA")
+    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "versions", "DestinyDynasty", "runtime", "windows-x64", "java-runtime-gamma", "bin", "java.exe");
 if (File.Exists(java))
 {
+    defaults.AutoJoinServer = true;
     defaults.JavaArguments = LauncherConfig.DefaultJavaArguments + " " + quotedFlags + " -Xms16m -XshowSettings:properties -version";
-    var javaOptions = MinecraftService.CreateLaunchOptions(defaults);
+    var javaOptions = MinecraftService.CreateLaunchOptions(defaults, null, profileMods);
     javaOptions.JavaPath = java;
     using (var versionProcess = await LibraryTestLauncher(path, http).BuildProcessAsync(profile, javaOptions))
     {
+            await File.WriteAllTextAsync(Path.Combine(root, "java-flags-command.txt"), versionProcess.StartInfo.FileName + " " + versionProcess.StartInfo.Arguments);
         Assert(versionProcess.StartInfo.Arguments.Contains("destinydynasty.tatnikhost.net"), "Enabled automatic entry reaches the actual game command line");
         Assert(versionProcess.StartInfo.Arguments.Contains("--width 1280") && versionProcess.StartInfo.Arguments.Contains("--height 720"),
             "Configured resolution reaches the actual Minecraft command line");
@@ -198,9 +314,11 @@ if (File.Exists(java))
         await versionSession.Process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
         var output = await versionSession.ReadErrorsAsync();
         await File.WriteAllTextAsync(Path.Combine(root, "java-flags-check.log"), output);
-        Assert(versionSession.Process.ExitCode == 0 && output.Contains("java.version = 17"), "Installed Java 17 accepts the default flags through the real launch builder");
+        Assert(versionSession.Process.ExitCode == 0 && output.Contains("java.version = "), "An installed Java runtime accepts the default flags through the real launch builder");
         Assert(output.Contains("destiny.path = C:\\Game Folder\\") && output.Contains("destiny.quote = a\"b"),
             "Real Java receives quoted custom properties exactly, without launching Minecraft");
+        Assert(output.Contains("fabric.modsFolder = " + Path.GetFullPath(profileMods)),
+            "Real Java receives the selected per-edition Fabric mods folder, including paths with spaces");
     }
 
     defaults.AutoJoinServer = false;
