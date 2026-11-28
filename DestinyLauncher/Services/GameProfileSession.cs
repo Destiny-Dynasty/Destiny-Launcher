@@ -21,6 +21,7 @@ internal sealed class GameProfileSession : IAsyncDisposable
     private bool _ownsJournal;
 
     private sealed record Journal(string Slug, string Phase, int ProcessId = 0, long ProcessStartUtcTicks = 0);
+    private sealed record InPlaceBackup(int Schema, bool? Ready);
 
     private GameProfileSession(LauncherPaths paths, string slug, FileStream fileLock)
     {
@@ -204,77 +205,68 @@ internal sealed class GameProfileSession : IAsyncDisposable
 
     private async Task ApplyAsync(CancellationToken token)
     {
-        StorageSpaceGuard.RequireBytes(_paths.GameDirectory, Roots.Sum(root => StorageSpaceGuard.TreeBytes(Path.Combine(_paths.ProfileConfigDirectory(_slug), root))));
+        var profileRoot = _paths.ProfileConfigDirectory(_slug);
+        var plans = new List<ProfileConfigFileSync.Plan>();
+        foreach (var root in Roots)
+        {
+            var plan = await ProfileConfigFileSync.PlanAsync(Path.Combine(profileRoot, root), Path.Combine(_paths.GameDirectory, root), token);
+            if (plan.HasChanges) plans.Add(plan);
+        }
+        // Most launches already have exactly this profile in place. In particular, a
+        // reader without delete sharing must not force us to rename its entire folder.
+        if (plans.Count == 0) return;
+        var backupBytes = Roots.Sum(root => StorageSpaceGuard.TreeBytes(Path.Combine(_paths.GameDirectory, root)));
+        StorageSpaceGuard.RequireBytes(_paths.GameDirectory, checked(backupBytes + plans.Sum(plan => plan.RequiredBytes)));
         DeleteBackup();
         Directory.CreateDirectory(_backup);
-        var staging = Path.Combine(_paths.GameDirectory, ".destiny-profile-staging");
-        if (Directory.Exists(staging)) DeleteTree(staging);
-        Directory.CreateDirectory(staging);
-        var profileRoot = _paths.ProfileConfigDirectory(_slug);
-        try
+        await WriteBackupStateAsync(ready: false, token);
+        foreach (var root in Roots)
         {
-            foreach (var root in Roots)
-            {
-                token.ThrowIfCancellationRequested();
-                var source = Path.Combine(profileRoot, root);
-                var staged = Path.Combine(staging, root);
-                if (Directory.Exists(source)) CopyTree(source, staged);
-                var current = Path.Combine(_paths.GameDirectory, root);
-                if (Directory.Exists(current)) RejectTreeLinks(current);
-            }
-            var existing = Roots.Where(root => Directory.Exists(Path.Combine(_paths.GameDirectory, root))).ToArray();
-            await File.WriteAllTextAsync(Path.Combine(_backup, "existing-roots.json"), JsonSerializer.Serialize(existing), token);
-            foreach (var root in existing)
-                Directory.Move(Path.Combine(_paths.GameDirectory, root), Path.Combine(_backup, root));
-            foreach (var root in Roots)
-            {
-                token.ThrowIfCancellationRequested();
-                var staged = Path.Combine(staging, root);
-                if (Directory.Exists(staged)) Directory.Move(staged, Path.Combine(_paths.GameDirectory, root));
-            }
-            DeleteTree(staging);
+            token.ThrowIfCancellationRequested();
+            var live = Path.Combine(_paths.GameDirectory, root);
+            if (Directory.Exists(live)) CopyTree(live, Path.Combine(_backup, root));
         }
-        catch
-        {
-            await RestoreBackupAsync(CancellationToken.None);
-            if (Directory.Exists(staging)) DeleteTree(staging);
-            throw;
-        }
+        // A partial copy is never used as a restore source. The durable ready marker
+        // is written before the first live file changes, so a killed process can recover.
+        await WriteBackupStateAsync(ready: true, token);
+        foreach (var plan in plans) ProfileConfigFileSync.Apply(plan, token);
     }
 
     private async Task CaptureAsync(CancellationToken token, string? slug = null)
     {
         var profileRoot = _paths.ProfileConfigDirectory(slug ?? _slug);
-        StorageSpaceGuard.RequireBytes(profileRoot, Roots.Sum(root => StorageSpaceGuard.TreeBytes(Path.Combine(_paths.GameDirectory, root))));
         InstallationDataService.RejectLinks(profileRoot);
         Directory.CreateDirectory(profileRoot);
+        var plans = new List<ProfileConfigFileSync.Plan>();
+        foreach (var root in Roots)
+        {
+            var plan = await ProfileConfigFileSync.PlanAsync(Path.Combine(_paths.GameDirectory, root), Path.Combine(profileRoot, root), token);
+            if (plan.HasChanges) plans.Add(plan);
+        }
+        StorageSpaceGuard.RequireBytes(profileRoot, plans.Sum(plan => plan.RequiredBytes));
+        // The live files remain authoritative until capture completes and the journal
+        // becomes idle. An interrupted capture is therefore safe to repeat file by file.
+        foreach (var plan in plans) ProfileConfigFileSync.Apply(plan, token);
         var staging = Path.Combine(profileRoot, ".capture-staging");
         if (Directory.Exists(staging)) DeleteTree(staging);
-        Directory.CreateDirectory(staging);
-        try
-        {
-            foreach (var root in Roots)
-            {
-                token.ThrowIfCancellationRequested();
-                var live = Path.Combine(_paths.GameDirectory, root);
-                if (Directory.Exists(live)) CopyTree(live, Path.Combine(staging, root));
-            }
-            foreach (var root in Roots)
-            {
-                token.ThrowIfCancellationRequested();
-                var target = Path.Combine(profileRoot, root);
-                var staged = Path.Combine(staging, root);
-                if (Directory.Exists(target)) DeleteTree(target);
-                if (Directory.Exists(staged)) Directory.Move(staged, target);
-                else Directory.CreateDirectory(target);
-            }
-        }
-        finally { if (Directory.Exists(staging)) DeleteTree(staging); }
         await ProfileConfigReconciler.SnapshotAsync(_paths, slug ?? _slug, token);
     }
 
     private async Task RestoreBackupAsync(CancellationToken token)
     {
+        var stateFile = Path.Combine(_backup, "in-place.json");
+        InstallationDataService.RejectLinks(stateFile);
+        if (File.Exists(stateFile))
+        {
+            var state = JsonSerializer.Deserialize<InPlaceBackup>(await File.ReadAllTextAsync(stateFile, token));
+            if (state is null || state.Schema != 1 || state.Ready is null) throw new InvalidDataException("El respaldo de configuración tiene un formato desconocido.");
+            if (state.Ready == true)
+                foreach (var root in Roots)
+                    await ProfileConfigFileSync.SynchronizeAsync(Path.Combine(_backup, root), Path.Combine(_paths.GameDirectory, root), token);
+            DeleteBackup();
+            return;
+        }
+        // Backward-compatible recovery for the directory-move backups written by 1.2.0.
         string[]? existing = null;
         var manifest = Path.Combine(_backup, "existing-roots.json");
         InstallationDataService.RejectLinks(manifest);
@@ -286,15 +278,21 @@ internal sealed class GameProfileSession : IAsyncDisposable
             var backup = Path.Combine(_backup, root);
             var live = Path.Combine(_paths.GameDirectory, root);
             if (Directory.Exists(backup))
-            {
-                if (Directory.Exists(live)) DeleteTree(live);
-                Directory.Move(backup, live);
-            }
+                await ProfileConfigFileSync.SynchronizeAsync(backup, live, token);
             else if (existing is not null && !existing.Contains(root, StringComparer.Ordinal) && Directory.Exists(live))
-                DeleteTree(live);
+                await ProfileConfigFileSync.SynchronizeAsync(backup, live, token);
         }
         DeleteBackup();
-        await Task.CompletedTask;
+    }
+
+    private async Task WriteBackupStateAsync(bool ready, CancellationToken token)
+    {
+        var target = Path.Combine(_backup, "in-place.json");
+        var next = target + ".next";
+        InstallationDataService.RejectLinks(target);
+        InstallationDataService.RejectLinks(next);
+        await File.WriteAllTextAsync(next, JsonSerializer.Serialize(new InPlaceBackup(1, ready)), token);
+        File.Move(next, target, overwrite: true);
     }
 
     private async Task WriteJournalAsync(Journal journal, CancellationToken token)
@@ -322,6 +320,10 @@ internal sealed class GameProfileSession : IAsyncDisposable
     private static void DeleteTree(string path)
     {
         RejectTreeLinks(path);
+        // These are private backup/staging trees. Copies of read-only user files
+        // must not prevent their disposal; the user's live attributes stay untouched.
+        foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+            File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
         Directory.Delete(path, true);
     }
 

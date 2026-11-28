@@ -630,6 +630,7 @@ public partial class MainWindow : Window
     internal static string GetFriendlyError(Exception ex) => ex switch
     {
         ProfileConfigurationConflictException => ex.Message,
+        ProfileConfigurationAccessException => ex.Message,
         InsufficientStorageException => ex.Message,
         JavaRuntimeException => ex.Message,
         HttpRequestException { StatusCode: System.Net.HttpStatusCode.NotFound } => "El modpack no está disponible en el servidor. Vuelve a comprobarlo más tarde.",

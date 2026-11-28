@@ -1,5 +1,11 @@
 name: Build and test launcher
 on:
+  workflow_dispatch:
+    inputs:
+      linux_only:
+        description: 'Run the native Linux storage and shared-core checks only'
+        type: boolean
+        default: false
   pull_request:
   push:
     branches: [main, '1.1.0']
@@ -7,6 +13,7 @@ permissions:
   contents: read
 jobs:
   windows:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.linux_only }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262

@@ -15,6 +15,7 @@
     <Compile Include="../../DestinyLauncher/Services/GitHubPackUpdater.cs" Link="GitHubPackUpdater.cs" />
     <Compile Include="../../DestinyLauncher/Services/GameProfileSession.cs" Link="GameProfileSession.cs" />
     <Compile Include="../../DestinyLauncher.Core/Services/ProfileConfigReconciler.cs" Link="ProfileConfigReconciler.cs" />
+    <Compile Include="../../DestinyLauncher.Core/Services/ProfileConfigFileSync.cs" Link="ProfileConfigFileSync.cs" />
     <Compile Include="../../DestinyLauncher.Core/Services/StorageSpaceGuard.cs" Link="StorageSpaceGuard.cs" />
     <Compile Include="../../DestinyLauncher/Services/SharedGameDirectoryLock.cs" Link="SharedGameDirectoryLock.cs" />
     <Compile Include="../../DestinyLauncher/Services/LauncherPaths.cs" Link="LauncherPaths.cs" />

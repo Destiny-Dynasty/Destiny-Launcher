@@ -51,11 +51,23 @@ internal static class ProfileConfigReconciler
             token.ThrowIfCancellationRequested();
             var source = SafePath(paths.GameDirectory, relative);
             var target = SafePath(profile, relative);
-            if (!live.ContainsKey(relative)) { if (File.Exists(target)) File.Delete(target); continue; }
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            var next = target + ".destiny-merge-" + Guid.NewGuid().ToString("N");
-            try { File.Copy(source, next); token.ThrowIfCancellationRequested(); File.Move(next, target, true); }
-            finally { if (File.Exists(next)) File.Delete(next); }
+            try
+            {
+                if (!live.ContainsKey(relative)) { if (File.Exists(target)) File.Delete(target); continue; }
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                var next = target + ".destiny-merge-" + Guid.NewGuid().ToString("N");
+                try { File.Copy(source, next); token.ThrowIfCancellationRequested(); File.Move(next, target, true); }
+                finally
+                {
+                    if (File.Exists(next))
+                    {
+                        File.SetAttributes(next, File.GetAttributes(next) & ~FileAttributes.ReadOnly);
+                        File.Delete(next);
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            { throw new ProfileConfigurationAccessException(target, ex); }
         }
     }
 
@@ -80,7 +92,7 @@ internal static class ProfileConfigReconciler
             foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
             {
                 token.ThrowIfCancellationRequested();
-                await using var stream = File.OpenRead(file);
+                await using var stream = ProfileConfigFileSync.OpenRead(file);
                 files.Add(Path.GetRelativePath(directory, file).Replace('\\', '/'), Convert.ToHexString(await SHA256.HashDataAsync(stream, token)));
             }
         }

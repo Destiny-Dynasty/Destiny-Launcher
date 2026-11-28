@@ -45,6 +45,7 @@ for (var index = 0; index < 30; index++)
     Check(File.ReadAllText(Path.Combine(paths.ProfileConfigDirectory(edition), "config", "custom.txt")) == edition + index, "Switch " + index + " persists player edits");
 }
 Check(File.ReadAllText(world) == "player-world", "Repeated switches preserve shared worlds");
+await ProfileFileSyncAudit.Run(root, checks);
 // A completed game's stale live copy must not undo a newer pack config.
 Put(Path.Combine(paths.ProfileConfigDirectory("destiny-staff"), "config", "edition.txt"), "updated-staff");
 await using (var updated = await GameProfileSession.BeginAsync(paths, "destiny-staff", CancellationToken.None))
