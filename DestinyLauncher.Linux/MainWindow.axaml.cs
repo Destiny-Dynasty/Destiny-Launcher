@@ -103,6 +103,8 @@ public sealed partial class MainWindow : Window
                 }
                 else if (App.ExportPage == "add-account") _ = ShowAddAccountAsync();
                 else if (App.ExportPage == "repair") _ = ShowRepairAsync();
+                else if (App.ExportPage == "file-access") _ = ShowFileAccessFailureAsync(new ProfileConfigurationAccessException(
+                    "/home/jugador/.minecraft/versions/DestinyDynasty/config/opciones-del-modpack.toml", new IOException("Archivo en uso.")));
                 else if (App.ExportPage == "game-menu") GameOptions_Click(null, new RoutedEventArgs());
                 else if (App.ExportPage == "settings-bottom") { ShowPage("settings"); await Task.Delay(50); SettingsScroll.ScrollToEnd(); }
                 else ShowPage(App.ExportPage);
@@ -155,7 +157,7 @@ public sealed partial class MainWindow : Window
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         Visual target = WindowFrame;
         var size = new Size(Width, Height);
-        if (App.ExportPage is "profile" or "accounts" or "add-account" or "repair" && _activeDialog?.Content is Control dialogSurface) { target = dialogSurface; size = new Size(_activeDialog.Width, _activeDialog.Height); }
+        if (App.ExportPage is "profile" or "accounts" or "add-account" or "repair" or "file-access" && _activeDialog?.Content is Control dialogSurface) { target = dialogSurface; size = new Size(_activeDialog.Width, _activeDialog.Height); }
         if (App.ExportPage == "game-menu" && GameOptionsButton.ContextMenu is { } menu) { target = menu; size = menu.Bounds.Size; }
         using var bitmap = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(size.Width), (int)Math.Ceiling(size.Height)), new Vector(96, 96));
         bitmap.Render(target);
@@ -402,12 +404,15 @@ public sealed partial class MainWindow : Window
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_uiLifetime.Token);
         _packCancellation = cancellation;
         CancelDownloadButton.IsEnabled = true;
+        ProfileConfigurationAccessException? fileAccessError = null;
+        var gameStarted = false;
         try
         {
             var progress = new Progress<(string status, double value)>(SetDownloadProgress);
             using var session = signedIn
                 ? await _launcher.LaunchMicrosoftAsync(_launcher.Settings.SelectedEdition, progress, cancellation.Token)
                 : await _launcher.LaunchOfflineAsync(_launcher.Settings.SelectedEdition, _launcher.Settings.PlayerName, progress, cancellation.Token);
+            gameStarted = true;
             CancelDownloadButton.IsVisible = false;
             SetStatus("Minecraft se está ejecutando", "");
             if (!session.Process.HasExited) Hide();
@@ -417,8 +422,13 @@ public sealed partial class MainWindow : Window
         }
         catch (OperationCanceledException) when (_uiLifetime.IsCancellationRequested) { }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { SetStatus("Descarga cancelada", "Puedes volver a intentarlo cuando quieras."); }
-        catch (Exception ex) { SetStatus("No se pudo iniciar Minecraft", ex.Message, true); }
+        catch (Exception ex)
+        {
+            SetStatus("No se pudo iniciar Minecraft", ex.Message, true);
+            if (!gameStarted && ex is ProfileConfigurationAccessException access) fileAccessError = access;
+        }
         finally { _packCancellation = null; if (!_uiLifetime.IsCancellationRequested) { if (!IsVisible) { WindowState = WindowState.Normal; Show(); Activate(); } SetBusy(false); } }
+        if (!_uiLifetime.IsCancellationRequested && fileAccessError is not null) await ShowFileAccessFailureAsync(fileAccessError);
     }
 
     private void LoadSettings()

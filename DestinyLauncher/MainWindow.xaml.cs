@@ -473,6 +473,8 @@ public partial class MainWindow : Window
         SetBusy(true, "Consultando versión");
         string finalStatus = "Partida terminada";
         string finalDetail = "Minecraft se ha cerrado. Puedes volver a jugar cuando quieras.";
+        ProfileConfigurationAccessException? fileAccessError = null;
+        var gameStarted = false;
         try
         {
             var progress = new Progress<(string status, double value)>(SetProgress);
@@ -534,6 +536,7 @@ public partial class MainWindow : Window
                 Refresh();
             }
             using var session = await _minecraft.PrepareAndLaunchAsync(_config, pack, progress, _lifetime.Token, premiumSession);
+            gameStarted = true;
             // A settings write failure after a successful start must never abandon the game
             // handle or leave the launcher visible for the rest of the session.
             TrySaveConfig();
@@ -566,6 +569,7 @@ public partial class MainWindow : Window
             finalStatus = "No se pudo completar la operación";
             finalDetail = GetFriendlyError(ex);
             _log.Error("Launcher operation failed", ex);
+            if (!gameStarted && ex is ProfileConfigurationAccessException access) fileAccessError = access;
         }
         finally
         {
@@ -576,6 +580,7 @@ public partial class MainWindow : Window
                 SetNotice(finalStatus, finalDetail, _operationFailed ? "Error" : "Success", animate: true);
             }
         }
+        if (!_closed && fileAccessError is not null) ShowFileAccessFailure(fileAccessError);
     }
 
     // The caller owns/disposes the process. Waiting uses the OS exit event, not a timer,

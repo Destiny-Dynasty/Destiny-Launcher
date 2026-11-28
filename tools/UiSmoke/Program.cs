@@ -44,6 +44,7 @@ internal static partial class Program
             try
             {
                 if (args.Contains("--memory-only")) await AuditMemory();
+                else if (args.Contains("--file-access-only")) await AuditFileAccessDialog();
                 else if (args.Contains("--resources-only")) await AuditClosedWindows();
                 else if (args.Contains("--parity-reference")) await AuditParityReference();
                 else if (args.Contains("--accounts-only")) await AuditAccountFlow();

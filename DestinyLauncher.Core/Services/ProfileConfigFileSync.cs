@@ -147,4 +147,7 @@ internal static class ProfileConfigFileSync
 }
 
 internal sealed class ProfileConfigurationAccessException(string path, Exception inner) : IOException(
-    $"No se pudo modificar «{path}». Si está abierto en otro programa, cierra ese archivo y vuelve a intentarlo. Comprueba también los permisos de la carpeta.", inner);
+    $"No se pudo modificar «{path}». Si está abierto en otro programa, cierra ese archivo y vuelve a intentarlo. Comprueba también los permisos de la carpeta.", inner)
+{
+    internal string AffectedPath { get; } = path;
+}

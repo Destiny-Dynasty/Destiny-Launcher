@@ -73,3 +73,14 @@ jobs:
           dotnet run --project tools/StorageSmoke -c Release -- artifacts/ci/linux-storage
           dotnet run --project tools/PackUpdaterSmoke -c Release -- artifacts/ci/linux-packs
           dotnet build DestinyLauncher.Linux/DestinyLauncher.Linux.csproj -c Release
+      - name: Render Linux file-access modal
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libice6 libsm6 libfontconfig1 fonts-liberation xvfb
+          xvfb-run -a dotnet run --project DestinyLauncher.Linux -c Release -- --render-preview artifacts/ci/linux-file-access.png --page file-access
+          test -s artifacts/ci/linux-file-access.png
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: linux-file-access-modal
+          path: artifacts/ci/linux-file-access*
+          if-no-files-found: error
